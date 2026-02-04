@@ -9,6 +9,7 @@ import 'pages/explore_page.dart';
 import 'pages/pricing_page.dart';
 import 'pages/about_page.dart';
 import 'pages/login_page.dart';
+import 'pages/signup_page.dart';
 import 'pages/become_creator_page.dart';
 import 'pages/profile_page.dart';
 import 'pages/dashboard_page.dart';
@@ -27,6 +28,10 @@ final router = GoRouter(
     GoRoute(
       path: '/login',
       builder: (context, state) => LoginPage(auth: auth),
+    ),
+    GoRoute(
+      path: '/signup',
+      builder: (context, state) => SignupPage(auth: auth),
     ),
 
     // TOP NAVBAR FOR ALL ROUTES INSIDE SHELL
