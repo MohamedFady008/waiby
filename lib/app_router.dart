@@ -41,7 +41,10 @@ final router = GoRouter(
         builder: (context, _) => AppShell(auth: auth, child: child),
       ),
       routes: [
-        GoRoute(path: '/', builder: (context, state) => const HomePage()),
+        GoRoute(
+          path: '/',
+          builder: (context, state) => HomePage(auth: auth),
+        ),
         GoRoute(
           path: '/explore',
           builder: (context, state) => const ExplorePage(),

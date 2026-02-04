@@ -148,9 +148,21 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: UserMenu(auth: auth),
+        const SizedBox(width: 6),
+        ElevatedButton(
+          onPressed: () => context.go('/become-creator'),
+          style: solidButton.copyWith(
+            backgroundColor: MaterialStateProperty.all(accentGreen),
+          ),
+          child: const Text('Be a creator'),
+        ),
+        const SizedBox(width: 6),
+        IconButton(
+          tooltip: "Notifications",
+          onPressed: () => context.go('/notifications'),
+          icon: const Icon(Icons.notifications_none_rounded),
+          color: Colors.white,
+          splashRadius: 24,
         ),
         IconButton(
           tooltip: "Wallet top up",
@@ -159,20 +171,9 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
           color: Colors.white,
           splashRadius: 24,
         ),
-        IconButton(
-          tooltip: "Notifications",
-          onPressed: () => context.go('/notifications'),
-          icon: const Icon(Icons.notifications_none_rounded),
-          color: Colors.white,
-          splashRadius: 24,
-        ),
-        const SizedBox(width: 6),
-        ElevatedButton(
-          onPressed: () => context.go('/become-creator'),
-          style: solidButton.copyWith(
-            backgroundColor: MaterialStateProperty.all(accentGreen),
-          ),
-          child: const Text('Be a creator'),
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: UserMenu(auth: auth),
         ),
       ],
     );

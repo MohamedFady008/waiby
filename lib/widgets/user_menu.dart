@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
 
 class UserMenu extends StatelessWidget {
@@ -9,9 +10,21 @@ class UserMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const menuBackground = Color(0xFF0B1023);
+    const menuBorderColor = Color(0xFF1A2344);
+    const accentGreen = Color(0xFF51D76E);
+    const destructiveRed = Color(0xFFE04B4B);
+
     return PopupMenuButton<_UserMenuAction>(
       tooltip: "Account",
-      offset: const Offset(0, 44),
+      offset: const Offset(0, 46),
+      constraints: const BoxConstraints.tightFor(width: 320),
+      color: menuBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: menuBorderColor.withOpacity(0.55)),
+      ),
+      elevation: 18,
       onSelected: (action) {
         switch (action) {
           case _UserMenuAction.myProfile:
@@ -41,83 +54,132 @@ class UserMenu extends StatelessWidget {
       itemBuilder: (context) => [
         PopupMenuItem<_UserMenuAction>(
           enabled: false,
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundImage: auth.photoUrl != null
-                    ? NetworkImage(auth.photoUrl!)
-                    : null,
-                child: auth.photoUrl == null ? const Icon(Icons.person) : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      auth.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    Text(auth.userId, style: const TextStyle(fontSize: 12)),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.circle,
-                          size: 10,
-                          color: auth.online ? Colors.green : Colors.grey,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          auth.online ? "Online" : "Offline",
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ],
+          height: 210,
+          padding: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0E1631), Color(0xFF080C1D)],
                 ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
-            ],
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _UserAvatar(
+                    photoUrl: auth.photoUrl,
+                    online: auth.online,
+                    onlineColor: accentGreen,
+                    ringColor: menuBackground,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    auth.name,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'ID: ${auth.userId}',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        const PopupMenuDivider(),
-        const PopupMenuItem(
+        PopupMenuItem<_UserMenuAction>(
+          enabled: false,
+          height: 1,
+          padding: EdgeInsets.zero,
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withOpacity(0.08),
+          ),
+        ),
+        const PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.myProfile,
-          child: _MenuTile(icon: Icons.person_outline, text: "My profile"),
+          height: 52,
+          child: _MenuRow(icon: Icons.person_outline, text: "My profile"),
         ),
-        const PopupMenuItem(
+        const PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.dashboard,
-          child: _MenuTile(icon: Icons.dashboard_outlined, text: "Dashboard"),
+          height: 52,
+          child: _MenuRow(icon: Icons.dashboard_outlined, text: "Dashboard"),
         ),
-        const PopupMenuItem(
+        const PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.wallet,
-          child: _MenuTile(
+          height: 52,
+          child: _MenuRow(
             icon: Icons.account_balance_wallet_outlined,
             text: "Wallet",
           ),
         ),
-        const PopupMenuItem(
+        const PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.settings,
-          child: _MenuTile(icon: Icons.settings_outlined, text: "Settings"),
+          height: 52,
+          child: _MenuRow(icon: Icons.settings_outlined, text: "Settings"),
         ),
-        const PopupMenuItem(
-          value: _UserMenuAction.toggleOnline,
-          child: _MenuTile(
-            icon: Icons.toggle_on_outlined,
-            text: "Change online status",
+        PopupMenuItem<_UserMenuAction>(
+          enabled: false,
+          height: 1,
+          padding: EdgeInsets.zero,
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withOpacity(0.08),
           ),
         ),
-        const PopupMenuDivider(),
-        const PopupMenuItem(
-          value: _UserMenuAction.logout,
-          child: _MenuTile(icon: Icons.logout, text: "Logout"),
+        PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.toggleOnline,
+          height: 54,
+          child: _OnlineStatusRow(
+            online: auth.online,
+            onlineColor: accentGreen,
+          ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem<_UserMenuAction>(
+          enabled: false,
+          height: 1,
+          padding: EdgeInsets.zero,
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withOpacity(0.08),
+          ),
+        ),
+        PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.logout,
+          height: 52,
+          child: _MenuRow(
+            icon: Icons.logout,
+            text: "Logout",
+            color: destructiveRed,
+          ),
+        ),
+        PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.reportIssue,
-          child: _MenuTile(
+          height: 52,
+          child: _MenuRow(
             icon: Icons.report_problem_outlined,
             text: "Report issue",
+            color: destructiveRed,
           ),
         ),
       ],
@@ -134,19 +196,131 @@ class UserMenu extends StatelessWidget {
   }
 }
 
-class _MenuTile extends StatelessWidget {
-  final IconData icon;
-  final String text;
+class _UserAvatar extends StatelessWidget {
+  final String? photoUrl;
+  final bool online;
+  final Color onlineColor;
+  final Color ringColor;
 
-  const _MenuTile({required this.icon, required this.text});
+  const _UserAvatar({
+    required this.photoUrl,
+    required this.online,
+    required this.onlineColor,
+    required this.ringColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon),
-      title: Text(text),
+    final ImageProvider? avatarImage = photoUrl != null
+        ? NetworkImage(photoUrl!)
+        : null;
+    final statusColor = online ? onlineColor : Colors.grey;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CircleAvatar(
+          radius: 44,
+          backgroundColor: Colors.white.withOpacity(0.08),
+          backgroundImage: avatarImage,
+          child: avatarImage == null
+              ? const Icon(Icons.person, size: 44, color: Colors.white)
+              : null,
+        ),
+        Positioned(
+          right: -2,
+          bottom: -2,
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(color: ringColor, shape: BoxShape.circle),
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: statusColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color? color;
+
+  const _MenuRow({required this.icon, required this.text, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = color ?? Colors.white;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Icon(icon, color: foreground, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                color: foreground,
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OnlineStatusRow extends StatelessWidget {
+  final bool online;
+  final Color onlineColor;
+
+  const _OnlineStatusRow({required this.online, required this.onlineColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final statusText = online ? "Online" : "Offline";
+    final statusColor = online ? onlineColor : Colors.grey;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              statusText,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.white.withOpacity(0.7),
+          ),
+        ],
+      ),
     );
   }
 }
