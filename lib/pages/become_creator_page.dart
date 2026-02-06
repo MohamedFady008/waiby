@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class BecomeCreatorPage extends StatelessWidget {
@@ -98,7 +99,7 @@ class HeroSection extends StatelessWidget {
                   width: w < 700 ? 190 : 209,
                   height: 44,
                   label: "Apply as Creator",
-                  onTap: () {},
+                  onTap: () => context.go('/become-creator/creator-form'),
                 ),
                 const SizedBox(height: 28),
                 Align(
@@ -184,7 +185,7 @@ class HeroSection extends StatelessWidget {
                   width: sx(209),
                   height: sy(44),
                   label: "Apply as Creator",
-                  onTap: () {},
+                  onTap: () => context.go('/become-creator/creator-form'),
                 ),
               ),
 
@@ -837,10 +838,10 @@ class HowItWorks extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final padding = _pageHorizontalPadding(constraints.maxWidth);
-        final isWide = constraints.maxWidth >= 1440;
+        final contentWidth = constraints.maxWidth - (padding * 2);
+        final isWide = contentWidth >= (360.0 * 4);
         final isCompact = constraints.maxWidth < 700;
         final topSpace = isWide ? 120.0 : 70.0;
-        final contentWidth = constraints.maxWidth - (padding * 2);
         final stepWidth = isCompact ? contentWidth : 360.0;
 
         return Padding(
@@ -1012,7 +1013,16 @@ class TrustSection extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final padding = _pageHorizontalPadding(constraints.maxWidth);
-        final isWide = constraints.maxWidth >= 1100;
+        final contentWidth = (constraints.maxWidth - (padding * 2))
+            .clamp(0.0, double.infinity)
+            .toDouble();
+        final showTwoColumns = contentWidth >= 980;
+        final horizontalGap = showTwoColumns
+            ? (contentWidth >= 1500 ? 99.0 : 32.0)
+            : 0.0;
+        final cardWidth = showTwoColumns
+            ? (contentWidth - horizontalGap) / 2
+            : contentWidth;
 
         return Padding(
           padding: EdgeInsets.symmetric(horizontal: padding),
@@ -1029,62 +1039,13 @@ class TrustSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
-              if (isWide)
-                const Row(
-                  children: [
-                    Expanded(
-                      child: _TrustBox(
-                        title: "Requirements",
-                        items: [
-                          _TrustItem(
-                            text: "18+ years old only",
-                            type: _TrustItemType.check,
-                          ),
-                          _TrustItem(
-                            text: "Completed registration",
-                            type: _TrustItemType.check,
-                          ),
-                          _TrustItem(
-                            text: "Mandatory ID & face verification",
-                            type: _TrustItemType.check,
-                          ),
-                          _TrustItem(
-                            text: "Follow community guidelines",
-                            type: _TrustItemType.check,
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(width: 99),
-                    Expanded(
-                      child: _TrustBox(
-                        title: "Trust & Safety",
-                        items: [
-                          _TrustItem(
-                            text: "Secure payments & withdrawals",
-                            type: _TrustItemType.shield,
-                          ),
-                          _TrustItem(
-                            text: "Identity-verified creators",
-                            type: _TrustItemType.verified,
-                          ),
-                          _TrustItem(
-                            text: "Block & report system",
-                            type: _TrustItemType.report,
-                          ),
-                          _TrustItem(
-                            text: "Privacy & safety tools",
-                            type: _TrustItemType.privacy,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                )
-              else
-                const Column(
-                  children: [
-                    _TrustBox(
+              Wrap(
+                spacing: horizontalGap,
+                runSpacing: 24,
+                children: [
+                  SizedBox(
+                    width: cardWidth,
+                    child: const _TrustBox(
                       title: "Requirements",
                       items: [
                         _TrustItem(
@@ -1105,8 +1066,10 @@ class TrustSection extends StatelessWidget {
                         ),
                       ],
                     ),
-                    SizedBox(height: 24),
-                    _TrustBox(
+                  ),
+                  SizedBox(
+                    width: cardWidth,
+                    child: const _TrustBox(
                       title: "Trust & Safety",
                       items: [
                         _TrustItem(
@@ -1127,8 +1090,9 @@ class TrustSection extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 198),
             ],
           ),
@@ -1225,6 +1189,7 @@ class _TrustRow extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(width: 12),
         _TrustIcon(type: item.type, size: compact ? 20 : 22),
       ],
     );

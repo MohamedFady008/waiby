@@ -101,7 +101,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     required Color accentBlue,
     required Color accentGreen,
   }) {
-    final ButtonStyle ghostButton = OutlinedButton.styleFrom(
+    OutlinedButton.styleFrom(
       foregroundColor: Colors.white,
       side: BorderSide(color: Colors.white.withOpacity(0.35)),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -133,12 +133,14 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
           ElevatedButton(
             onPressed: () => context.go('/become-creator'),
             style: solidButton,
-            child: const Text('Become an Ebudy'),
+            child: const Text('Become an Creator'),
           ),
           const SizedBox(width: 10),
           OutlinedButton(
             onPressed: () => context.go('/login'),
-            style: ghostButton,
+            style: solidButton.copyWith(
+              backgroundColor: MaterialStateProperty.all(accentGreen),
+            ),
             child: const Text('Login'),
           ),
         ],
@@ -151,10 +153,8 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
         const SizedBox(width: 6),
         ElevatedButton(
           onPressed: () => context.go('/become-creator'),
-          style: solidButton.copyWith(
-            backgroundColor: MaterialStateProperty.all(accentGreen),
-          ),
-          child: const Text('Be a creator'),
+          style: solidButton,
+          child: const Text('Become an Creator'),
         ),
         const SizedBox(width: 6),
         IconButton(

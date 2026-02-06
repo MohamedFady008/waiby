@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:waiby/pages/creator_form.dart';
 
 import 'controllers/auth_controller.dart';
 import 'shell/app_shell.dart';
@@ -85,6 +86,10 @@ final router = GoRouter(
         GoRoute(
           path: '/report',
           builder: (context, state) => const ReportIssuePage(),
+        ),
+        GoRoute(
+          path: '/become-creator/creator-form',
+          builder: (context, state) => const CreatorFormPage(),
         ),
       ],
     ),
