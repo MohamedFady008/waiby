@@ -14,15 +14,27 @@ class ExplorePage extends StatelessWidget {
         final showRail = w >= 1680;
         final threeCol = w >= 1380;
         final twoCol = w >= 1080 && !threeCol;
+        const railRightInset = 8.0;
+        const railWidth = 76.0;
+        const railGap = 8.0;
         final pad = w >= 1200
             ? 28.0
             : w >= 900
             ? 20.0
             : 12.0;
+        final railReserve = showRail
+            ? railWidth + railRightInset + railGap
+            : 0.0;
+        final contentW = math.min(
+          1680.0,
+          math.max(0.0, w - (pad * 2) - (railReserve * 2)),
+        );
         final sideW = w >= 1540 ? 300.0 : 272.0;
         final feedW = threeCol
-            ? 803.0
-            : math.min(803.0, w - (pad * 2) - (twoCol ? sideW + 20 : 0));
+            ? math.min(803.0, contentW - (sideW * 2) - 48.0)
+            : twoCol
+            ? math.min(803.0, contentW - sideW - 20.0)
+            : math.min(803.0, contentW);
 
         return Container(
           decoration: const BoxDecoration(
@@ -37,14 +49,14 @@ class ExplorePage extends StatelessWidget {
               const Positioned.fill(child: _BgGlow()),
               SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(
-                  pad,
+                  pad + railReserve,
                   22,
-                  pad + (showRail ? 86 : 0),
+                  pad + railReserve,
                   220,
                 ),
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1680),
+                    constraints: BoxConstraints(maxWidth: contentW),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -53,6 +65,7 @@ class ExplorePage extends StatelessWidget {
                         if (threeCol)
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               SizedBox(
                                 width: sideW,
@@ -127,11 +140,11 @@ class ExplorePage extends StatelessWidget {
                 ),
               ),
               if (showRail)
-                const Positioned(
-                  right: 8,
+                Positioned(
+                  right: railRightInset,
                   top: 10,
                   bottom: 10,
-                  child: _RightRail(),
+                  child: const _RightRail(),
                 ),
             ],
           ),
