@@ -6,6 +6,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../controllers/auth_controller.dart';
+import '../widgets/chat_sidebar.dart';
+import '../widgets/chat_window.dart';
 
 double _clampDouble(double value, double min, double max) =>
     value.clamp(min, max).toDouble();
@@ -48,16 +50,22 @@ class _HomeBody extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
+        final showChatSidebar = loggedIn && width >= 1000;
+        const chatSidebarWidth = 84.0;
+        const chatSidebarGap = 12.0;
+        final reservedSidebarSpace = showChatSidebar
+            ? chatSidebarWidth + chatSidebarGap
+            : 0.0;
         final pagePadding = _scaleByWidth(
           width,
           min: 12,
           max: 26,
-          maxWidth: 1300,
+          maxWidth: width,
         );
-        final maxContentWidth = 1770.0;
+        final maxContentWidth = width;
         final contentWidth = math.min(
           maxContentWidth,
-          math.max(320.0, width - (pagePadding * 2)),
+          math.max(320.0, width - (pagePadding * 2) - reservedSidebarSpace),
         );
         final buddyCardWidth = _clampDouble(
           contentWidth < 560
@@ -82,49 +90,54 @@ class _HomeBody extends StatelessWidget {
           509,
         );
         final topPadding = width < 700 ? 8.0 : 16.0;
-        final heroGap = _scaleByWidth(width, min: 20, max: 26, maxWidth: 1500);
+        final heroGap = _scaleByWidth(width, min: 20, max: 26, maxWidth: width);
         final headingGap = _scaleByWidth(
           width,
           min: 20,
           max: 28,
-          maxWidth: 1500,
+          maxWidth: width,
         );
-        final titleGap = _scaleByWidth(width, min: 10, max: 14, maxWidth: 1500);
+        final titleGap = _scaleByWidth(
+          width,
+          min: 10,
+          max: 14,
+          maxWidth: width,
+        );
         final servicesGap = _scaleByWidth(
           width,
           min: 18,
           max: 24,
-          maxWidth: 1500,
+          maxWidth: width,
         );
         final searchGap = _scaleByWidth(
           width,
           min: 30,
           max: 44,
-          maxWidth: 1500,
+          maxWidth: width,
         );
         final sectionGap = _scaleByWidth(
           width,
           min: 24,
           max: 34,
-          maxWidth: 1500,
+          maxWidth: width,
         );
         final dividerGapTop = _scaleByWidth(
           width,
           min: 28,
           max: 38,
-          maxWidth: 1500,
+          maxWidth: width,
         );
         final dividerGapBottom = _scaleByWidth(
           width,
           min: 18,
           max: 26,
-          maxWidth: 1500,
+          maxWidth: width,
         );
         final bottomGap = _scaleByWidth(
           width,
           min: 16,
           max: 24,
-          maxWidth: 1500,
+          maxWidth: width,
         );
 
         return Container(
@@ -200,8 +213,146 @@ class _HomeBody extends StatelessWidget {
                   ],
                 ),
               ),
+              if (showChatSidebar)
+                Positioned.fill(
+                  child: _HomeChatDock(
+                    sidebarWidth: chatSidebarWidth,
+                    sidebarGap: chatSidebarGap,
+                  ),
+                ),
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+class _HomeChatDock extends StatefulWidget {
+  final double sidebarWidth;
+  final double sidebarGap;
+
+  const _HomeChatDock({required this.sidebarWidth, required this.sidebarGap});
+
+  @override
+  State<_HomeChatDock> createState() => _HomeChatDockState();
+}
+
+class _HomeChatDockState extends State<_HomeChatDock> {
+  late final List<WaibyChatThread> _threads;
+  String? _activeThreadId;
+
+  @override
+  void initState() {
+    super.initState();
+    _threads = WaibyChatThread.demoThreads();
+  }
+
+  bool get _panelOpen => _activeThreadId != null;
+
+  void _openThread(String threadId) {
+    setState(() => _activeThreadId = threadId);
+  }
+
+  void _closePanel() {
+    setState(() => _activeThreadId = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sidebarItems = _threads
+        .map(
+          (thread) => ChatSidebarItem(
+            avatarAsset: thread.avatarAsset,
+            frameAsset: thread.frameAsset,
+            unreadCount: thread.unreadCount,
+            showUnreadIndicator: thread.showUnreadIndicator,
+            onTap: () => _openThread(thread.id),
+          ),
+        )
+        .toList(growable: false);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final dockHeight = math.max(320.0, constraints.maxHeight - 16);
+        final rawPanelWidth =
+            constraints.maxWidth - widget.sidebarWidth - widget.sidebarGap - 24;
+        final maxPanelWidth = rawPanelWidth.clamp(560.0, 1142.0).toDouble();
+        final visiblePanelWidth = _panelOpen ? maxPanelWidth : 0.0;
+
+        return Stack(
+          children: [
+            if (_panelOpen)
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _closePanel,
+                ),
+              ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 340),
+                      curve: Curves.easeOutCubic,
+                      width: visiblePanelWidth,
+                      height: dockHeight,
+                      child: ClipRect(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: SizedBox(
+                            width: maxPanelWidth,
+                            height: dockHeight,
+                            child: IgnorePointer(
+                              ignoring: !_panelOpen,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 180),
+                                curve: Curves.easeOut,
+                                opacity: _panelOpen ? 1 : 0,
+                                child: AnimatedSlide(
+                                  duration: const Duration(milliseconds: 340),
+                                  curve: Curves.easeOutCubic,
+                                  offset: _panelOpen
+                                      ? Offset.zero
+                                      : const Offset(0.08, 0),
+                                  child: WaibyChatWindow(
+                                    width: maxPanelWidth,
+                                    height: dockHeight,
+                                    threads: _threads,
+                                    initialThreadId: _activeThreadId,
+                                    onClose: _closePanel,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: widget.sidebarGap),
+                    AnimatedSlide(
+                      duration: const Duration(milliseconds: 340),
+                      curve: Curves.easeOutCubic,
+                      offset: _panelOpen ? const Offset(-0.02, 0) : Offset.zero,
+                      child: SizedBox(
+                        width: widget.sidebarWidth,
+                        height: dockHeight,
+                        child: ChatSidebar(
+                          width: widget.sidebarWidth,
+                          items: sidebarItems,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -267,70 +418,70 @@ class _HeroAdBanner extends StatelessWidget {
           min: 170,
           max: 260,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final horizontalPadding = _scaleByWidth(
           width,
           min: 16,
           max: 36,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final verticalPadding = _scaleByWidth(
           width,
           min: 12,
           max: 20,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final titleFont = _scaleByWidth(
           width,
           min: 18,
           max: 44,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final mvpFont = _scaleByWidth(
           width,
           min: 30,
           max: 78,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final titleLetterSpacing = _scaleByWidth(
           width,
           min: 0.8,
           max: 2.0,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final avatarSize = _scaleByWidth(
           width,
           min: 152,
           max: 208,
           minWidth: 760,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final avatarBorder = _scaleByWidth(
           width,
           min: 8,
           max: 13,
           minWidth: 760,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final avatarPadding = _scaleByWidth(
           width,
           min: 5,
           max: 7,
           minWidth: 760,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final sparkleSize = _scaleByWidth(
           width,
           min: 44,
           max: 62,
           minWidth: 760,
-          maxWidth: 1200,
+          maxWidth: width,
         );
 
         return Container(
@@ -386,7 +537,7 @@ class _HeroAdBanner extends StatelessWidget {
                                 min: 4,
                                 max: 8,
                                 minWidth: 320,
-                                maxWidth: 1200,
+                                maxWidth: width,
                               ),
                             ),
                             Text(
@@ -466,7 +617,7 @@ class _HeroAdBanner extends StatelessWidget {
                                         min: 9,
                                         max: 11,
                                         minWidth: 760,
-                                        maxWidth: 1200,
+                                        maxWidth: width,
                                       ),
                                       letterSpacing: 0.7,
                                     ),
@@ -499,19 +650,19 @@ class _HeadlineBlock extends StatelessWidget {
           width,
           min: 24,
           max: 36,
-          maxWidth: 1300,
+          maxWidth: width,
         );
         final subtitleSize = _scaleByWidth(
           width,
           min: 15,
           max: 20,
-          maxWidth: 1300,
+          maxWidth: width,
         );
         final dividerThickness = _scaleByWidth(
           width,
           min: 2,
           max: 3,
-          maxWidth: 1300,
+          maxWidth: width,
         );
 
         return Column(
@@ -527,7 +678,7 @@ class _HeadlineBlock extends StatelessWidget {
               ),
             ),
             SizedBox(
-              height: _scaleByWidth(width, min: 6, max: 8, maxWidth: 1300),
+              height: _scaleByWidth(width, min: 6, max: 8, maxWidth: width),
             ),
             Text.rich(
               TextSpan(
@@ -551,10 +702,10 @@ class _HeadlineBlock extends StatelessWidget {
               ),
             ),
             SizedBox(
-              height: _scaleByWidth(width, min: 10, max: 14, maxWidth: 1300),
+              height: _scaleByWidth(width, min: 10, max: 14, maxWidth: width),
             ),
             ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: math.min(764, width * 0.9)),
+              constraints: BoxConstraints(maxWidth: width),
               child: Divider(
                 color: const Color(0xFF51D76E),
                 thickness: dividerThickness,
@@ -581,7 +732,7 @@ class _SimpleSectionTitle extends StatelessWidget {
       style: GoogleFonts.poppins(
         color: Colors.white,
         fontWeight: FontWeight.w600,
-        fontSize: _scaleByWidth(width, min: 24, max: 32, maxWidth: 1300),
+        fontSize: _scaleByWidth(width, min: 24, max: 32, maxWidth: width),
       ),
     );
   }
@@ -591,7 +742,10 @@ class _ServicesCarousel extends StatelessWidget {
   const _ServicesCarousel();
 
   static const _services = <_ServiceEntry>[
-    _ServiceEntry(asset: 'assets/live.png', fallbackColor: Color(0xFF1F2E65)),
+    _ServiceEntry(
+      asset: 'assets/all_services/valorant.png',
+      fallbackColor: Color(0xFF1F2E65),
+    ),
     _ServiceEntry(
       title: 'Echat',
       icon: Icons.forum_rounded,
@@ -602,8 +756,14 @@ class _ServicesCarousel extends StatelessWidget {
       labelBottom: 11,
       labelWeight: FontWeight.w600,
     ),
-    _ServiceEntry(asset: 'assets/play.png', fallbackColor: Color(0xFF1C2B6A)),
-    _ServiceEntry(asset: 'assets/level.png', fallbackColor: Color(0xFF222F64)),
+    _ServiceEntry(
+      asset: 'assets/all_services/rivals.png',
+      fallbackColor: Color(0xFF1C2B6A),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/lol.png',
+      fallbackColor: Color(0xFF222F64),
+    ),
     _ServiceEntry(
       title: 'Watch\nTogether',
       icon: Icons.card_giftcard_rounded,
@@ -613,9 +773,18 @@ class _ServicesCarousel extends StatelessWidget {
       iconSize: 84,
       labelBottom: 8,
     ),
-    _ServiceEntry(asset: 'assets/earn.png', fallbackColor: Color(0xFF2B469D)),
-    _ServiceEntry(asset: 'assets/bunny1.png', fallbackColor: Color(0xFF75777D)),
-    _ServiceEntry(asset: 'assets/bunny2.png', fallbackColor: Color(0xFF324267)),
+    _ServiceEntry(
+      asset: 'assets/all_services/clash_royale.png',
+      fallbackColor: Color(0xFF2B469D),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/overwatch.png',
+      fallbackColor: Color(0xFF75777D),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/cs_go.png',
+      fallbackColor: Color(0xFF324267),
+    ),
     _ServiceEntry(
       title: 'Video\nCalls',
       icon: Icons.videocam_rounded,
@@ -625,17 +794,50 @@ class _ServicesCarousel extends StatelessWidget {
       iconSize: 84,
       labelBottom: 8,
     ),
-    _ServiceEntry(asset: 'assets/level.png', fallbackColor: Color(0xFF222F64)),
-    _ServiceEntry(asset: 'assets/live.png', fallbackColor: Color(0xFF2A334F)),
-    _ServiceEntry(asset: 'assets/play.png', fallbackColor: Color(0xFF2D3E70)),
-    _ServiceEntry(asset: 'assets/pp3.png', fallbackColor: Color(0xFF243A6D)),
-    _ServiceEntry(asset: 'assets/pp5.png', fallbackColor: Color(0xFF35364D)),
-    _ServiceEntry(asset: 'assets/pp6.png', fallbackColor: Color(0xFF35364D)),
-    _ServiceEntry(asset: 'assets/pp7.png', fallbackColor: Color(0xFF264275)),
-    _ServiceEntry(asset: 'assets/login.png', fallbackColor: Color(0xFF243A72)),
-    _ServiceEntry(asset: 'assets/pp1.png', fallbackColor: Color(0xFF394056)),
-    _ServiceEntry(asset: 'assets/pp2.png', fallbackColor: Color(0xFF472D24)),
-    _ServiceEntry(asset: 'assets/pp4.png', fallbackColor: Color(0xFF334560)),
+    _ServiceEntry(
+      asset: 'assets/all_services/apex.png',
+      fallbackColor: Color(0xFF222F64),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/dead_by_daylight.png',
+      fallbackColor: Color(0xFF2A334F),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/tft.png',
+      fallbackColor: Color(0xFF2D3E70),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/gta.png',
+      fallbackColor: Color(0xFF243A6D),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/fall_guys.png',
+      fallbackColor: Color(0xFF35364D),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/roblox.png',
+      fallbackColor: Color(0xFF35364D),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/minecraft.png',
+      fallbackColor: Color(0xFF264275),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/world_warcraft.png',
+      fallbackColor: Color(0xFF243A72),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/vr_chat.png',
+      fallbackColor: Color(0xFF394056),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/red_dead2.png',
+      fallbackColor: Color(0xFF472D24),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/genshin_impact.png',
+      fallbackColor: Color(0xFF334560),
+    ),
     _ServiceEntry(
       title: 'Photo\nDrop',
       icon: Icons.camera_alt_rounded,
@@ -645,10 +847,22 @@ class _ServicesCarousel extends StatelessWidget {
       iconSize: 82,
       labelBottom: 8,
     ),
-    _ServiceEntry(asset: 'assets/pp5.png', fallbackColor: Color(0xFF313746)),
-    _ServiceEntry(asset: 'assets/pp6.png', fallbackColor: Color(0xFF2D3143)),
-    _ServiceEntry(asset: 'assets/pp7.png', fallbackColor: Color(0xFF223154)),
-    _ServiceEntry(asset: 'assets/pp3.png', fallbackColor: Color(0xFF273450)),
+    _ServiceEntry(
+      asset: 'assets/all_services/fortnite.png',
+      fallbackColor: Color(0xFF313746),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/lethal_company.png',
+      fallbackColor: Color(0xFF2D3143),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/dota2.png',
+      fallbackColor: Color(0xFF223154),
+    ),
+    _ServiceEntry(
+      asset: 'assets/all_services/honkai_star_rail.png',
+      fallbackColor: Color(0xFF273450),
+    ),
     _ServiceEntry(
       title: 'Wake-up\nCalls',
       icon: Icons.alarm_rounded,
@@ -667,7 +881,6 @@ class _ServicesCarousel extends StatelessWidget {
       iconSize: 78,
       labelBottom: 12,
     ),
-    _ServiceEntry(asset: 'assets/pp1.png', fallbackColor: Color(0xFF2B469D)),
   ];
 
   @override
@@ -680,35 +893,35 @@ class _ServicesCarousel extends StatelessWidget {
           min: 0.72,
           max: 1,
           minWidth: 320,
-          maxWidth: 1100,
+          maxWidth: width,
         );
         final carouselHeight = _scaleByWidth(
           width,
           min: 150,
           max: 186,
           minWidth: 320,
-          maxWidth: 1100,
+          maxWidth: width,
         );
         final horizontalPadding = _scaleByWidth(
           width,
           min: 10,
           max: 24,
           minWidth: 320,
-          maxWidth: 1100,
+          maxWidth: width,
         );
         final verticalPadding = _scaleByWidth(
           width,
           min: 4,
           max: 8,
           minWidth: 320,
-          maxWidth: 1100,
+          maxWidth: width,
         );
         final cardSpacing = _scaleByWidth(
           width,
           min: 16,
           max: 60,
           minWidth: 320,
-          maxWidth: 1400,
+          maxWidth: width,
         );
 
         return SizedBox(
@@ -760,7 +973,8 @@ class _SearchStripState extends State<_SearchStrip> {
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final LayerLink _panelLayerLink = LayerLink();
+  final LayerLink _searchPanelLayerLink = LayerLink();
+  final LayerLink _filterPanelLayerLink = LayerLink();
   final Object _panelTapRegionGroupId = Object();
 
   bool _isFilterOpen = false;
@@ -935,30 +1149,30 @@ class _SearchStripState extends State<_SearchStrip> {
           final width = _lastAnchorWidth > 0
               ? _lastAnchorWidth
               : MediaQuery.sizeOf(context).width;
-          final stripHeight = _scaleByWidth(
-            width,
-            min: 58,
-            max: 71,
-            minWidth: 320,
-            maxWidth: 1000,
-          );
+          final showFilterPanel = _isFilterOpen;
+          final link = showFilterPanel
+              ? _filterPanelLayerLink
+              : _searchPanelLayerLink;
+          final targetAnchor = showFilterPanel
+              ? Alignment.bottomRight
+              : Alignment.bottomLeft;
+          final followerAnchor = showFilterPanel
+              ? Alignment.topRight
+              : Alignment.topLeft;
 
-          return Positioned.fill(
-            child: CompositedTransformFollower(
-              link: _panelLayerLink,
-              showWhenUnlinked: false,
-              offset: Offset(0, stripHeight + 8),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: TapRegion(
-                  groupId: _panelTapRegionGroupId,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: _isFilterOpen
-                        ? _buildFiltersPanel(width)
-                        : _buildSearchResultsPanel(width),
-                  ),
-                ),
+          return CompositedTransformFollower(
+            link: link,
+            targetAnchor: targetAnchor,
+            followerAnchor: followerAnchor,
+            showWhenUnlinked: false,
+            offset: const Offset(0, 8),
+            child: TapRegion(
+              groupId: _panelTapRegionGroupId,
+              child: Material(
+                color: Colors.transparent,
+                child: _isFilterOpen
+                    ? _buildFiltersPanel(width)
+                    : _buildSearchResultsPanel(width),
               ),
             ),
           );
@@ -1248,28 +1462,28 @@ class _SearchStripState extends State<_SearchStrip> {
       min: 15,
       max: 16,
       minWidth: 320,
-      maxWidth: 1000,
+      maxWidth: width,
     );
     final panelTextSize = _scaleByWidth(
       width,
       min: 12,
       max: 14,
       minWidth: 320,
-      maxWidth: 1000,
+      maxWidth: width,
     );
     final sectionTitleSize = _scaleByWidth(
       width,
       min: 14,
       max: 16,
       minWidth: 320,
-      maxWidth: 1000,
+      maxWidth: width,
     );
     final showMoreSize = _scaleByWidth(
       width,
       min: 10,
       max: 12,
       minWidth: 320,
-      maxWidth: 1000,
+      maxWidth: width,
     );
 
     return Container(
@@ -1409,42 +1623,42 @@ class _SearchStripState extends State<_SearchStrip> {
       min: 290,
       max: 351,
       minWidth: 320,
-      maxWidth: 1100,
+      maxWidth: width,
     );
     final searchTabTitleSize = _scaleByWidth(
       width,
       min: 15,
       max: 16,
       minWidth: 320,
-      maxWidth: 1100,
+      maxWidth: width,
     );
     final searchTabCountSize = _scaleByWidth(
       width,
       min: 12,
       max: 13,
       minWidth: 320,
-      maxWidth: 1100,
+      maxWidth: width,
     );
     final searchLabelSize = _scaleByWidth(
       width,
       min: 12,
       max: 13,
       minWidth: 320,
-      maxWidth: 1100,
+      maxWidth: width,
     );
     final searchIconSizeInPanel = _scaleByWidth(
       width,
       min: 28,
       max: 30,
       minWidth: 320,
-      maxWidth: 1100,
+      maxWidth: width,
     );
     final searchBadgeSize = _scaleByWidth(
       width,
       min: 11,
       max: 13,
       minWidth: 320,
-      maxWidth: 1100,
+      maxWidth: width,
     );
 
     return Container(
@@ -1516,56 +1730,56 @@ class _SearchStripState extends State<_SearchStrip> {
           min: 58,
           max: 71,
           minWidth: 320,
-          maxWidth: 1000,
+          maxWidth: width,
         );
         final outerRadius = _scaleByWidth(
           width,
           min: 12,
           max: 15,
           minWidth: 320,
-          maxWidth: 1000,
+          maxWidth: width,
         );
         final horizontalInset = _scaleByWidth(
           width,
           min: 10,
           max: 14,
           minWidth: 320,
-          maxWidth: 1000,
+          maxWidth: width,
         );
         final verticalInset = _scaleByWidth(
           width,
           min: 8,
           max: 10,
           minWidth: 320,
-          maxWidth: 1000,
+          maxWidth: width,
         );
         final leadingGap = _scaleByWidth(
           width,
           min: 8,
           max: 12,
           minWidth: 320,
-          maxWidth: 1000,
+          maxWidth: width,
         );
         final searchIconSize = _scaleByWidth(
           width,
           min: 24,
           max: 32,
           minWidth: 320,
-          maxWidth: 1000,
+          maxWidth: width,
         );
         final textSize = _scaleByWidth(
           width,
           min: 14,
           max: 20,
           minWidth: 320,
-          maxWidth: 1000,
+          maxWidth: width,
         );
         final filterIconSize = _scaleByWidth(
           width,
           min: 20,
           max: 24,
           minWidth: 320,
-          maxWidth: 1000,
+          maxWidth: width,
         );
 
         if ((_lastAnchorWidth - width).abs() > 0.1) {
@@ -1579,7 +1793,7 @@ class _SearchStripState extends State<_SearchStrip> {
           groupId: _panelTapRegionGroupId,
           onTapOutside: (event) => _collapsePanels(),
           child: CompositedTransformTarget(
-            link: _panelLayerLink,
+            link: _searchPanelLayerLink,
             child: Container(
               height: stripHeight,
               decoration: BoxDecoration(
@@ -1642,25 +1856,28 @@ class _SearchStripState extends State<_SearchStrip> {
                         min: 6,
                         max: 8,
                         minWidth: 320,
-                        maxWidth: 1000,
+                        maxWidth: width,
                       ),
                     ),
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: _toggleOpen,
-                        borderRadius: BorderRadius.circular(22),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 2,
-                          ),
-                          child: Icon(
-                            _isFilterOpen
-                                ? Icons.expand_less_rounded
-                                : Icons.tune_rounded,
-                            color: Colors.white,
-                            size: filterIconSize,
+                    CompositedTransformTarget(
+                      link: _filterPanelLayerLink,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _toggleOpen,
+                          borderRadius: BorderRadius.circular(22),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 2,
+                            ),
+                            child: Icon(
+                              _isFilterOpen
+                                  ? Icons.expand_less_rounded
+                                  : Icons.tune_rounded,
+                              color: Colors.white,
+                              size: filterIconSize,
+                            ),
                           ),
                         ),
                       ),
@@ -1693,8 +1910,13 @@ class _BuddySection extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final titleGap = _scaleByWidth(width, min: 10, max: 14, maxWidth: 1300);
-        final cardGap = _scaleByWidth(width, min: 12, max: 22, maxWidth: 1300);
+        final titleGap = _scaleByWidth(
+          width,
+          min: 10,
+          max: 14,
+          maxWidth: width,
+        );
+        final cardGap = _scaleByWidth(width, min: 12, max: 22, maxWidth: width);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1750,8 +1972,13 @@ class _ProGamersSection extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final titleGap = _scaleByWidth(width, min: 10, max: 14, maxWidth: 1300);
-        final cardGap = _scaleByWidth(width, min: 14, max: 24, maxWidth: 1300);
+        final titleGap = _scaleByWidth(
+          width,
+          min: 10,
+          max: 14,
+          maxWidth: width,
+        );
+        final cardGap = _scaleByWidth(width, min: 14, max: 24, maxWidth: width);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1815,21 +2042,21 @@ class _HowItWorksSection extends StatelessWidget {
           min: 26,
           max: 32,
           minWidth: 320,
-          maxWidth: 1300,
+          maxWidth: width,
         );
         final subtitleSize = _scaleByWidth(
           width,
           min: 15,
           max: 20,
           minWidth: 320,
-          maxWidth: 1300,
+          maxWidth: width,
         );
         final topPadding = _scaleByWidth(
           width,
           min: 18,
           max: 24,
           minWidth: 320,
-          maxWidth: 1300,
+          maxWidth: width,
         );
         final leftPadding = compact
             ? _scaleByWidth(
@@ -1837,7 +2064,7 @@ class _HowItWorksSection extends StatelessWidget {
                 min: 4,
                 max: 10,
                 minWidth: 320,
-                maxWidth: 800,
+                maxWidth: width,
               )
             : 20.0;
         final stepsTopGap = _scaleByWidth(
@@ -1845,7 +2072,7 @@ class _HowItWorksSection extends StatelessWidget {
           min: 30,
           max: 54,
           minWidth: 320,
-          maxWidth: 1300,
+          maxWidth: width,
         );
 
         return SizedBox(
@@ -1988,13 +2215,11 @@ class _HowItWorksSection extends StatelessWidget {
                             min: 6,
                             max: 8,
                             minWidth: 320,
-                            maxWidth: 1300,
+                            maxWidth: width,
                           ),
                         ),
                         ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: compact ? 560 : 637,
-                          ),
+                          constraints: BoxConstraints(maxWidth: width),
                           child: Text(
                             'Finding the perfect buddy has never been this easy.\nJust choose a service, connect, and enjoy',
                             textAlign: TextAlign.center,
@@ -2047,13 +2272,13 @@ class _FooterStrip extends StatelessWidget {
           width,
           min: 24,
           max: 100,
-          maxWidth: 1400,
+          maxWidth: width,
         );
         final verticalPadding = _scaleByWidth(
           width,
           min: 14,
           max: 20,
-          maxWidth: 1400,
+          maxWidth: width,
         );
 
         return Container(
@@ -2116,28 +2341,28 @@ class _SectionHeaderRow extends StatelessWidget {
           min: 24,
           max: 32,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final buttonHeight = _scaleByWidth(
           width,
           min: 33,
           max: 40,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final buttonTextSize = _scaleByWidth(
           width,
           min: 13,
           max: 16,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
         final buttonHorizontalPadding = _scaleByWidth(
           width,
           min: 12,
           max: 18,
           minWidth: 320,
-          maxWidth: 1200,
+          maxWidth: width,
         );
 
         final viewMoreButton = SizedBox(
@@ -2575,8 +2800,8 @@ class _HowStepRow extends StatelessWidget {
     final railWidth = compact ? (tinyCompact ? 82.0 : 104.0) : 176.0;
     final rowHeight = markerSize + (showLine ? lineHeight : 0);
 
-    return SizedBox(
-      height: rowHeight,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: rowHeight),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2706,9 +2931,9 @@ class _FooterIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final boxSize = _scaleByWidth(width, min: 40, max: 44, maxWidth: 1000);
-    final borderRadius = _scaleByWidth(width, min: 8, max: 9, maxWidth: 1000);
-    final iconSize = _scaleByWidth(width, min: 18, max: 22, maxWidth: 1000);
+    final boxSize = _scaleByWidth(width, min: 40, max: 44, maxWidth: width);
+    final borderRadius = _scaleByWidth(width, min: 8, max: 9, maxWidth: width);
+    final iconSize = _scaleByWidth(width, min: 18, max: 22, maxWidth: width);
     final iconColor = background == Colors.white
         ? const Color(0xFF151515)
         : Colors.white;

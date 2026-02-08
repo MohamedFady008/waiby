@@ -39,11 +39,11 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
               colors: [backgroundTop, backgroundBottom],
             ),
             border: Border(
-              bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
+              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.35),
+                color: Colors.black.withValues(alpha: 0.35),
                 blurRadius: 16,
                 spreadRadius: -6,
                 offset: const Offset(0, 10),
@@ -101,18 +101,6 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     required Color accentBlue,
     required Color accentGreen,
   }) {
-    OutlinedButton.styleFrom(
-      foregroundColor: Colors.white,
-      side: BorderSide(color: Colors.white.withOpacity(0.35)),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      textStyle: GoogleFonts.poppins(
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.2,
-      ),
-    );
-
     final ButtonStyle solidButton = ElevatedButton.styleFrom(
       backgroundColor: accentBlue,
       foregroundColor: Colors.white,
@@ -139,7 +127,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
           OutlinedButton(
             onPressed: () => context.go('/login'),
             style: solidButton.copyWith(
-              backgroundColor: MaterialStateProperty.all(accentGreen),
+              backgroundColor: WidgetStateProperty.all(accentGreen),
             ),
             child: const Text('Login'),
           ),
@@ -229,24 +217,26 @@ class _NavLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final baseColor = Colors.white.withOpacity(0.76);
+    final baseColor = Colors.white.withValues(alpha: 0.76);
     const activeColor = Colors.white;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      splashColor: Colors.white.withOpacity(0.08),
-      highlightColor: Colors.white.withOpacity(0.05),
+      splashColor: Colors.white.withValues(alpha: 0.08),
+      highlightColor: Colors.white.withValues(alpha: 0.05),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? Colors.white.withOpacity(0.06) : Colors.transparent,
+          color: isActive
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isActive
-                ? Colors.white.withOpacity(0.2)
-                : Colors.white.withOpacity(0.04),
+                ? Colors.white.withValues(alpha: 0.2)
+                : Colors.white.withValues(alpha: 0.04),
           ),
         ),
         child: Text(

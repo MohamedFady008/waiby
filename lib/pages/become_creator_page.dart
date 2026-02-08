@@ -6,6 +6,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../widgets/common/waiby_common.dart';
+
 class BecomeCreatorPage extends StatelessWidget {
   const BecomeCreatorPage({super.key});
 
@@ -38,7 +40,7 @@ class BecomeCreatorPage extends StatelessWidget {
         const Positioned(
           right: 24,
           bottom: 24,
-          child: SafeArea(child: _ChatFab()),
+          child: SafeArea(child: SupportChatFab()),
         ),
       ],
     );
@@ -61,7 +63,7 @@ class HeroSection extends StatelessWidget {
         double sy(double designPx) => designPx; // design is absolute px
 
         if (isCompact) {
-          final padding = _pageHorizontalPadding(w);
+          final padding = pageHorizontalPadding(w);
           final maxArtWidth = (w - (padding * 2)).clamp(280.0, 760.0);
           final artScale = (maxArtWidth / 593.0).clamp(0.55, 1.25);
           final artWidth = 593.0 * artScale;
@@ -95,10 +97,10 @@ class HeroSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _GradientButton(
+                WaibyGradientButton(
                   width: w < 700 ? 190 : 209,
                   height: 44,
-                  label: "Apply as Creator",
+                  label: 'Apply as Creator',
                   onTap: () => context.go('/become-creator/creator-form'),
                 ),
                 const SizedBox(height: 28),
@@ -181,10 +183,10 @@ class HeroSection extends StatelessWidget {
               Positioned(
                 left: sx(140),
                 top: sy(299) - appBarHeight,
-                child: _GradientButton(
+                child: WaibyGradientButton(
                   width: sx(209),
                   height: sy(44),
-                  label: "Apply as Creator",
+                  label: 'Apply as Creator',
                   onTap: () => context.go('/become-creator/creator-form'),
                 ),
               ),
@@ -644,7 +646,7 @@ class CreatorCards extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final padding = _pageHorizontalPadding(constraints.maxWidth);
+        final padding = pageHorizontalPadding(constraints.maxWidth);
         final spacing = constraints.maxWidth >= 1440 ? 85.0 : 24.0;
         final contentWidth = constraints.maxWidth - (padding * 2);
         final cardWidth = contentWidth < 340 ? contentWidth : 320.0;
@@ -837,7 +839,7 @@ class HowItWorks extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final padding = _pageHorizontalPadding(constraints.maxWidth);
+        final padding = pageHorizontalPadding(constraints.maxWidth);
         final contentWidth = constraints.maxWidth - (padding * 2);
         final isWide = contentWidth >= (360.0 * 4);
         final isCompact = constraints.maxWidth < 700;
@@ -1012,7 +1014,7 @@ class TrustSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final padding = _pageHorizontalPadding(constraints.maxWidth);
+        final padding = pageHorizontalPadding(constraints.maxWidth);
         final contentWidth = (constraints.maxWidth - (padding * 2))
             .clamp(0.0, double.infinity)
             .toDouble();
@@ -1326,76 +1328,6 @@ class _FooterIcon extends StatelessWidget {
   }
 }
 
-class _ChatFab extends StatelessWidget {
-  const _ChatFab();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 54,
-      height: 54,
-      child: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFF51D76E),
-        foregroundColor: Colors.white,
-        elevation: 12,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.chat_bubble_rounded, size: 28),
-      ),
-    );
-  }
-}
-
-class _GradientButton extends StatelessWidget {
-  final double width;
-  final double height;
-  final String label;
-  final VoidCallback onTap;
-
-  const _GradientButton({
-    required this.width,
-    required this.height,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(5),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(5),
-        child: Ink(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(5),
-            gradient: const LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: [Color(0xFFCCF308), Color(0xFFEDDB74), Color(0xFFCCF308)],
-              stops: [0.1394, 0.5, 0.8846],
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: Colors.black,
-                height: 21 / 14,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _BunnyImage extends StatelessWidget {
   final String asset;
   final Alignment cropAlignment;
@@ -1427,11 +1359,4 @@ class _BunnyImage extends StatelessWidget {
       ),
     );
   }
-}
-
-double _pageHorizontalPadding(double width) {
-  if (width >= 1440) return 140;
-  if (width >= 1100) return 80;
-  if (width >= 900) return 40;
-  return 16;
 }

@@ -22,7 +22,7 @@ class UserMenu extends StatelessWidget {
       color: menuBackground,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: menuBorderColor.withOpacity(0.55)),
+        side: BorderSide(color: menuBorderColor.withValues(alpha: 0.55)),
       ),
       elevation: 18,
       onSelected: (action) {
@@ -68,7 +68,7 @@ class UserMenu extends StatelessWidget {
                   colors: [Color(0xFF0E1631), Color(0xFF080C1D)],
                 ),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -93,7 +93,7 @@ class UserMenu extends StatelessWidget {
                   Text(
                     'ID: ${auth.userId}',
                     style: GoogleFonts.poppins(
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                     ),
@@ -110,7 +110,7 @@ class UserMenu extends StatelessWidget {
           child: Divider(
             height: 1,
             thickness: 1,
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
           ),
         ),
         const PopupMenuItem<_UserMenuAction>(
@@ -143,7 +143,7 @@ class UserMenu extends StatelessWidget {
           child: Divider(
             height: 1,
             thickness: 1,
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
           ),
         ),
         PopupMenuItem<_UserMenuAction>(
@@ -161,7 +161,7 @@ class UserMenu extends StatelessWidget {
           child: Divider(
             height: 1,
             thickness: 1,
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
           ),
         ),
         PopupMenuItem<_UserMenuAction>(
@@ -221,7 +221,7 @@ class _UserAvatar extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 44,
-          backgroundColor: Colors.white.withOpacity(0.08),
+          backgroundColor: Colors.white.withValues(alpha: 0.08),
           backgroundImage: avatarImage,
           child: avatarImage == null
               ? const Icon(Icons.person, size: 44, color: Colors.white)
@@ -317,7 +317,7 @@ class _OnlineStatusRow extends StatelessWidget {
           ),
           Icon(
             Icons.chevron_right_rounded,
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
           ),
         ],
       ),

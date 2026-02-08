@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../widgets/common/waiby_common.dart';
+
 class CreatorFormPage extends StatelessWidget {
   const CreatorFormPage({super.key});
 
@@ -21,7 +23,7 @@ class CreatorFormPage extends StatelessWidget {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final width = constraints.maxWidth;
-                      final horizontalPadding = _pageHorizontalPadding(width);
+                      final horizontalPadding = pageHorizontalPadding(width);
                       final useTwoColumns = width >= 1060;
                       final sectionGap = useTwoColumns ? 28.0 : 18.0;
 
@@ -132,7 +134,7 @@ class CreatorFormPage extends StatelessWidget {
         const Positioned(
           right: 24,
           bottom: 24,
-          child: SafeArea(child: _ChatFab()),
+          child: SafeArea(child: SupportChatFab()),
         ),
       ],
     );
@@ -338,7 +340,17 @@ class _LegalAcknowledgementSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        _SubmitButton(width: compact ? double.infinity : (medium ? 250 : 270)),
+        WaibyGradientButton(
+          width: compact ? double.infinity : (medium ? 250 : 270),
+          height: 56,
+          label: 'Submit application',
+          textStyle: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Colors.black,
+            height: 30 / 20,
+          ),
+        ),
       ],
     );
   }
@@ -635,67 +647,4 @@ class _CountedTextAreaState extends State<_CountedTextArea> {
       ),
     );
   }
-}
-
-class _SubmitButton extends StatelessWidget {
-  const _SubmitButton({required this.width});
-
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: 56,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(5),
-          gradient: const LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [Color(0xFFCCF308), Color(0xFFEDDB74), Color(0xFFCCF308)],
-            stops: [0.1394, 0.5, 0.8846],
-          ),
-        ),
-        child: Center(
-          child: Text(
-            "Submit application",
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Colors.black,
-              height: 30 / 20,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ChatFab extends StatelessWidget {
-  const _ChatFab();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 54,
-      height: 54,
-      child: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFF51D76E),
-        foregroundColor: Colors.white,
-        elevation: 12,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.chat_bubble_rounded, size: 28),
-      ),
-    );
-  }
-}
-
-double _pageHorizontalPadding(double width) {
-  if (width >= 1440) return 140;
-  if (width >= 1100) return 80;
-  if (width >= 900) return 40;
-  return 16;
 }
