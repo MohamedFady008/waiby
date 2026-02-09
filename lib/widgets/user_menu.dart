@@ -1,0 +1,336 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../controllers/auth_controller.dart';
+
+class UserMenu extends StatelessWidget {
+  final AuthController auth;
+
+  const UserMenu({super.key, required this.auth});
+
+  @override
+  Widget build(BuildContext context) {
+    const menuBackground = Color(0xFF0B1023);
+    const menuBorderColor = Color(0xFF1A2344);
+    const accentGreen = Color(0xFF51D76E);
+    const destructiveRed = Color(0xFFE04B4B);
+
+    return PopupMenuButton<_UserMenuAction>(
+      tooltip: "Account",
+      offset: const Offset(0, 46),
+      constraints: const BoxConstraints.tightFor(width: 320),
+      color: menuBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: menuBorderColor.withValues(alpha: 0.55)),
+      ),
+      elevation: 18,
+      onSelected: (action) {
+        switch (action) {
+          case _UserMenuAction.myProfile:
+            context.go('/profile');
+            break;
+          case _UserMenuAction.dashboard:
+            context.go('/dashboard');
+            break;
+          case _UserMenuAction.wallet:
+            context.go('/wallet');
+            break;
+          case _UserMenuAction.settings:
+            context.go('/settings');
+            break;
+          case _UserMenuAction.toggleOnline:
+            auth.toggleOnline();
+            break;
+          case _UserMenuAction.logout:
+            auth.logout();
+            context.go('/');
+            break;
+          case _UserMenuAction.reportIssue:
+            context.go('/report');
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<_UserMenuAction>(
+          enabled: false,
+          height: 210,
+          padding: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0E1631), Color(0xFF080C1D)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _UserAvatar(
+                    photoUrl: auth.photoUrl,
+                    online: auth.online.value,
+                    onlineColor: accentGreen,
+                    ringColor: menuBackground,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    auth.name,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'ID: ${auth.userId}',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        PopupMenuItem<_UserMenuAction>(
+          enabled: false,
+          height: 1,
+          padding: EdgeInsets.zero,
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        const PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.myProfile,
+          height: 52,
+          child: _MenuRow(icon: Icons.person_outline, text: "My profile"),
+        ),
+        const PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.dashboard,
+          height: 52,
+          child: _MenuRow(icon: Icons.dashboard_outlined, text: "Dashboard"),
+        ),
+        const PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.wallet,
+          height: 52,
+          child: _MenuRow(
+            icon: Icons.account_balance_wallet_outlined,
+            text: "Wallet",
+          ),
+        ),
+        const PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.settings,
+          height: 52,
+          child: _MenuRow(icon: Icons.settings_outlined, text: "Settings"),
+        ),
+        PopupMenuItem<_UserMenuAction>(
+          enabled: false,
+          height: 1,
+          padding: EdgeInsets.zero,
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.toggleOnline,
+          height: 54,
+          child: _OnlineStatusRow(
+            online: auth.online.value,
+            onlineColor: accentGreen,
+          ),
+        ),
+        PopupMenuItem<_UserMenuAction>(
+          enabled: false,
+          height: 1,
+          padding: EdgeInsets.zero,
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.logout,
+          height: 52,
+          child: _MenuRow(
+            icon: Icons.logout,
+            text: "Logout",
+            color: destructiveRed,
+          ),
+        ),
+        PopupMenuItem<_UserMenuAction>(
+          value: _UserMenuAction.reportIssue,
+          height: 52,
+          child: _MenuRow(
+            icon: Icons.report_problem_outlined,
+            text: "Report issue",
+            color: destructiveRed,
+          ),
+        ),
+      ],
+      child: CircleAvatar(
+        radius: 16,
+        backgroundImage: auth.photoUrl != null
+            ? NetworkImage(auth.photoUrl!)
+            : null,
+        child: auth.photoUrl == null
+            ? const Icon(Icons.person, size: 18)
+            : null,
+      ),
+    );
+  }
+}
+
+class _UserAvatar extends StatelessWidget {
+  final String? photoUrl;
+  final bool online;
+  final Color onlineColor;
+  final Color ringColor;
+
+  const _UserAvatar({
+    required this.photoUrl,
+    required this.online,
+    required this.onlineColor,
+    required this.ringColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ImageProvider? avatarImage = photoUrl != null
+        ? NetworkImage(photoUrl!)
+        : null;
+    final statusColor = online ? onlineColor : Colors.grey;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CircleAvatar(
+          radius: 44,
+          backgroundColor: Colors.white.withValues(alpha: 0.08),
+          backgroundImage: avatarImage,
+          child: avatarImage == null
+              ? const Icon(Icons.person, size: 44, color: Colors.white)
+              : null,
+        ),
+        Positioned(
+          right: -2,
+          bottom: -2,
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(color: ringColor, shape: BoxShape.circle),
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: statusColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color? color;
+
+  const _MenuRow({required this.icon, required this.text, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = color ?? Colors.white;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Icon(icon, color: foreground, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                color: foreground,
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OnlineStatusRow extends StatelessWidget {
+  final bool online;
+  final Color onlineColor;
+
+  const _OnlineStatusRow({required this.online, required this.onlineColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final statusText = online ? "Online" : "Offline";
+    final statusColor = online ? onlineColor : Colors.grey;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              statusText,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.white.withValues(alpha: 0.7),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _UserMenuAction {
+  myProfile,
+  dashboard,
+  wallet,
+  settings,
+  toggleOnline,
+  logout,
+  reportIssue,
+}
