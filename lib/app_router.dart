@@ -64,6 +64,11 @@ final router = GoRouter(
           builder: (context, state) => const ProfilePage(),
         ),
         GoRoute(
+          path: '/profile/:userId',
+          builder: (context, state) =>
+              ProfilePage(userId: state.pathParameters['userId']),
+        ),
+        GoRoute(
           path: '/dashboard',
           builder: (context, state) => const DashboardPage(),
         ),

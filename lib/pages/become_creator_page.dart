@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:waiby/widgets/waiby_footer.dart';
 
 import '../widgets/common/waiby_common.dart';
 
@@ -19,7 +20,6 @@ class BecomeCreatorPage extends StatelessWidget {
           child: ColoredBox(
             color: const Color(0xFF0C0C13),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 120),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1920),
@@ -29,7 +29,7 @@ class BecomeCreatorPage extends StatelessWidget {
                       CreatorCards(),
                       HowItWorks(),
                       TrustSection(),
-                      FooterIcons(),
+                      WaibyFooter(),
                     ],
                   ),
                 ),
