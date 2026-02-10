@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:waiby/widgets/waiby_footer.dart';
 
 import '../widgets/common/waiby_common.dart';
 
@@ -16,7 +17,6 @@ class CreatorFormPage extends StatelessWidget {
           child: ColoredBox(
             color: const Color(0xFF0C0C13),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 90),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1910),
@@ -27,102 +27,110 @@ class CreatorFormPage extends StatelessWidget {
                       final useTwoColumns = width >= 1060;
                       final sectionGap = useTwoColumns ? 28.0 : 18.0;
 
-                      return Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          horizontalPadding,
-                          40,
-                          horizontalPadding,
-                          0,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Become a Waiby Creator",
-                              style: GoogleFonts.notoSans(
-                                fontSize: width < 700 ? 28 : 34,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                height: 49 / 36,
-                              ),
+                      return Column(
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              horizontalPadding,
+                              40,
+                              horizontalPadding,
+                              0,
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "Applying is free and only takes a few minutes. You'll receive an update within 48 hours",
-                              style: GoogleFonts.notoSans(
-                                fontSize: width < 700 ? 16 : 19,
-                                fontWeight: FontWeight.w400,
-                                color: Colors.white,
-                                height: 27 / 20,
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            const Divider(
-                              color: Color(0xFF1B234B),
-                              thickness: 0.5,
-                              height: 0.5,
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              "Basic Information",
-                              style: GoogleFonts.notoSans(
-                                fontSize: width < 700 ? 27 : 30,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                height: 44 / 32,
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-                            if (useTwoColumns)
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Expanded(
-                                    flex: 10,
-                                    child: _BasicInformationForm(),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Become a Waiby Creator",
+                                  style: GoogleFonts.notoSans(
+                                    fontSize: width < 700 ? 28 : 34,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    height: 49 / 36,
                                   ),
-                                  SizedBox(width: sectionGap),
-                                  SizedBox(
-                                    width: math.min(493, width * 0.31),
-                                    child: const _IdentityVerificationCard(),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  "Applying is free and only takes a few minutes. You'll receive an update within 48 hours",
+                                  style: GoogleFonts.notoSans(
+                                    fontSize: width < 700 ? 16 : 19,
+                                    fontWeight: FontWeight.w400,
+                                    color: Colors.white,
+                                    height: 27 / 20,
                                   ),
+                                ),
+                                const SizedBox(height: 20),
+                                const Divider(
+                                  color: Color(0xFF1B234B),
+                                  thickness: 0.5,
+                                  height: 0.5,
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  "Basic Information",
+                                  style: GoogleFonts.notoSans(
+                                    fontSize: width < 700 ? 27 : 30,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    height: 44 / 32,
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                if (useTwoColumns)
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Expanded(
+                                        flex: 10,
+                                        child: _BasicInformationForm(),
+                                      ),
+                                      SizedBox(width: sectionGap),
+                                      SizedBox(
+                                        width: math.min(493, width * 0.31),
+                                        child:
+                                            const _IdentityVerificationCard(),
+                                      ),
+                                    ],
+                                  )
+                                else ...[
+                                  const _BasicInformationForm(),
+                                  const SizedBox(height: 18),
+                                  const _IdentityVerificationCard(),
                                 ],
-                              )
-                            else ...[
-                              const _BasicInformationForm(),
-                              const SizedBox(height: 18),
-                              const _IdentityVerificationCard(),
-                            ],
-                            const SizedBox(height: 24),
-                            const Divider(
-                              color: Color(0xFF1B234B),
-                              thickness: 0.5,
-                              height: 0.5,
-                            ),
-                            const SizedBox(height: 20),
-                            if (useTwoColumns)
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Expanded(
-                                    flex: 10,
-                                    child: _CreatorIntroductionSection(),
-                                  ),
-                                  SizedBox(width: sectionGap),
-                                  const Expanded(
-                                    flex: 7,
-                                    child: _LegalAcknowledgementSection(),
-                                  ),
+                                const SizedBox(height: 24),
+                                const Divider(
+                                  color: Color(0xFF1B234B),
+                                  thickness: 0.5,
+                                  height: 0.5,
+                                ),
+                                const SizedBox(height: 20),
+                                if (useTwoColumns)
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Expanded(
+                                        flex: 10,
+                                        child: _CreatorIntroductionSection(),
+                                      ),
+                                      SizedBox(width: sectionGap),
+                                      const Expanded(
+                                        flex: 7,
+                                        child: _LegalAcknowledgementSection(),
+                                      ),
+                                    ],
+                                  )
+                                else ...[
+                                  const _CreatorIntroductionSection(),
+                                  const SizedBox(height: 18),
+                                  const _LegalAcknowledgementSection(),
                                 ],
-                              )
-                            else ...[
-                              const _CreatorIntroductionSection(),
-                              const SizedBox(height: 18),
-                              const _LegalAcknowledgementSection(),
-                            ],
-                            const SizedBox(height: 40),
-                          ],
-                        ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: 100),
+                          const WaibyFooter(),
+                        ],
                       );
                     },
                   ),

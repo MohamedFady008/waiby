@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -73,33 +75,55 @@ class ChatSidebar extends StatelessWidget {
   final double avatarSize;
   final double frameSize;
   final double itemSpacing;
+  final double unreadBadgeSize;
+  final double unreadBadgeFontSize;
 
   const ChatSidebar({
     super.key,
     this.items = defaultItems,
-    this.width = 84,
+    this.width = 76,
     this.padding = const EdgeInsets.symmetric(vertical: 8),
     this.backgroundColor = const Color.fromRGBO(255, 255, 255, 0.08),
     this.avatarSize = 48,
     this.frameSize = 66,
     this.itemSpacing = 18,
+    this.unreadBadgeSize = 30,
+    this.unreadBadgeFontSize = 16,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      color: backgroundColor,
-      child: ListView.separated(
-        padding: padding,
-        itemCount: items.length,
-        separatorBuilder: (_, _) => SizedBox(height: itemSpacing),
-        itemBuilder: (context, index) => _ChatSidebarTile(
-          item: items[index],
-          avatarSize: avatarSize,
-          frameSize: frameSize,
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final railWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : width;
+        final resolvedFrameSize = math
+            .min(frameSize, railWidth - 8)
+            .clamp(54.0, frameSize)
+            .toDouble();
+        final resolvedAvatarSize = math
+            .min(avatarSize, resolvedFrameSize - 12)
+            .clamp(40.0, avatarSize)
+            .toDouble();
+        final resolvedSpacing = railWidth < 72 ? 12.0 : itemSpacing;
+
+        return Container(
+          color: backgroundColor,
+          child: ListView.separated(
+            padding: padding,
+            itemCount: items.length,
+            separatorBuilder: (_, _) => SizedBox(height: resolvedSpacing),
+            itemBuilder: (context, index) => _ChatSidebarTile(
+              item: items[index],
+              avatarSize: resolvedAvatarSize,
+              frameSize: resolvedFrameSize,
+              unreadBadgeSize: unreadBadgeSize,
+              unreadBadgeFontSize: unreadBadgeFontSize,
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -108,11 +132,15 @@ class _ChatSidebarTile extends StatelessWidget {
   final ChatSidebarItem item;
   final double avatarSize;
   final double frameSize;
+  final double unreadBadgeSize;
+  final double unreadBadgeFontSize;
 
   const _ChatSidebarTile({
     required this.item,
     required this.avatarSize,
     required this.frameSize,
+    required this.unreadBadgeSize,
+    required this.unreadBadgeFontSize,
   });
 
   @override
@@ -180,7 +208,11 @@ class _ChatSidebarTile extends StatelessWidget {
                       Positioned(
                         right: -2,
                         bottom: -2,
-                        child: _UnreadBadge(count: item.unreadCount),
+                        child: _UnreadBadge(
+                          count: item.unreadCount,
+                          size: unreadBadgeSize,
+                          fontSize: unreadBadgeFontSize,
+                        ),
                       ),
                   ],
                 ),
@@ -195,19 +227,29 @@ class _ChatSidebarTile extends StatelessWidget {
 
 class _UnreadBadge extends StatelessWidget {
   final int count;
+  final double size;
+  final double fontSize;
 
-  const _UnreadBadge({required this.count});
+  const _UnreadBadge({
+    required this.count,
+    required this.size,
+    required this.fontSize,
+  });
 
   @override
   Widget build(BuildContext context) {
     final text = count > 99 ? '99+' : '$count';
+    final borderWidth = size <= 22 ? 1.4 : 2.0;
     return Container(
-      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+      constraints: BoxConstraints(minWidth: size, minHeight: size),
+      padding: EdgeInsets.symmetric(
+        horizontal: size * 0.24,
+        vertical: size * 0.16,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFFED4245),
         shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFF202225), width: 2),
+        border: Border.all(color: const Color(0xFF202225), width: borderWidth),
       ),
       child: Center(
         child: Text(
@@ -215,7 +257,7 @@ class _UnreadBadge extends StatelessWidget {
           style: GoogleFonts.poppins(
             color: Colors.white,
             fontWeight: FontWeight.w700,
-            fontSize: 16,
+            fontSize: fontSize,
             letterSpacing: -0.2,
             height: 1,
           ),

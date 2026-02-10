@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,11 +16,17 @@ class UserMenu extends StatelessWidget {
     const menuBorderColor = Color(0xFF1A2344);
     const accentGreen = Color(0xFF51D76E);
     const destructiveRed = Color(0xFFE04B4B);
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final menuMaxWidth = math.max(240.0, math.min(320.0, viewportWidth - 32));
+    final menuMinWidth = math.max(220.0, menuMaxWidth * 0.75);
 
     return PopupMenuButton<_UserMenuAction>(
       tooltip: "Account",
       offset: const Offset(0, 46),
-      constraints: const BoxConstraints.tightFor(width: 320),
+      constraints: BoxConstraints(
+        minWidth: menuMinWidth,
+        maxWidth: menuMaxWidth,
+      ),
       color: menuBackground,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
@@ -28,7 +36,7 @@ class UserMenu extends StatelessWidget {
       onSelected: (action) {
         switch (action) {
           case _UserMenuAction.myProfile:
-            context.go('/profile');
+            context.go('/profile/${Uri.encodeComponent(auth.userId)}');
             break;
           case _UserMenuAction.dashboard:
             context.go('/dashboard');
@@ -54,13 +62,12 @@ class UserMenu extends StatelessWidget {
       itemBuilder: (context) => [
         PopupMenuItem<_UserMenuAction>(
           enabled: false,
-          height: 210,
           padding: EdgeInsets.zero,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
@@ -80,21 +87,21 @@ class UserMenu extends StatelessWidget {
                     onlineColor: accentGreen,
                     ringColor: menuBackground,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   Text(
                     auth.name,
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
-                      fontSize: 16,
+                      fontSize: 15,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'ID: ${auth.userId}',
                     style: GoogleFonts.poppins(
                       color: Colors.white.withValues(alpha: 0.6),
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -115,17 +122,14 @@ class UserMenu extends StatelessWidget {
         ),
         const PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.myProfile,
-          height: 52,
           child: _MenuRow(icon: Icons.person_outline, text: "My profile"),
         ),
         const PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.dashboard,
-          height: 52,
           child: _MenuRow(icon: Icons.dashboard_outlined, text: "Dashboard"),
         ),
         const PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.wallet,
-          height: 52,
           child: _MenuRow(
             icon: Icons.account_balance_wallet_outlined,
             text: "Wallet",
@@ -133,7 +137,6 @@ class UserMenu extends StatelessWidget {
         ),
         const PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.settings,
-          height: 52,
           child: _MenuRow(icon: Icons.settings_outlined, text: "Settings"),
         ),
         PopupMenuItem<_UserMenuAction>(
@@ -148,7 +151,6 @@ class UserMenu extends StatelessWidget {
         ),
         PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.toggleOnline,
-          height: 54,
           child: _OnlineStatusRow(
             online: auth.online.value,
             onlineColor: accentGreen,
@@ -166,7 +168,6 @@ class UserMenu extends StatelessWidget {
         ),
         PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.logout,
-          height: 52,
           child: _MenuRow(
             icon: Icons.logout,
             text: "Logout",
@@ -175,7 +176,6 @@ class UserMenu extends StatelessWidget {
         ),
         PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.reportIssue,
-          height: 52,
           child: _MenuRow(
             icon: Icons.report_problem_outlined,
             text: "Report issue",
@@ -184,12 +184,12 @@ class UserMenu extends StatelessWidget {
         ),
       ],
       child: CircleAvatar(
-        radius: 16,
+        radius: 15,
         backgroundImage: auth.photoUrl != null
             ? NetworkImage(auth.photoUrl!)
             : null,
         child: auth.photoUrl == null
-            ? const Icon(Icons.person, size: 18)
+            ? const Icon(Icons.person, size: 17)
             : null,
       ),
     );
@@ -220,11 +220,11 @@ class _UserAvatar extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         CircleAvatar(
-          radius: 44,
+          radius: 38,
           backgroundColor: Colors.white.withValues(alpha: 0.08),
           backgroundImage: avatarImage,
           child: avatarImage == null
-              ? const Icon(Icons.person, size: 44, color: Colors.white)
+              ? const Icon(Icons.person, size: 38, color: Colors.white)
               : null,
         ),
         Positioned(
@@ -234,8 +234,8 @@ class _UserAvatar extends StatelessWidget {
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(color: ringColor, shape: BoxShape.circle),
             child: Container(
-              width: 14,
-              height: 14,
+              width: 12,
+              height: 12,
               decoration: BoxDecoration(
                 color: statusColor,
                 shape: BoxShape.circle,
@@ -263,7 +263,7 @@ class _MenuRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
         children: [
-          Icon(icon, color: foreground, size: 22),
+          Icon(icon, color: foreground, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -271,7 +271,7 @@ class _MenuRow extends StatelessWidget {
               style: GoogleFonts.poppins(
                 color: foreground,
                 fontWeight: FontWeight.w500,
-                fontSize: 15,
+                fontSize: 14,
               ),
             ),
           ),
@@ -311,7 +311,7 @@ class _OnlineStatusRow extends StatelessWidget {
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontWeight: FontWeight.w500,
-                fontSize: 15,
+                fontSize: 14,
               ),
             ),
           ),

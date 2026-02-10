@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
@@ -9,22 +10,71 @@ import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/chat_sidebar.dart';
 import '../widgets/chat_window.dart';
+import '../widgets/common/responsive_layout.dart';
+import '../widgets/waiby_footer.dart';
 
 double _clampDouble(double value, double min, double max) =>
     value.clamp(min, max).toDouble();
+
+const double _desktopMaxContentWidth = WaibyBreakpoints.desktopContentMaxWidth;
 
 double _scaleByWidth(
   double width, {
   required double min,
   required double max,
   double minWidth = 360,
-  double maxWidth = 1440,
+  double maxWidth = 1200,
 }) {
-  if (maxWidth <= minWidth) {
+  if (max <= min) {
     return min;
   }
-  final factor = ((width - minWidth) / (maxWidth - minWidth)).clamp(0.0, 1.0);
-  return min + ((max - min) * factor);
+
+  // Use breakpoint-based tokens instead of continuous screen scaling.
+  if (width <= WaibyBreakpoints.mobile) {
+    return min;
+  }
+  if (width >= maxWidth) {
+    return max;
+  }
+  return (min + max) / 2;
+}
+
+const double _servicesCarouselCardSpacing = WaibySpacing.s16;
+const double _servicesCarouselCardAspectRatio = 0.94;
+const double _servicesCarouselArrowButtonSize = 38;
+const double _servicesCarouselArrowToTrackGap = WaibySpacing.s8;
+
+int _servicesVisibleCardsForWidth(double width) {
+  if (width >= WaibyBreakpoints.tablet) {
+    return 7;
+  }
+  if (width >= WaibyBreakpoints.mobile) {
+    return 4;
+  }
+  if (width >= 460) {
+    return 3;
+  }
+  return 2;
+}
+
+double _servicesCardWidthForWidth(double width) {
+  final visibleCards = _servicesVisibleCardsForWidth(width);
+  final trackWidth = math.max(
+    0.0,
+    width -
+        ((_servicesCarouselArrowButtonSize * 2) +
+            (_servicesCarouselArrowToTrackGap * 2)),
+  );
+  return math.max(
+    92.0,
+    (trackWidth - (_servicesCarouselCardSpacing * (visibleCards - 1))) /
+        visibleCards,
+  );
+}
+
+double _servicesWidthForCardCount(double width, int count) {
+  final cardWidth = _servicesCardWidthForWidth(width);
+  return (cardWidth * count) + (_servicesCarouselCardSpacing * (count - 1));
 }
 
 class HomePage extends StatelessWidget {
@@ -54,89 +104,18 @@ class _HomeBody extends StatelessWidget {
         final reservedSidebarSpace = showChatSidebar
             ? chatSidebarWidth + chatSidebarGap
             : 0.0;
-        final pagePadding = _scaleByWidth(
-          width,
-          min: 12,
-          max: 26,
-          maxWidth: width,
-        );
-        final maxContentWidth = width;
-        final contentWidth = math.min(
-          maxContentWidth,
-          math.max(320.0, width - (pagePadding * 2) - reservedSidebarSpace),
-        );
-        final buddyCardWidth = _clampDouble(
-          contentWidth < 560
-              ? contentWidth * 0.72
-              : contentWidth < 880
-              ? contentWidth * 0.46
-              : contentWidth < 1200
-              ? contentWidth * 0.28
-              : contentWidth * 0.19,
-          172,
-          306,
-        );
-        final proCardWidth = _clampDouble(
-          contentWidth < 600
-              ? contentWidth * 0.9
-              : contentWidth < 980
-              ? contentWidth * 0.72
-              : contentWidth < 1320
-              ? contentWidth * 0.42
-              : contentWidth * 0.29,
-          300,
-          509,
-        );
-        final topPadding = width < 700 ? 8.0 : 16.0;
-        final heroGap = _scaleByWidth(width, min: 20, max: 26, maxWidth: width);
-        final headingGap = _scaleByWidth(
-          width,
-          min: 20,
-          max: 28,
-          maxWidth: width,
-        );
-        final titleGap = _scaleByWidth(
-          width,
-          min: 10,
-          max: 14,
-          maxWidth: width,
-        );
-        final servicesGap = _scaleByWidth(
-          width,
-          min: 18,
-          max: 24,
-          maxWidth: width,
-        );
-        final searchGap = _scaleByWidth(
-          width,
-          min: 30,
-          max: 44,
-          maxWidth: width,
-        );
-        final sectionGap = _scaleByWidth(
-          width,
-          min: 24,
-          max: 34,
-          maxWidth: width,
-        );
-        final dividerGapTop = _scaleByWidth(
-          width,
-          min: 28,
-          max: 38,
-          maxWidth: width,
-        );
-        final dividerGapBottom = _scaleByWidth(
-          width,
-          min: 18,
-          max: 26,
-          maxWidth: width,
-        );
-        final bottomGap = _scaleByWidth(
-          width,
-          min: 16,
-          max: 24,
-          maxWidth: width,
-        );
+        final pagePadding = waibyHorizontalPaddingForWidth(width);
+        final compact = width < WaibyBreakpoints.mobile;
+        final topPadding = compact ? WaibySpacing.s8 : WaibySpacing.s16;
+        final heroGap = compact ? WaibySpacing.s16 : WaibySpacing.s24;
+        final headingGap = compact ? WaibySpacing.s16 : WaibySpacing.s24;
+        final titleGap = compact ? WaibySpacing.s12 : WaibySpacing.s16;
+        final servicesGap = compact ? WaibySpacing.s16 : WaibySpacing.s24;
+        final searchGap = compact ? WaibySpacing.s24 : WaibySpacing.s32;
+        final sectionGap = compact ? WaibySpacing.s24 : WaibySpacing.s32;
+        final dividerGapTop = compact ? WaibySpacing.s24 : WaibySpacing.s32;
+        final dividerGapBottom = compact ? WaibySpacing.s16 : WaibySpacing.s24;
+        final bottomGap = compact ? WaibySpacing.s16 : WaibySpacing.s24;
 
         return Container(
           decoration: const BoxDecoration(
@@ -154,60 +133,82 @@ class _HomeBody extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: pagePadding),
-                      child: Center(
-                        child: SizedBox(
-                          width: contentWidth,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _HeroAdBanner(isLoggedIn: loggedIn),
-                              SizedBox(height: heroGap),
-                              const _HeadlineBlock(),
-                              SizedBox(height: headingGap),
-                              const _SimpleSectionTitle(text: 'All Services'),
-                              SizedBox(height: titleGap),
-                              const _ServicesCarousel(),
-                              SizedBox(height: servicesGap),
-                              const _SearchStrip(),
-                              SizedBox(height: searchGap),
-                              _BuddySection(
-                                title: 'The Best buddies',
-                                items: _bestBuddies,
-                                cardWidth: buddyCardWidth,
-                              ),
-                              SizedBox(height: sectionGap),
-                              _ProGamersSection(cardWidth: proCardWidth),
-                              SizedBox(height: sectionGap),
-                              _BuddySection(
-                                title: 'New Budies- Discover',
-                                items: _discoverBuddies,
-                                cardWidth: buddyCardWidth,
-                              ),
-                              SizedBox(height: sectionGap),
-                              _BuddySection(
-                                title: 'High Potential match',
-                                items: _matchBuddies,
-                                cardWidth: buddyCardWidth,
-                              ),
-                              SizedBox(height: dividerGapTop),
-                              Divider(
-                                color: const Color(
-                                  0xFF51D76E,
-                                ).withValues(alpha: 0.5),
-                                thickness: 1,
-                                height: 1,
-                              ),
-                              SizedBox(height: dividerGapBottom),
-                              const _HowItWorksSection(),
-                              SizedBox(height: bottomGap),
-                            ],
+                    WaibyConstrainedContent(
+                      maxWidth: _desktopMaxContentWidth,
+                      padding: EdgeInsets.fromLTRB(
+                        pagePadding,
+                        0,
+                        pagePadding + reservedSidebarSpace,
+                        0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _HeroAdBanner(isLoggedIn: loggedIn),
+                          SizedBox(height: heroGap),
+                          const _HeadlineBlock(),
+                          SizedBox(height: headingGap),
+                          const _SimpleSectionTitle(text: 'All Services'),
+                          SizedBox(height: titleGap),
+                          const _ServicesCarousel(),
+                          SizedBox(height: servicesGap),
+                          LayoutBuilder(
+                            builder: (context, sectionConstraints) {
+                              final sectionWidth = sectionConstraints.maxWidth;
+                              final servicesCardHeight =
+                                  _servicesCardWidthForWidth(sectionWidth) /
+                                  _servicesCarouselCardAspectRatio;
+                              final searchStripHeight = servicesCardHeight / 3;
+                              final searchStripWidth = math.min(
+                                sectionWidth,
+                                _servicesWidthForCardCount(sectionWidth, 5),
+                              );
+                              return Align(
+                                alignment: Alignment.center,
+                                child: SizedBox(
+                                  width: searchStripWidth,
+                                  child: _SearchStrip(
+                                    fixedHeight: searchStripHeight,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        ),
+                          SizedBox(height: searchGap),
+                          _BuddySection(
+                            title: 'The Best buddies',
+                            items: _bestBuddies,
+                            overlayStyle: _BuddyCardOverlayStyle.vibrant,
+                          ),
+                          SizedBox(height: sectionGap),
+                          const _ProGamersSection(),
+                          SizedBox(height: sectionGap),
+                          _BuddySection(
+                            title: 'New Budies- Discover',
+                            items: _discoverBuddies,
+                            overlayStyle: _BuddyCardOverlayStyle.mutedBlur,
+                          ),
+                          SizedBox(height: sectionGap),
+                          _BuddySection(
+                            title: 'High Potential match',
+                            items: _matchBuddies,
+                            overlayStyle: _BuddyCardOverlayStyle.mutedBlur,
+                          ),
+                          SizedBox(height: dividerGapTop),
+                          Divider(
+                            color: const Color(
+                              0xFF51D76E,
+                            ).withValues(alpha: 0.5),
+                            thickness: 1,
+                            height: 1,
+                          ),
+                          SizedBox(height: dividerGapBottom),
+                          const _HowItWorksSection(),
+                          SizedBox(height: bottomGap),
+                        ],
                       ),
                     ),
-                    const _FooterStrip(),
+                    const WaibyFooter(),
                   ],
                 ),
               ),
@@ -272,10 +273,10 @@ class _HomeChatDockState extends State<_HomeChatDock> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final dockHeight = math.max(320.0, constraints.maxHeight - 16);
+        final dockHeight = math.max(320.0, constraints.maxHeight - 20);
         final rawPanelWidth =
             constraints.maxWidth - widget.sidebarWidth - widget.sidebarGap - 24;
-        final maxPanelWidth = rawPanelWidth.clamp(560.0, 1142.0).toDouble();
+        final maxPanelWidth = rawPanelWidth.clamp(520.0, 860.0).toDouble();
         final visiblePanelWidth = _panelOpen ? maxPanelWidth : 0.0;
 
         return Stack(
@@ -410,224 +411,230 @@ class _HeroAdBanner extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final showAvatar = width >= 760;
-        final bannerHeight = _scaleByWidth(
-          width,
-          min: 170,
-          max: 260,
-          minWidth: 320,
-          maxWidth: width,
-        );
+        final showAvatar = width >= 880;
+        final bannerAspectRatio = width >= 1024
+            ? 4.2
+            : width >= WaibyBreakpoints.mobile
+            ? 3.2
+            : 2.0;
+        final bannerMinHeight = width >= WaibyBreakpoints.mobile
+            ? 210.0
+            : 180.0;
         final horizontalPadding = _scaleByWidth(
           width,
           min: 16,
-          max: 36,
+          max: 28,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final verticalPadding = _scaleByWidth(
           width,
           min: 12,
-          max: 20,
+          max: 18,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final titleFont = _scaleByWidth(
           width,
           min: 18,
-          max: 44,
+          max: 24,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final mvpFont = _scaleByWidth(
           width,
           min: 30,
-          max: 78,
+          max: 40,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final titleLetterSpacing = _scaleByWidth(
           width,
           min: 0.8,
-          max: 2.0,
+          max: 1.4,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final avatarSize = _scaleByWidth(
           width,
-          min: 152,
-          max: 208,
-          minWidth: 760,
-          maxWidth: width,
+          min: 118,
+          max: 156,
+          minWidth: 880,
+          maxWidth: 1200,
         );
         final avatarBorder = _scaleByWidth(
           width,
-          min: 8,
-          max: 13,
-          minWidth: 760,
-          maxWidth: width,
+          min: 6,
+          max: 8,
+          minWidth: 880,
+          maxWidth: 1200,
         );
         final avatarPadding = _scaleByWidth(
           width,
-          min: 5,
-          max: 7,
-          minWidth: 760,
-          maxWidth: width,
+          min: 4,
+          max: 6,
+          minWidth: 880,
+          maxWidth: 1200,
         );
         final sparkleSize = _scaleByWidth(
           width,
-          min: 44,
-          max: 62,
-          minWidth: 760,
-          maxWidth: width,
+          min: 34,
+          max: 48,
+          minWidth: 880,
+          maxWidth: 1200,
         );
 
-        return Container(
-          height: bannerHeight,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(5),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset('assets/login.png', fit: BoxFit.cover),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        const Color(0xCC102961),
-                        const Color(0x80121E46),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: verticalPadding,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'PANDIPARXDE',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white.withValues(alpha: 0.92),
-                                fontWeight: FontWeight.w700,
-                                fontSize: titleFont,
-                                letterSpacing: titleLetterSpacing,
-                              ),
-                            ),
-                            SizedBox(
-                              height: _scaleByWidth(
-                                width,
-                                min: 4,
-                                max: 8,
-                                minWidth: 320,
-                                maxWidth: width,
-                              ),
-                            ),
-                            Text(
-                              'WEEKLY MVP',
-                              style: GoogleFonts.poppins(
-                                color: const Color(0xFFFF6AD6),
-                                fontWeight: FontWeight.w700,
-                                fontSize: mvpFont,
-                                height: 0.92,
-                              ),
-                            ),
+        return ConstrainedBox(
+          constraints: BoxConstraints(minHeight: bannerMinHeight),
+          child: AspectRatio(
+            aspectRatio: bannerAspectRatio,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.asset('assets/login.png', fit: BoxFit.cover),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            const Color(0xCC102961),
+                            const Color(0x80121E46),
+                            Colors.transparent,
                           ],
                         ),
                       ),
-                      if (showAvatar)
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              width: avatarSize,
-                              height: avatarSize,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: avatarBorder,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF2F88FF,
-                                    ).withValues(alpha: 0.34),
-                                    blurRadius: 38,
-                                    spreadRadius: -6,
-                                  ),
-                                ],
-                              ),
-                              child: Padding(
-                                padding: EdgeInsets.all(avatarPadding),
-                                child: ClipOval(
-                                  child: Image.asset(
-                                    'assets/pp1.png',
-                                    fit: BoxFit.cover,
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                        vertical: verticalPadding,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'PANDIPARXDE',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white.withValues(alpha: 0.92),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: titleFont,
+                                    letterSpacing: titleLetterSpacing,
                                   ),
                                 ),
-                              ),
-                            ),
-                            Positioned(
-                              right: -8,
-                              bottom: 8,
-                              child: Icon(
-                                Icons.auto_awesome_rounded,
-                                color: Color(0xFF2F88FF),
-                                size: sparkleSize,
-                              ),
-                            ),
-                            if (isLoggedIn)
-                              Positioned(
-                                left: 8,
-                                top: -6,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 4,
+                                SizedBox(
+                                  height: _scaleByWidth(
+                                    width,
+                                    min: 4,
+                                    max: 8,
+                                    minWidth: 320,
+                                    maxWidth: 1200,
                                   ),
+                                ),
+                                Text(
+                                  'WEEKLY MVP',
+                                  style: GoogleFonts.poppins(
+                                    color: const Color(0xFFFF6AD6),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: mvpFont,
+                                    height: 0.92,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (showAvatar)
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  width: avatarSize,
+                                  height: avatarSize,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF51D76E),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    'ONLINE',
-                                    style: GoogleFonts.poppins(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
                                       color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: _scaleByWidth(
-                                        width,
-                                        min: 9,
-                                        max: 11,
-                                        minWidth: 760,
-                                        maxWidth: width,
+                                      width: avatarBorder,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFF2F88FF,
+                                        ).withValues(alpha: 0.34),
+                                        blurRadius: 38,
+                                        spreadRadius: -6,
                                       ),
-                                      letterSpacing: 0.7,
+                                    ],
+                                  ),
+                                  child: Padding(
+                                    padding: EdgeInsets.all(avatarPadding),
+                                    child: ClipOval(
+                                      child: Image.asset(
+                                        'assets/pp1.png',
+                                        fit: BoxFit.cover,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                          ],
-                        ),
-                    ],
-                  ),
+                                Positioned(
+                                  right: -8,
+                                  bottom: 8,
+                                  child: Icon(
+                                    Icons.auto_awesome_rounded,
+                                    color: Color(0xFF2F88FF),
+                                    size: sparkleSize,
+                                  ),
+                                ),
+                                if (isLoggedIn)
+                                  Positioned(
+                                    left: 8,
+                                    top: -6,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 9,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF51D76E),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        'ONLINE',
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: _scaleByWidth(
+                                            width,
+                                            min: 9,
+                                            max: 10,
+                                            minWidth: 880,
+                                            maxWidth: 1200,
+                                          ),
+                                          letterSpacing: 0.7,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -644,23 +651,24 @@ class _HeadlineBlock extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
+        final textTheme = Theme.of(context).textTheme;
         final titleSize = _scaleByWidth(
           width,
-          min: 24,
-          max: 36,
-          maxWidth: width,
+          min: 28,
+          max: 40,
+          maxWidth: 1200,
         );
         final subtitleSize = _scaleByWidth(
           width,
-          min: 15,
-          max: 20,
-          maxWidth: width,
+          min: 14,
+          max: 16,
+          maxWidth: 1200,
         );
         final dividerThickness = _scaleByWidth(
           width,
           min: 2,
           max: 3,
-          maxWidth: width,
+          maxWidth: 1200,
         );
 
         return Column(
@@ -668,15 +676,22 @@ class _HeadlineBlock extends StatelessWidget {
             Text(
               'FIND YOUR PERFECT BUDDY. ANYTIME',
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: titleSize,
-                height: 1.15,
-              ),
+              style:
+                  textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: titleSize,
+                    height: 1.15,
+                  ) ??
+                  GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: titleSize,
+                    height: 1.15,
+                  ),
             ),
             SizedBox(
-              height: _scaleByWidth(width, min: 6, max: 8, maxWidth: width),
+              height: _scaleByWidth(width, min: 6, max: 8, maxWidth: 1200),
             ),
             Text.rich(
               TextSpan(
@@ -692,18 +707,25 @@ class _HeadlineBlock extends StatelessWidget {
                 ],
               ),
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w400,
-                fontSize: subtitleSize,
-                height: 1.3,
-              ),
+              style:
+                  textTheme.bodyLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w400,
+                    fontSize: subtitleSize,
+                    height: 1.3,
+                  ) ??
+                  GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w400,
+                    fontSize: subtitleSize,
+                    height: 1.3,
+                  ),
             ),
             SizedBox(
-              height: _scaleByWidth(width, min: 10, max: 14, maxWidth: width),
+              height: _scaleByWidth(width, min: 10, max: 14, maxWidth: 1200),
             ),
             ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: width),
+              constraints: BoxConstraints(maxWidth: 1200),
               child: Divider(
                 color: const Color(0xFF51D76E),
                 thickness: dividerThickness,
@@ -725,19 +747,29 @@ class _SimpleSectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
+    final textTheme = Theme.of(context).textTheme;
     return Text(
       text,
-      style: GoogleFonts.poppins(
-        color: Colors.white,
-        fontWeight: FontWeight.w600,
-        fontSize: _scaleByWidth(width, min: 24, max: 32, maxWidth: width),
-      ),
+      style:
+          textTheme.titleLarge?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: _scaleByWidth(width, min: 18, max: 24, maxWidth: 1200),
+          ) ??
+          GoogleFonts.poppins(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: _scaleByWidth(width, min: 18, max: 24, maxWidth: 1200),
+          ),
     );
   }
 }
 
-class _ServicesCarousel extends StatelessWidget {
+class _ServicesCarousel extends StatefulWidget {
   const _ServicesCarousel();
+
+  @override
+  State<_ServicesCarousel> createState() => _ServicesCarouselState();
 
   static const _services = <_ServiceEntry>[
     _ServiceEntry(
@@ -880,67 +912,148 @@ class _ServicesCarousel extends StatelessWidget {
       labelBottom: 12,
     ),
   ];
+}
+
+class _ServicesCarouselState extends State<_ServicesCarousel> {
+  final ScrollController _scrollController = ScrollController();
+
+  bool _canScrollBackward = false;
+  bool _canScrollForward = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_syncArrowState);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncArrowState());
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_syncArrowState)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _syncArrowState() {
+    if (!mounted || !_scrollController.hasClients) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    final canScrollBackward = position.pixels > position.minScrollExtent + 0.5;
+    final canScrollForward = position.pixels < position.maxScrollExtent - 0.5;
+
+    if (canScrollBackward == _canScrollBackward &&
+        canScrollForward == _canScrollForward) {
+      return;
+    }
+
+    setState(() {
+      _canScrollBackward = canScrollBackward;
+      _canScrollForward = canScrollForward;
+    });
+  }
+
+  void _scrollBy(double delta) {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+
+    _scrollController.animateTo(
+      target.toDouble(),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _onPointerSignal(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_scrollController.hasClients) {
+      return;
+    }
+
+    final delta = event.scrollDelta.dy.abs() > event.scrollDelta.dx.abs()
+        ? event.scrollDelta.dy
+        : event.scrollDelta.dx;
+    if (delta == 0) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+
+    if ((target - position.pixels).abs() < 0.5) {
+      return;
+    }
+
+    _scrollController.jumpTo(target.toDouble());
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final cardScale = _scaleByWidth(
-          width,
-          min: 0.72,
-          max: 1,
-          minWidth: 320,
-          maxWidth: width,
-        );
-        final carouselHeight = _scaleByWidth(
-          width,
-          min: 150,
-          max: 186,
-          minWidth: 320,
-          maxWidth: width,
-        );
-        final horizontalPadding = _scaleByWidth(
-          width,
-          min: 10,
-          max: 24,
-          minWidth: 320,
-          maxWidth: width,
-        );
-        final verticalPadding = _scaleByWidth(
-          width,
-          min: 4,
-          max: 8,
-          minWidth: 320,
-          maxWidth: width,
-        );
-        final cardSpacing = _scaleByWidth(
-          width,
-          min: 16,
-          max: 60,
-          minWidth: 320,
-          maxWidth: width,
-        );
+        final cardWidth = _servicesCardWidthForWidth(width);
+        final cardHeight = cardWidth / _servicesCarouselCardAspectRatio;
+        final scrollStep = (cardWidth + _servicesCarouselCardSpacing) * 3;
 
         return SizedBox(
-          height: carouselHeight,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: verticalPadding,
+          height: cardHeight,
+          child: Row(
+            children: [
+              _CarouselArrowButton(
+                icon: Icons.chevron_left_rounded,
+                isEnabled: _canScrollBackward,
+                onPressed: () => _scrollBy(-scrollStep),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  for (int i = 0; i < _services.length; i++) ...[
-                    _ServiceCard(entry: _services[i], scale: cardScale),
-                    if (i != _services.length - 1) SizedBox(width: cardSpacing),
-                  ],
-                ],
+              const SizedBox(width: _servicesCarouselArrowToTrackGap),
+              Expanded(
+                child: NotificationListener<ScrollMetricsNotification>(
+                  onNotification: (notification) {
+                    _syncArrowState();
+                    return false;
+                  },
+                  child: Listener(
+                    onPointerSignal: _onPointerSignal,
+                    child: ScrollConfiguration(
+                      behavior: const _HorizontalMouseDragScrollBehavior(),
+                      child: ListView.separated(
+                        controller: _scrollController,
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _ServicesCarousel._services.length,
+                        physics: const BouncingScrollPhysics(),
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(width: _servicesCarouselCardSpacing),
+                        itemBuilder: (context, index) {
+                          return SizedBox(
+                            width: cardWidth,
+                            child: _ServiceCard(
+                              entry: _ServicesCarousel._services[index],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: _servicesCarouselArrowToTrackGap),
+              _CarouselArrowButton(
+                icon: Icons.chevron_right_rounded,
+                isEnabled: _canScrollForward,
+                onPressed: () => _scrollBy(scrollStep),
+              ),
+            ],
           ),
         );
       },
@@ -948,8 +1061,56 @@ class _ServicesCarousel extends StatelessWidget {
   }
 }
 
+class _CarouselArrowButton extends StatelessWidget {
+  final IconData icon;
+  final bool isEnabled;
+  final VoidCallback onPressed;
+
+  const _CarouselArrowButton({
+    required this.icon,
+    required this.isEnabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _servicesCarouselArrowButtonSize,
+      height: _servicesCarouselArrowButtonSize,
+      child: IconButton(
+        onPressed: isEnabled ? onPressed : null,
+        icon: Icon(icon, size: 24),
+        color: Colors.white.withValues(alpha: isEnabled ? 0.96 : 0.3),
+        disabledColor: Colors.white.withValues(alpha: 0.3),
+        style: IconButton.styleFrom(
+          padding: EdgeInsets.zero,
+          backgroundColor: const Color(
+            0xFF1B2348,
+          ).withValues(alpha: isEnabled ? 0.82 : 0.45),
+          side: BorderSide(
+            color: Colors.white.withValues(alpha: isEnabled ? 0.26 : 0.1),
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+    );
+  }
+}
+
+class _HorizontalMouseDragScrollBehavior extends MaterialScrollBehavior {
+  const _HorizontalMouseDragScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => <PointerDeviceKind>{
+    ...super.dragDevices,
+    PointerDeviceKind.mouse,
+  };
+}
+
 class _SearchStrip extends StatefulWidget {
-  const _SearchStrip();
+  final double? fixedHeight;
+
+  const _SearchStrip({this.fixedHeight});
 
   @override
   State<_SearchStrip> createState() => _SearchStripState();
@@ -1402,8 +1563,8 @@ class _SearchStripState extends State<_SearchStrip> {
       child: InkWell(
         onTap: () => _selectSearchEntry(entry),
         borderRadius: BorderRadius.circular(6),
-        child: SizedBox(
-          height: 36,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             children: [
               Container(
@@ -1445,7 +1606,7 @@ class _SearchStripState extends State<_SearchStrip> {
   }
 
   Widget _buildFiltersPanel(double width) {
-    final filtersPanelWidth = math.min(621.0, width);
+    final filtersPanelWidth = math.min(560.0, width);
     final languageColumns = filtersPanelWidth >= 580
         ? 4
         : filtersPanelWidth >= 420
@@ -1453,267 +1614,279 @@ class _SearchStripState extends State<_SearchStrip> {
         : 2;
     final languageRows = (_visibleLanguages.length / languageColumns).ceil();
     final panelHeight = _showAllLanguages
-        ? _clampDouble(278 + (languageRows * 38), 420, 760)
-        : 351.0;
+        ? _clampDouble(260 + (languageRows * 34), 360, 620)
+        : 330.0;
     final panelTitleSize = _scaleByWidth(
       width,
       min: 15,
       max: 16,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
     final panelTextSize = _scaleByWidth(
       width,
       min: 12,
       max: 14,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
     final sectionTitleSize = _scaleByWidth(
       width,
       min: 14,
       max: 16,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
     final showMoreSize = _scaleByWidth(
       width,
       min: 10,
       max: 12,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
 
-    return Container(
-      width: filtersPanelWidth,
-      height: panelHeight,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D1220),
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minWidth: math.min(300.0, filtersPanelWidth),
+        maxWidth: filtersPanelWidth,
+        minHeight: 280,
+        maxHeight: panelHeight,
       ),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Choose filters',
-              style: GoogleFonts.notoSans(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: panelTitleSize,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1220),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Choose filters',
+                style: GoogleFonts.notoSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: panelTitleSize,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'View only online buddies',
-                    style: GoogleFonts.notoSans(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                      fontSize: panelTextSize,
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'View only online buddies',
+                      style: GoogleFonts.notoSans(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                        fontSize: panelTextSize,
+                      ),
+                    ),
+                  ),
+                  _buildOnlineToggle(
+                    value: _onlineOnly,
+                    onTap: () {
+                      setState(() => _onlineOnly = !_onlineOnly);
+                      _syncPanelOverlay();
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Language',
+                style: GoogleFonts.notoSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: sectionTitleSize,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildOptionWrap(
+                options: _visibleLanguages.map((e) => e.label).toList(),
+                selectedValue: _selectedLanguageLabel,
+                onSelect: (value) {
+                  final code = _filterLanguages
+                      .where((entry) => entry.label == value)
+                      .map((entry) => entry.code)
+                      .firstOrNull;
+                  if (code != null) {
+                    _setLanguage(code);
+                  }
+                },
+                availableWidth: filtersPanelWidth - 40,
+                textSize: panelTextSize,
+                columns: languageColumns,
+              ),
+              const SizedBox(height: 6),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _toggleShowAllLanguages,
+                  borderRadius: BorderRadius.circular(3),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      _showAllLanguages ? 'Show less' : 'Show more',
+                      style: GoogleFonts.notoSans(
+                        color: const Color(0xFF51D76E),
+                        fontWeight: FontWeight.w500,
+                        fontSize: showMoreSize,
+                      ),
                     ),
                   ),
                 ),
-                _buildOnlineToggle(
-                  value: _onlineOnly,
-                  onTap: () {
-                    setState(() => _onlineOnly = !_onlineOnly);
-                    _syncPanelOverlay();
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Language',
-              style: GoogleFonts.notoSans(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: sectionTitleSize,
               ),
-            ),
-            const SizedBox(height: 8),
-            _buildOptionWrap(
-              options: _visibleLanguages.map((e) => e.label).toList(),
-              selectedValue: _selectedLanguageLabel,
-              onSelect: (value) {
-                final code = _filterLanguages
-                    .where((entry) => entry.label == value)
-                    .map((entry) => entry.code)
-                    .firstOrNull;
-                if (code != null) {
-                  _setLanguage(code);
-                }
-              },
-              availableWidth: filtersPanelWidth - 40,
-              textSize: panelTextSize,
-              columns: languageColumns,
-            ),
-            const SizedBox(height: 6),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _toggleShowAllLanguages,
-                borderRadius: BorderRadius.circular(3),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Text(
-                    _showAllLanguages ? 'Show less' : 'Show more',
-                    style: GoogleFonts.notoSans(
-                      color: const Color(0xFF51D76E),
-                      fontWeight: FontWeight.w500,
-                      fontSize: showMoreSize,
-                    ),
-                  ),
+              const SizedBox(height: 10),
+              Text(
+                'Gender',
+                style: GoogleFonts.notoSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: sectionTitleSize,
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Gender',
-              style: GoogleFonts.notoSans(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: sectionTitleSize,
+              const SizedBox(height: 8),
+              _buildOptionWrap(
+                options: const ['Female', 'Male', 'Non-binary'],
+                selectedValue: _selectedGender,
+                onSelect: _setGender,
+                availableWidth: filtersPanelWidth - 40,
+                textSize: panelTextSize,
+                columns: filtersPanelWidth >= 580 ? 3 : 2,
               ),
-            ),
-            const SizedBox(height: 8),
-            _buildOptionWrap(
-              options: const ['Female', 'Male', 'Non-binary'],
-              selectedValue: _selectedGender,
-              onSelect: _setGender,
-              availableWidth: filtersPanelWidth - 40,
-              textSize: panelTextSize,
-              columns: filtersPanelWidth >= 580 ? 3 : 2,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Age',
-              style: GoogleFonts.notoSans(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: sectionTitleSize,
+              const SizedBox(height: 10),
+              Text(
+                'Age',
+                style: GoogleFonts.notoSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: sectionTitleSize,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            _buildOptionWrap(
-              options: const ['18-25', '25-30', '30+'],
-              selectedValue: _selectedAgeRange,
-              onSelect: _setAgeRange,
-              availableWidth: filtersPanelWidth - 40,
-              textSize: panelTextSize,
-              columns: filtersPanelWidth >= 580 ? 3 : 2,
-            ),
-          ],
+              const SizedBox(height: 8),
+              _buildOptionWrap(
+                options: const ['18-25', '25-30', '30+'],
+                selectedValue: _selectedAgeRange,
+                onSelect: _setAgeRange,
+                availableWidth: filtersPanelWidth - 40,
+                textSize: panelTextSize,
+                columns: filtersPanelWidth >= 580 ? 3 : 2,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildSearchResultsPanel(double width) {
-    final searchPanelWidth = math.min(445.0, width);
+    final searchPanelWidth = math.min(560.0, width);
     final searchPanelHeight = _scaleByWidth(
       width,
-      min: 290,
-      max: 351,
+      min: 250,
+      max: 320,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
     final searchTabTitleSize = _scaleByWidth(
       width,
       min: 15,
       max: 16,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
     final searchTabCountSize = _scaleByWidth(
       width,
       min: 12,
       max: 13,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
     final searchLabelSize = _scaleByWidth(
       width,
       min: 12,
       max: 13,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
     final searchIconSizeInPanel = _scaleByWidth(
       width,
       min: 28,
       max: 30,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
     final searchBadgeSize = _scaleByWidth(
       width,
       min: 11,
       max: 13,
       minWidth: 320,
-      maxWidth: width,
+      maxWidth: 1200,
     );
 
-    return Container(
-      width: searchPanelWidth,
-      height: searchPanelHeight,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D1220),
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minWidth: math.min(320.0, searchPanelWidth),
+        maxWidth: searchPanelWidth,
+        minHeight: 220,
+        maxHeight: searchPanelHeight,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 20, top: 12, right: 20),
-            child: Row(
-              children: [
-                _buildSearchTab(
-                  label: 'Games',
-                  count: 20,
-                  isActive: _activeSearchTab == _SearchResultsTab.games,
-                  onTap: () => _setSearchTab(_SearchResultsTab.games),
-                  titleSize: searchTabTitleSize,
-                  countSize: searchTabCountSize,
-                  indicatorWidth: 56,
-                ),
-                const SizedBox(width: 24),
-                _buildSearchTab(
-                  label: 'Services',
-                  count: 10,
-                  isActive: _activeSearchTab == _SearchResultsTab.services,
-                  onTap: () => _setSearchTab(_SearchResultsTab.services),
-                  titleSize: searchTabTitleSize,
-                  countSize: searchTabCountSize,
-                  indicatorWidth: 64,
-                ),
-              ],
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1220),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 20, top: 12, right: 20),
+              child: Row(
+                children: [
+                  _buildSearchTab(
+                    label: 'Games',
+                    count: 20,
+                    isActive: _activeSearchTab == _SearchResultsTab.games,
+                    onTap: () => _setSearchTab(_SearchResultsTab.games),
+                    titleSize: searchTabTitleSize,
+                    countSize: searchTabCountSize,
+                    indicatorWidth: 56,
+                  ),
+                  const SizedBox(width: 24),
+                  _buildSearchTab(
+                    label: 'Services',
+                    count: 10,
+                    isActive: _activeSearchTab == _SearchResultsTab.services,
+                    onTap: () => _setSearchTab(_SearchResultsTab.services),
+                    titleSize: searchTabTitleSize,
+                    countSize: searchTabCountSize,
+                    indicatorWidth: 64,
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(18, 0, 12, 12),
-              itemCount: _filteredSearchEntries.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 5),
-              itemBuilder: (context, index) {
-                final entry = _filteredSearchEntries[index];
-                return _buildQuickSearchRow(
-                  entry: entry,
-                  iconSize: searchIconSizeInPanel,
-                  labelSize: searchLabelSize,
-                  badgeSize: searchBadgeSize,
-                );
-              },
+            const SizedBox(height: 10),
+            Flexible(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(18, 0, 12, 12),
+                itemCount: _filteredSearchEntries.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 5),
+                itemBuilder: (context, index) {
+                  final entry = _filteredSearchEntries[index];
+                  return _buildQuickSearchRow(
+                    entry: entry,
+                    iconSize: searchIconSizeInPanel,
+                    labelSize: searchLabelSize,
+                    badgeSize: searchBadgeSize,
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1723,61 +1896,63 @@ class _SearchStripState extends State<_SearchStrip> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final stripHeight = _scaleByWidth(
-          width,
-          min: 58,
-          max: 71,
-          minWidth: 320,
-          maxWidth: width,
-        );
+        final stripHeight =
+            widget.fixedHeight ??
+            _scaleByWidth(
+              width,
+              min: 44,
+              max: 52,
+              minWidth: 320,
+              maxWidth: 1200,
+            );
         final outerRadius = _scaleByWidth(
           width,
           min: 12,
           max: 15,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final horizontalInset = _scaleByWidth(
           width,
           min: 10,
           max: 14,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final verticalInset = _scaleByWidth(
           width,
           min: 8,
           max: 10,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final leadingGap = _scaleByWidth(
           width,
           min: 8,
           max: 12,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final searchIconSize = _scaleByWidth(
-          width,
-          min: 24,
-          max: 32,
-          minWidth: 320,
-          maxWidth: width,
-        );
-        final textSize = _scaleByWidth(
-          width,
-          min: 14,
-          max: 20,
-          minWidth: 320,
-          maxWidth: width,
-        );
-        final filterIconSize = _scaleByWidth(
           width,
           min: 20,
           max: 24,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
+        );
+        final textSize = _scaleByWidth(
+          width,
+          min: 14,
+          max: 16,
+          minWidth: 320,
+          maxWidth: 1200,
+        );
+        final filterIconSize = _scaleByWidth(
+          width,
+          min: 18,
+          max: 22,
+          minWidth: 320,
+          maxWidth: 1200,
         );
 
         if ((_lastAnchorWidth - width).abs() > 0.1) {
@@ -1854,7 +2029,7 @@ class _SearchStripState extends State<_SearchStrip> {
                         min: 6,
                         max: 8,
                         minWidth: 320,
-                        maxWidth: width,
+                        maxWidth: 1200,
                       ),
                     ),
                     CompositedTransformTarget(
@@ -1895,41 +2070,78 @@ class _SearchStripState extends State<_SearchStrip> {
 class _BuddySection extends StatelessWidget {
   final String title;
   final List<_BuddyEntry> items;
-  final double cardWidth;
+  final _BuddyCardOverlayStyle overlayStyle;
 
   const _BuddySection({
     required this.title,
     required this.items,
-    required this.cardWidth,
+    required this.overlayStyle,
   });
+
+  static const double _cardSpacing = WaibySpacing.s16;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final titleGap = _scaleByWidth(
-          width,
-          min: 10,
-          max: 14,
-          maxWidth: width,
+        final titleGap = width < WaibyBreakpoints.mobile
+            ? WaibySpacing.s12
+            : WaibySpacing.s16;
+        final visibleCards = width >= WaibyBreakpoints.tablet
+            ? 5
+            : width >= WaibyBreakpoints.mobile
+            ? 3
+            : 2;
+        final cardWidth = _clampDouble(
+          (width - (_cardSpacing * (visibleCards - 1))) / visibleCards,
+          140,
+          260,
         );
-        final cardGap = _scaleByWidth(width, min: 12, max: 22, maxWidth: width);
+        final cardHeight = _clampDouble(cardWidth * 0.92, 180, 230);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionHeaderRow(title: title),
+            _SectionHeaderRow(
+              title: title,
+              onViewMore: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _BuddyCategoryPage(
+                      title: title,
+                      items: items,
+                      overlayStyle: overlayStyle,
+                    ),
+                  ),
+                );
+              },
+            ),
             SizedBox(height: titleGap),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (int i = 0; i < items.length; i++) ...[
-                    _BuddyCard(entry: items[i], cardWidth: cardWidth),
-                    if (i != items.length - 1) SizedBox(width: cardGap),
-                  ],
-                ],
+            SizedBox(
+              height: cardHeight,
+              child: ScrollConfiguration(
+                behavior: const _HorizontalMouseDragScrollBehavior(),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: items.length,
+                  physics: const BouncingScrollPhysics(),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: _cardSpacing),
+                  itemBuilder: (context, index) {
+                    final entry = items[index];
+                    return SizedBox(
+                      width: cardWidth,
+                      child: _BuddyCard(
+                        entry: entry,
+                        overlayStyle: overlayStyle,
+                        onTap: () => context.go(
+                          '/profile/${Uri.encodeComponent(entry.name)}',
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -1940,9 +2152,9 @@ class _BuddySection extends StatelessWidget {
 }
 
 class _ProGamersSection extends StatelessWidget {
-  final double cardWidth;
+  const _ProGamersSection();
 
-  const _ProGamersSection({required this.cardWidth});
+  static const double _cardSpacing = WaibySpacing.s16;
 
   static const _pros = <_ProEntry>[
     _ProEntry(
@@ -1970,33 +2182,218 @@ class _ProGamersSection extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final titleGap = _scaleByWidth(
-          width,
-          min: 10,
-          max: 14,
-          maxWidth: width,
+        final titleGap = width < WaibyBreakpoints.mobile
+            ? WaibySpacing.s12
+            : WaibySpacing.s16;
+        final cardWidth = _clampDouble(
+          (width - (_cardSpacing * 2)) / 3,
+          230,
+          420,
         );
-        final cardGap = _scaleByWidth(width, min: 14, max: 24, maxWidth: width);
+        final cardHeight = cardWidth * 0.6;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionHeaderRow(title: 'Pro Gamers'),
+            _SectionHeaderRow(
+              title: 'Pro Gamers',
+              onViewMore: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const _ProCategoryPage(
+                      title: 'Pro Gamers',
+                      items: _pros,
+                    ),
+                  ),
+                );
+              },
+            ),
             SizedBox(height: titleGap),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (int i = 0; i < _pros.length; i++) ...[
-                    _ProCard(entry: _pros[i], cardWidth: cardWidth),
-                    if (i != _pros.length - 1) SizedBox(width: cardGap),
-                  ],
-                ],
+            SizedBox(
+              height: cardHeight,
+              child: ScrollConfiguration(
+                behavior: const _HorizontalMouseDragScrollBehavior(),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _pros.length,
+                  physics: const BouncingScrollPhysics(),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: _cardSpacing),
+                  itemBuilder: (context, index) {
+                    final entry = _pros[index];
+                    return SizedBox(
+                      width: cardWidth,
+                      child: _ProCard(
+                        entry: entry,
+                        onTap: () => context.go(
+                          '/profile/${Uri.encodeComponent(entry.name)}',
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+class _BuddyCategoryPage extends StatelessWidget {
+  final String title;
+  final List<_BuddyEntry> items;
+  final _BuddyCardOverlayStyle overlayStyle;
+
+  const _BuddyCategoryPage({
+    required this.title,
+    required this.items,
+    required this.overlayStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const cardSpacing = WaibySpacing.s16;
+    return Scaffold(
+      backgroundColor: const Color(0xFF050816),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0E1631),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          title,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final horizontalPadding = waibyHorizontalPaddingForWidth(width);
+          final contentWidth = math.min(
+            _desktopMaxContentWidth,
+            width - (horizontalPadding * 2),
+          );
+          final visibleCards = width >= WaibyBreakpoints.tablet
+              ? 5
+              : width >= WaibyBreakpoints.mobile
+              ? 3
+              : 2;
+          final cardWidth = _clampDouble(
+            (contentWidth - (cardSpacing * (visibleCards - 1))) / visibleCards,
+            140,
+            260,
+          );
+          final cardHeight = _clampDouble(cardWidth * 0.92, 180, 230);
+
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: _desktopMaxContentWidth,
+              ),
+              child: GridView.builder(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  WaibySpacing.s16,
+                  horizontalPadding,
+                  WaibySpacing.s24,
+                ),
+                itemCount: items.length,
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: cardWidth,
+                  mainAxisExtent: cardHeight,
+                  crossAxisSpacing: cardSpacing,
+                  mainAxisSpacing: cardSpacing,
+                ),
+                itemBuilder: (context, index) {
+                  final entry = items[index];
+                  return _BuddyCard(
+                    entry: entry,
+                    overlayStyle: overlayStyle,
+                    onTap: () => context.go(
+                      '/profile/${Uri.encodeComponent(entry.name)}',
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProCategoryPage extends StatelessWidget {
+  final String title;
+  final List<_ProEntry> items;
+
+  const _ProCategoryPage({required this.title, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    const cardSpacing = WaibySpacing.s16;
+    return Scaffold(
+      backgroundColor: const Color(0xFF050816),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0E1631),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          title,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final horizontalPadding = waibyHorizontalPaddingForWidth(width);
+          final contentWidth = math.min(
+            _desktopMaxContentWidth,
+            width - (horizontalPadding * 2),
+          );
+          final cardWidth = _clampDouble(
+            (contentWidth - (cardSpacing * 2)) / 3,
+            230,
+            420,
+          );
+          final cardHeight = cardWidth * 0.6;
+
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: _desktopMaxContentWidth,
+              ),
+              child: GridView.builder(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  WaibySpacing.s16,
+                  horizontalPadding,
+                  WaibySpacing.s24,
+                ),
+                itemCount: items.length,
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: cardWidth,
+                  mainAxisExtent: cardHeight,
+                  crossAxisSpacing: cardSpacing,
+                  mainAxisSpacing: cardSpacing,
+                ),
+                itemBuilder: (context, index) {
+                  final entry = items[index];
+                  return _ProCard(
+                    entry: entry,
+                    onTap: () => context.go(
+                      '/profile/${Uri.encodeComponent(entry.name)}',
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -2030,143 +2427,80 @@ class _HowItWorksSection extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final compact = width < 980;
-        final sectionHeight = compact ? (width < 420 ? 760.0 : 820.0) : 956.0;
-        final contentWidth = compact
-            ? math.max(300.0, width - 20)
-            : math.min(1518.0, width - 20);
+        final compact = width < WaibyBreakpoints.tablet;
+        final contentWidth = math.min(width, 960.0);
         final headingSize = _scaleByWidth(
           width,
-          min: 26,
-          max: 32,
+          min: 22,
+          max: 28,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final subtitleSize = _scaleByWidth(
           width,
-          min: 15,
-          max: 20,
+          min: 14,
+          max: 16,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
-        final topPadding = _scaleByWidth(
-          width,
-          min: 18,
-          max: 24,
-          minWidth: 320,
-          maxWidth: width,
-        );
-        final leftPadding = compact
-            ? _scaleByWidth(
-                width,
-                min: 4,
-                max: 10,
-                minWidth: 320,
-                maxWidth: width,
-              )
-            : 20.0;
-        final stepsTopGap = _scaleByWidth(
-          width,
-          min: 30,
-          max: 54,
-          minWidth: 320,
-          maxWidth: width,
-        );
+        final topPadding = compact ? WaibySpacing.s24 : WaibySpacing.s32;
+        final stepsTopGap = compact ? WaibySpacing.s24 : WaibySpacing.s32;
 
-        return SizedBox(
-          height: sectionHeight,
+        return Container(
+          padding: EdgeInsets.symmetric(
+            vertical: topPadding,
+            horizontal: compact ? WaibySpacing.s8 : WaibySpacing.s12,
+          ),
           child: Stack(
             children: [
-              const Positioned.fill(
+              Positioned.fill(
                 child: DecoratedBox(
-                  decoration: BoxDecoration(color: Color(0x1A020305)),
+                  decoration: BoxDecoration(
+                    color: const Color(0x1A020305),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
               Positioned(
-                left: width * -0.018,
-                top: -sectionHeight * 0.64,
+                left: -width * 0.18,
+                top: -width * 0.18,
                 child: _BlurEllipse(
-                  width: width * 0.82,
-                  height: sectionHeight * 0.32,
+                  width: width * 0.56,
+                  height: 160,
                   colors: const [Color(0x33020303), Color(0x338FFDBB)],
-                  blurSigma: 100,
+                  blurSigma: 60,
                   rotation: 0.7,
                   opacity: 0.2,
                 ),
               ),
               Positioned(
-                left: -width * 0.22,
-                top: sectionHeight * 0.30,
+                left: -width * 0.28,
+                top: 140,
                 child: _BlurEllipse(
-                  width: width * 0.66,
-                  height: sectionHeight * 0.50,
+                  width: width * 0.42,
+                  height: 180,
                   colors: const [Color(0x66000000), Color(0x66FF0000)],
-                  blurSigma: 100,
+                  blurSigma: 70,
                   rotation: 0.55,
                 ),
               ),
               Positioned(
-                left: -width * 0.06,
-                top: sectionHeight * 0.45,
-                child: _BlurEllipse(
-                  width: width * 0.86,
-                  height: sectionHeight * 0.26,
-                  colors: const [Color(0x66FA474A), Color(0x66FFFFFF)],
-                  blurSigma: 40,
-                  rotation: -0.24,
-                ),
-              ),
-              Positioned(
-                left: -width * 0.29,
-                top: sectionHeight * 0.61,
+                right: -width * 0.16,
+                top: 220,
                 child: _BlurEllipse(
                   width: width * 0.62,
-                  height: sectionHeight * 0.24,
-                  colors: const [Color(0x66FE492D), Color(0x66F89A67)],
-                  blurSigma: 100,
-                  rotation: 0.35,
-                ),
-              ),
-              Positioned(
-                left: width * 0.29,
-                top: sectionHeight * 0.38,
-                child: _BlurEllipse(
-                  width: width * 0.86,
-                  height: sectionHeight * 0.42,
+                  height: 210,
                   colors: const [Color(0x00F8F8F8), Color(0x66F91E94)],
-                  blurSigma: 60,
+                  blurSigma: 44,
                   rotation: -0.22,
                 ),
               ),
               Positioned(
-                left: width * 0.24,
-                top: sectionHeight * 0.51,
+                right: width * 0.02,
+                bottom: -30,
                 child: _BlurEllipse(
-                  width: width * 0.72,
-                  height: sectionHeight * 0.45,
-                  colors: const [Color(0x66F50F1A), Color(0x66FB3CEE)],
-                  blurSigma: 60,
-                  rotation: -0.2,
-                ),
-              ),
-              Positioned(
-                left: width * 0.14,
-                top: sectionHeight * 0.63,
-                child: _BlurEllipse(
-                  width: width * 0.71,
-                  height: sectionHeight * 0.48,
-                  colors: const [Color(0x80F50F1A), Color(0x80FB3CEE)],
-                  blurSigma: 150,
-                  rotation: -0.2,
-                  opacity: 0.7,
-                ),
-              ),
-              Positioned(
-                left: width * 0.36,
-                top: sectionHeight * 0.67,
-                child: _BlurEllipse(
-                  width: width * 0.72,
-                  height: sectionHeight * 0.27,
+                  width: width * 0.52,
+                  height: 120,
                   colors: const [Color(0x00F8F8F8), Color(0x88FFDB00)],
                   blurSigma: 10,
                   rotation: 0.1,
@@ -2189,64 +2523,43 @@ class _HowItWorksSection extends StatelessWidget {
                 alignment: Alignment.topCenter,
                 child: SizedBox(
                   width: contentWidth,
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      compact ? 8 : 0,
-                      topPadding,
-                      compact ? 8 : 0,
-                      0,
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          'How It works',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: headingSize,
+                  child: Column(
+                    children: [
+                      Text(
+                        'How It works',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: headingSize,
+                        ),
+                      ),
+                      const SizedBox(height: WaibySpacing.s8),
+                      Text(
+                        'Finding the perfect buddy has never been this easy.\nJust choose a service, connect, and enjoy',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                          fontSize: subtitleSize,
+                          height: 1.35,
+                        ),
+                      ),
+                      SizedBox(height: stepsTopGap),
+                      for (int i = 0; i < _steps.length; i++)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            bottom: i == _steps.length - 1
+                                ? 0
+                                : WaibySpacing.s16,
+                          ),
+                          child: _HowStepRow(
+                            entry: _steps[i],
+                            showLine: i != _steps.length - 1,
+                            compact: compact,
                           ),
                         ),
-                        SizedBox(
-                          height: _scaleByWidth(
-                            width,
-                            min: 6,
-                            max: 8,
-                            minWidth: 320,
-                            maxWidth: width,
-                          ),
-                        ),
-                        ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: width),
-                          child: Text(
-                            'Finding the perfect buddy has never been this easy.\nJust choose a service, connect, and enjoy',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                              fontSize: subtitleSize,
-                              height: 1.35,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: stepsTopGap),
-                        Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(left: leftPadding),
-                            child: Column(
-                              children: [
-                                for (int i = 0; i < _steps.length; i++)
-                                  _HowStepRow(
-                                    entry: _steps[i],
-                                    showLine: i != _steps.length - 1,
-                                    compact: compact,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -2258,75 +2571,11 @@ class _HowItWorksSection extends StatelessWidget {
   }
 }
 
-class _FooterStrip extends StatelessWidget {
-  const _FooterStrip();
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final iconSpacing = _scaleByWidth(
-          width,
-          min: 24,
-          max: 100,
-          maxWidth: width,
-        );
-        final verticalPadding = _scaleByWidth(
-          width,
-          min: 14,
-          max: 20,
-          maxWidth: width,
-        );
-
-        return Container(
-          decoration: const BoxDecoration(color: Color(0xFF070B1D)),
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: verticalPadding),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 52),
-                child: Wrap(
-                  spacing: iconSpacing,
-                  runSpacing: 12,
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: const [
-                    _FooterIcon(
-                      icon: FontAwesomeIcons.google,
-                      background: Colors.white,
-                    ),
-                    _FooterIcon(
-                      icon: FontAwesomeIcons.discord,
-                      background: Color(0xFF5865F2),
-                    ),
-                    _FooterIcon(
-                      icon: FontAwesomeIcons.youtube,
-                      background: Colors.white,
-                    ),
-                    _FooterIcon(
-                      icon: FontAwesomeIcons.xTwitter,
-                      background: Color(0xFF111111),
-                    ),
-                    _FooterIcon(
-                      icon: FontAwesomeIcons.instagram,
-                      background: Color(0xFFE1306C),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _SectionHeaderRow extends StatelessWidget {
   final String title;
+  final VoidCallback? onViewMore;
 
-  const _SectionHeaderRow({required this.title});
+  const _SectionHeaderRow({required this.title, this.onViewMore});
 
   @override
   Widget build(BuildContext context) {
@@ -2336,37 +2585,37 @@ class _SectionHeaderRow extends StatelessWidget {
         final compact = width < 620;
         final titleSize = _scaleByWidth(
           width,
-          min: 24,
-          max: 32,
+          min: 18,
+          max: 24,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final buttonHeight = _scaleByWidth(
           width,
-          min: 33,
-          max: 40,
+          min: 34,
+          max: 38,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final buttonTextSize = _scaleByWidth(
           width,
           min: 13,
-          max: 16,
+          max: 14,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
         final buttonHorizontalPadding = _scaleByWidth(
           width,
           min: 12,
           max: 18,
           minWidth: 320,
-          maxWidth: width,
+          maxWidth: 1200,
         );
 
         final viewMoreButton = SizedBox(
           height: buttonHeight,
           child: ElevatedButton(
-            onPressed: () {},
+            onPressed: onViewMore,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2F88FF),
               foregroundColor: Colors.white,
@@ -2429,329 +2678,254 @@ class _SectionHeaderRow extends StatelessWidget {
 
 class _ServiceCard extends StatelessWidget {
   final _ServiceEntry entry;
-  final double scale;
 
-  const _ServiceCard({required this.entry, this.scale = 1});
+  const _ServiceCard({required this.entry});
 
   @override
   Widget build(BuildContext context) {
     final hasTitle = entry.title.trim().isNotEmpty;
     final titleParts = hasTitle ? entry.title.split('\n') : const <String>[];
-    final cardWidth = 159 * scale;
-    final cardHeight = 169 * scale;
-    final radius = _clampDouble(5 * scale, 4, 7);
-    final labelFontSize = _clampDouble(20 * scale, 14, 20);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = (constraints.maxWidth / 156).clamp(0.72, 1.1).toDouble();
+        final radius = _clampDouble(5 * scale, 4, 8);
+        final labelFontSize = _clampDouble(20 * scale, 14, 20);
 
-    return Container(
-      width: cardWidth,
-      height: cardHeight,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        color: entry.solidColor ?? entry.fallbackColor,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (entry.asset != null)
-              Image.asset(
-                entry.asset!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    ColoredBox(color: entry.fallbackColor),
-              ),
-            if (entry.asset != null && hasTitle)
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.58),
-                    ],
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            color: entry.solidColor ?? entry.fallbackColor,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(radius),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (entry.asset != null)
+                  Image.asset(
+                    entry.asset!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        ColoredBox(color: entry.fallbackColor),
                   ),
-                ),
-              ),
-            if (entry.icon != null)
-              Positioned(
-                top: entry.iconTop * scale,
-                left: 0,
-                right: 0,
-                child: Icon(
-                  entry.icon,
-                  color: Colors.white,
-                  size: entry.iconSize * scale,
-                ),
-              ),
-            if (hasTitle)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: entry.labelBottom * scale,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final part in titleParts)
-                      Text(
-                        part,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontWeight: entry.labelWeight,
-                          fontSize: labelFontSize,
-                          height: 1.0,
-                        ),
+                if (entry.asset != null && hasTitle)
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.58),
+                        ],
                       ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
+                    ),
+                  ),
+                if (entry.icon != null)
+                  Positioned(
+                    top: entry.iconTop * scale,
+                    left: 0,
+                    right: 0,
+                    child: Icon(
+                      entry.icon,
+                      color: Colors.white,
+                      size: entry.iconSize * scale,
+                    ),
+                  ),
+                if (hasTitle)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: entry.labelBottom * scale,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final part in titleParts)
+                          Text(
+                            part,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: entry.labelWeight,
+                              fontSize: labelFontSize,
+                              height: 1.0,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
+
+enum _BuddyCardOverlayStyle { vibrant, mutedBlur }
 
 class _BuddyCard extends StatelessWidget {
   final _BuddyEntry entry;
-  final double cardWidth;
+  final _BuddyCardOverlayStyle overlayStyle;
+  final VoidCallback onTap;
 
-  const _BuddyCard({required this.entry, required this.cardWidth});
+  const _BuddyCard({
+    required this.entry,
+    required this.overlayStyle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final overlayHeight = _clampDouble(cardWidth * 0.24, 52, 70);
-    final cardHeight = cardWidth * 0.94;
-    final radius = _clampDouble(cardWidth * 0.04, 8, 12);
-    final overlayHorizontalPadding = _clampDouble(cardWidth * 0.045, 10, 14);
-    final overlayVerticalPadding = _clampDouble(overlayHeight * 0.12, 6, 8);
-    final nameFontSize = _clampDouble(cardWidth * 0.082, 15, 20);
-    final ratingFontSize = _clampDouble(cardWidth * 0.065, 12, 16);
-    final actionSize = _clampDouble(overlayHeight * 0.52, 28, 36);
-    final actionIconSize = _clampDouble(actionSize * 0.58, 16, 20);
-    final heartSize = _clampDouble(ratingFontSize * 0.75, 10, 12);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth;
+        final cardHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : cardWidth * 0.88;
+        final overlayHeight = _clampDouble(cardHeight * 0.25, 50, 66);
+        final radius = _clampDouble(cardWidth * 0.035, 7, 10);
+        final overlayHorizontalPadding = _clampDouble(cardWidth * 0.045, 8, 12);
+        final overlayVerticalPadding = _clampDouble(overlayHeight * 0.14, 5, 8);
+        final nameFontSize = _clampDouble(cardWidth * 0.07, 12, 16);
+        final ratingFontSize = _clampDouble(cardWidth * 0.048, 10, 13);
+        final actionSize = _clampDouble(overlayHeight * 0.52, 24, 32);
+        final actionIconSize = _clampDouble(actionSize * 0.58, 14, 18);
+        final heartSize = _clampDouble(ratingFontSize * 0.75, 8, 11);
+        final overlayDecoration = overlayStyle == _BuddyCardOverlayStyle.vibrant
+            ? const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xFF2F88FF),
+                    Color(0xFF1A4C9D),
+                    Color(0xFF1B234B),
+                  ],
+                  stops: [0, 0.37, 0.97],
+                ),
+              )
+            : const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment(-1, -0.08),
+                  end: Alignment(1, 0.08),
+                  colors: [
+                    Color(0xE60D1220),
+                    Color(0xE61B234B),
+                    Color(0xE61A4C9D),
+                  ],
+                  stops: [0, 0.5959, 0.9684],
+                ),
+              );
 
-    return Container(
-      width: cardWidth,
-      height: cardHeight,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.asset(
-              entry.asset,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => ColoredBox(
-                color: const Color(0xFF141D38),
-                child: Icon(
-                  Icons.person_rounded,
-                  color: Colors.white.withValues(alpha: 0.72),
-                  size: 48,
-                ),
-              ),
+        return GestureDetector(
+          onTap: onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                height: overlayHeight,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Color(0xFF2F88FF),
-                      Color(0xFF1A4C9D),
-                      Color(0xFF1B234B),
-                    ],
-                    stops: [0, 0.37, 0.97],
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    entry.asset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => ColoredBox(
+                      color: const Color(0xFF141D38),
+                      child: Icon(
+                        Icons.person_rounded,
+                        color: Colors.white.withValues(alpha: 0.72),
+                        size: _clampDouble(cardWidth * 0.2, 28, 42),
+                      ),
+                    ),
                   ),
-                ),
-                padding: EdgeInsets.fromLTRB(
-                  overlayHorizontalPadding,
-                  overlayVerticalPadding,
-                  overlayHorizontalPadding * 0.7,
-                  overlayVerticalPadding,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            entry.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: nameFontSize,
-                              height: 1.0,
-                            ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: ClipRect(
+                      child: BackdropFilter(
+                        filter: overlayStyle == _BuddyCardOverlayStyle.mutedBlur
+                            ? ui.ImageFilter.blur(sigmaX: 7.5, sigmaY: 7.5)
+                            : ui.ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                        child: Container(
+                          height: overlayHeight,
+                          decoration: overlayDecoration,
+                          padding: EdgeInsets.fromLTRB(
+                            overlayHorizontalPadding,
+                            overlayVerticalPadding,
+                            overlayHorizontalPadding * 0.7,
+                            overlayVerticalPadding,
                           ),
-                          const Spacer(),
-                          Row(
+                          child: Row(
                             children: [
-                              Text(
-                                entry.rating,
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: ratingFontSize,
-                                  height: 1.0,
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      entry.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: nameFontSize,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          entry.rating,
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: ratingFontSize,
+                                            height: 1.0,
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: _clampDouble(
+                                            overlayHeight * 0.06,
+                                            3,
+                                            4,
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.favorite,
+                                          color: const Color(0xFF51D76E),
+                                          size: heartSize,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                               SizedBox(
-                                width: _clampDouble(overlayHeight * 0.06, 3, 4),
+                                width: _clampDouble(overlayHeight * 0.12, 6, 8),
                               ),
-                              Icon(
-                                Icons.favorite,
-                                color: Color(0xFF51D76E),
-                                size: heartSize,
+                              Container(
+                                width: actionSize,
+                                height: actionSize,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF2F88FF),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                  size: actionIconSize,
+                                ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(width: _clampDouble(overlayHeight * 0.12, 6, 8)),
-                    Container(
-                      width: actionSize,
-                      height: actionSize,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF2F88FF),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.play_arrow_rounded,
-                        color: Colors.white,
-                        size: actionIconSize,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProCard extends StatelessWidget {
-  final _ProEntry entry;
-  final double cardWidth;
-
-  const _ProCard({required this.entry, required this.cardWidth});
-
-  @override
-  Widget build(BuildContext context) {
-    final totalHeight = _clampDouble(cardWidth * 0.62, 240, 320);
-    final frameHeight = totalHeight - 41;
-    final playButtonSize = _clampDouble(cardWidth * 0.12, 46, 56);
-    final playIconSize = _clampDouble(playButtonSize * 0.6, 26, 34);
-    final gameFontSize = _clampDouble(cardWidth * 0.052, 18, 26);
-    final nameFontSize = _clampDouble(cardWidth * 0.088, 30, 44);
-    final rankFontSize = _clampDouble(cardWidth * 0.03, 12, 15);
-    final sidePadding = _clampDouble(cardWidth * 0.034, 12, 16);
-    final topPadding = _clampDouble(cardWidth * 0.04, 14, 18);
-    final bottomPadding = _clampDouble(cardWidth * 0.035, 12, 16);
-    final rankHorizontalPadding = _clampDouble(cardWidth * 0.028, 10, 14);
-    final rankVerticalPadding = _clampDouble(cardWidth * 0.006, 2, 4);
-
-    return SizedBox(
-      width: cardWidth,
-      height: totalHeight,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 0,
-            child: Container(
-              height: frameHeight,
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFF51D76E), width: 2),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 54,
-                    child: Image.asset(
-                      entry.asset,
-                      fit: BoxFit.cover,
-                      height: double.infinity,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const ColoredBox(color: Color(0xFF131A38)),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 46,
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        sidePadding,
-                        topPadding,
-                        sidePadding,
-                        bottomPadding,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            entry.game,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: gameFontSize,
-                              height: 1.02,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            entry.name,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: nameFontSize,
-                              height: 1.0,
-                            ),
-                          ),
-                          SizedBox(
-                            height: _clampDouble(cardWidth * 0.016, 4, 8),
-                          ),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: rankHorizontalPadding,
-                              vertical: rankVerticalPadding,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0x4D261A53),
-                              border: Border.all(
-                                color: const Color(0xFF5FE635),
-                              ),
-                            ),
-                            child: Text(
-                              entry.rank,
-                              style: GoogleFonts.poppins(
-                                color: const Color(0xFF48BE4C),
-                                fontWeight: FontWeight.w400,
-                                fontSize: rankFontSize,
-                                height: 1.2,
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
@@ -2759,21 +2933,166 @@ class _ProCard extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            width: playButtonSize,
-            height: playButtonSize,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFF51D76E),
-            ),
-            child: Icon(
-              Icons.play_arrow_rounded,
-              color: Colors.white,
-              size: playIconSize,
+        );
+      },
+    );
+  }
+}
+
+class _ProCard extends StatelessWidget {
+  final _ProEntry entry;
+  final VoidCallback onTap;
+
+  const _ProCard({required this.entry, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth;
+        final totalHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : cardWidth * 0.6;
+        final frameHeight = totalHeight - 34;
+        final playButtonSize = _clampDouble(cardWidth * 0.12, 34, 48);
+        final playIconSize = _clampDouble(playButtonSize * 0.6, 20, 30);
+        final gameFontSize = _clampDouble(cardWidth * 0.043, 12, 18);
+        final nameFontSize = _clampDouble(cardWidth * 0.065, 18, 26);
+        final rankFontSize = _clampDouble(cardWidth * 0.028, 10, 12);
+        final sidePadding = _clampDouble(cardWidth * 0.026, 8, 12);
+        final topPadding = _clampDouble(cardWidth * 0.026, 8, 12);
+        final bottomPadding = _clampDouble(cardWidth * 0.026, 8, 12);
+        final rankHorizontalPadding = _clampDouble(cardWidth * 0.02, 6, 10);
+        final rankVerticalPadding = _clampDouble(cardWidth * 0.006, 2, 4);
+
+        return GestureDetector(
+          onTap: onTap,
+          child: SizedBox(
+            height: totalHeight,
+            child: Stack(
+              alignment: Alignment.bottomCenter,
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    height: frameHeight,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: const Color(0xFF51D76E),
+                        width: 2,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 54,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Positioned.fill(
+                                child: Image.asset(
+                                  entry.asset,
+                                  fit: BoxFit.cover,
+                                  height: double.infinity,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const ColoredBox(
+                                        color: Color(0xFF131A38),
+                                      ),
+                                ),
+                              ),
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: -(playButtonSize / 2),
+                                child: Center(
+                                  child: Container(
+                                    width: playButtonSize,
+                                    height: playButtonSize,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Color(0xFF51D76E),
+                                    ),
+                                    child: Icon(
+                                      Icons.play_arrow_rounded,
+                                      color: Colors.white,
+                                      size: playIconSize,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          flex: 46,
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              sidePadding,
+                              topPadding,
+                              sidePadding,
+                              bottomPadding,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry.game,
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: gameFontSize,
+                                    height: 1.05,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  entry.name,
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: nameFontSize,
+                                    height: 1.0,
+                                  ),
+                                ),
+                                SizedBox(
+                                  height: _clampDouble(cardWidth * 0.01, 3, 6),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: rankHorizontalPadding,
+                                    vertical: rankVerticalPadding,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0x4D261A53),
+                                    border: Border.all(
+                                      color: const Color(0xFF5FE635),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    entry.rank,
+                                    style: GoogleFonts.poppins(
+                                      color: const Color(0xFF48BE4C),
+                                      fontWeight: FontWeight.w400,
+                                      fontSize: rankFontSize,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -2793,9 +3112,9 @@ class _HowStepRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final tinyCompact = compact && screenWidth < 420;
-    final markerSize = compact ? (tinyCompact ? 70.0 : 84.0) : 118.0;
-    final lineHeight = compact ? (tinyCompact ? 40.0 : 56.0) : 98.0;
-    final railWidth = compact ? (tinyCompact ? 82.0 : 104.0) : 176.0;
+    final markerSize = compact ? (tinyCompact ? 54.0 : 62.0) : 72.0;
+    final lineHeight = compact ? (tinyCompact ? 28.0 : 36.0) : 48.0;
+    final railWidth = compact ? (tinyCompact ? 64.0 : 76.0) : 110.0;
     final rowHeight = markerSize + (showLine ? lineHeight : 0);
 
     return ConstrainedBox(
@@ -2817,7 +3136,7 @@ class _HowStepRow extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       color: const Color(0xFF111111),
                       fontWeight: FontWeight.w700,
-                      fontSize: compact ? (tinyCompact ? 36 : 46) : 52,
+                      fontSize: compact ? (tinyCompact ? 28 : 32) : 36,
                       height: 1.0,
                     ),
                   ),
@@ -2827,11 +3146,11 @@ class _HowStepRow extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(width: compact ? (tinyCompact ? 12 : 18) : 26),
+          SizedBox(width: compact ? (tinyCompact ? 12 : 16) : 20),
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(
-                top: compact ? (tinyCompact ? 2 : 6) : 10,
+                top: compact ? (tinyCompact ? 2 : 4) : 8,
                 right: 8,
               ),
               child: Column(
@@ -2842,17 +3161,17 @@ class _HowStepRow extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
-                      fontSize: compact ? (tinyCompact ? 18 : 22) : 24,
+                      fontSize: compact ? (tinyCompact ? 18 : 20) : 22,
                       height: 1.15,
                     ),
                   ),
-                  SizedBox(height: compact ? 8 : 6),
+                  SizedBox(height: compact ? 6 : 8),
                   Text(
                     entry.description,
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontWeight: FontWeight.w400,
-                      fontSize: compact ? (tinyCompact ? 14 : 16) : 20,
+                      fontSize: compact ? (tinyCompact ? 14 : 15) : 16,
                       height: 1.4,
                     ),
                   ),
@@ -2916,43 +3235,6 @@ class _BlurEllipse extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _FooterIcon extends StatelessWidget {
-  final IconData icon;
-  final Color background;
-
-  const _FooterIcon({required this.icon, required this.background});
-
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final boxSize = _scaleByWidth(width, min: 40, max: 44, maxWidth: width);
-    final borderRadius = _scaleByWidth(width, min: 8, max: 9, maxWidth: width);
-    final iconSize = _scaleByWidth(width, min: 18, max: 22, maxWidth: width);
-    final iconColor = background == Colors.white
-        ? const Color(0xFF151515)
-        : Colors.white;
-
-    return Container(
-      width: boxSize,
-      height: boxSize,
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(borderRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 10,
-            spreadRadius: -4,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: FaIcon(icon, color: iconColor, size: iconSize),
     );
   }
 }

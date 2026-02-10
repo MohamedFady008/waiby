@@ -431,4 +431,17 @@ class AuthController extends GetxController {
   void logout() {
     signOut();
   }
+
+  void setCreatorStatus(bool value) {
+    if (_isCreator == value) {
+      return;
+    }
+    _isCreator = value;
+    notifyListeners();
+  }
+
+  void toggleCreatorStatus() {
+    _isCreator = !_isCreator;
+    notifyListeners();
+  }
 }

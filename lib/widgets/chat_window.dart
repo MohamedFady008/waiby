@@ -171,8 +171,8 @@ Future<void> showWaibyChatDialog(
     barrierColor: Colors.black.withValues(alpha: 0.7),
     builder: (dialogContext) {
       final size = MediaQuery.sizeOf(dialogContext);
-      final width = math.min(1142.0, size.width - 24);
-      final height = math.min(968.0, size.height - 24);
+      final width = (size.width - 24).clamp(320.0, 980.0).toDouble();
+      final height = (size.height - 24).clamp(440.0, 860.0).toDouble();
       return Dialog(
         insetPadding: const EdgeInsets.all(12),
         backgroundColor: Colors.transparent,
@@ -447,51 +447,103 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
   @override
   Widget build(BuildContext context) {
     final selected = _selectedThread;
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Column(
-          children: [
-            _buildTopBar(),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 15, 16, 16),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: math.min(395, widget.width * 0.36),
-                      child: _buildThreadList(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final panelWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : widget.width;
+        final panelHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : widget.height;
+        final compact = panelWidth < 860;
+        final tiny = panelWidth < 620;
+        final threadListWidth = math
+            .min(340.0, panelWidth * 0.34)
+            .clamp(230.0, 340.0)
+            .toDouble();
+        final outerPadding = tiny ? 12.0 : 16.0;
+        final threadListHeight = (panelHeight * 0.35)
+            .clamp(180.0, 260.0)
+            .toDouble();
+
+        return Container(
+          width: panelWidth,
+          constraints: BoxConstraints(minHeight: 420, maxHeight: panelHeight),
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Column(
+              children: [
+                _buildTopBar(compact: compact),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      outerPadding,
+                      outerPadding - 1,
+                      outerPadding,
+                      outerPadding,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildMessagesPanel(selected)),
-                  ],
+                    child: compact
+                        ? Column(
+                            children: [
+                              ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: 180,
+                                  maxHeight: threadListHeight,
+                                ),
+                                child: _buildThreadList(compact: true),
+                              ),
+                              const SizedBox(height: 12),
+                              Expanded(
+                                child: _buildMessagesPanel(
+                                  selected,
+                                  compact: true,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              SizedBox(
+                                width: threadListWidth,
+                                child: _buildThreadList(compact: false),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildMessagesPanel(
+                                  selected,
+                                  compact: false,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar({required bool compact}) {
     return Container(
-      height: 59,
+      constraints: BoxConstraints(minHeight: compact ? 54 : 58),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.21),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      alignment: Alignment.centerLeft,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 16,
+        vertical: compact ? 8 : 10,
+      ),
       child: Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        constraints: BoxConstraints(minHeight: compact ? 36 : 40),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 14),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.21),
           border: Border.all(color: Colors.black),
@@ -500,14 +552,18 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.inbox_rounded, color: Colors.white, size: 21),
+            Icon(
+              Icons.inbox_rounded,
+              color: Colors.white,
+              size: compact ? 19 : 21,
+            ),
             const SizedBox(width: 8),
             Text(
               'All',
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
-                fontSize: 20,
+                fontSize: compact ? 16 : 18,
               ),
             ),
           ],
@@ -516,7 +572,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     );
   }
 
-  Widget _buildThreadList() {
+  Widget _buildThreadList({required bool compact}) {
     final results = _filteredThreads;
     return Container(
       decoration: BoxDecoration(
@@ -526,33 +582,39 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
       child: Column(
         children: [
           Container(
-            height: 70,
+            constraints: BoxConstraints(minHeight: compact ? 56 : 60),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.38),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(10),
               ),
             ),
+            padding: EdgeInsets.symmetric(vertical: compact ? 10 : 12),
             alignment: Alignment.center,
             child: Text(
               'Blocked users',
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
-                fontSize: 20,
+                fontSize: compact ? 16 : 18,
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(21, 18, 21, 16),
+            padding: EdgeInsets.fromLTRB(
+              compact ? 14 : 18,
+              compact ? 12 : 16,
+              compact ? 14 : 18,
+              12,
+            ),
             child: SizedBox(
-              height: 52,
+              height: compact ? 46 : 50,
               child: TextField(
                 controller: _searchController,
                 style: GoogleFonts.inter(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: 16,
+                  fontSize: compact ? 14 : 15,
                 ),
                 decoration: InputDecoration(
                   filled: true,
@@ -561,14 +623,14 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                   hintStyle: GoogleFonts.inter(
                     color: Colors.white.withValues(alpha: 0.7),
                     fontWeight: FontWeight.w600,
-                    fontSize: 19,
+                    fontSize: compact ? 13 : 14,
                   ),
                   prefixIcon: Icon(
                     Icons.search_rounded,
                     color: Colors.white.withValues(alpha: 0.3),
-                    size: 30,
+                    size: compact ? 22 : 24,
                   ),
-                  contentPadding: const EdgeInsets.only(top: 11),
+                  contentPadding: EdgeInsets.only(top: compact ? 9 : 10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(
@@ -610,7 +672,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     );
   }
 
-  Widget _buildMessagesPanel(_ThreadRuntime thread) {
+  Widget _buildMessagesPanel(_ThreadRuntime thread, {required bool compact}) {
     final dayLabel = _formatDateStamp(
       thread.messages.isNotEmpty
           ? thread.messages.first.sentAt
@@ -619,18 +681,16 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final settingsPanelWidth = math.max(
-          280.0,
-          math.min(420.0, constraints.maxWidth - 22),
-        );
-        final giftPanelWidth = math.max(
-          360.0,
-          math.min(515.0, constraints.maxWidth - 22),
-        );
-        final giftPanelHeight = math.max(
-          280.0,
-          math.min(451.0, constraints.maxHeight - 18),
-        );
+        final settingsPanelWidth = (constraints.maxWidth * 0.72)
+            .clamp(240.0, 360.0)
+            .toDouble();
+        final giftPanelWidth = (constraints.maxWidth - 16)
+            .clamp(280.0, 460.0)
+            .toDouble();
+        final giftPanelHeight =
+            (constraints.maxHeight * (compact ? 0.72 : 0.62))
+                .clamp(260.0, 420.0)
+                .toDouble();
         final showFloatingOverlay = _showSettingsPanel || _showGiftPanel;
 
         return Container(
@@ -643,8 +703,11 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
               Column(
                 children: [
                   Container(
-                    height: 70,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    constraints: BoxConstraints(minHeight: compact ? 58 : 62),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 12 : 16,
+                      vertical: compact ? 8 : 10,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.38),
                       borderRadius: const BorderRadius.vertical(
@@ -656,18 +719,18 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                         _FramedAvatar(
                           avatarAsset: thread.avatarAsset,
                           frameAsset: thread.frameAsset,
-                          avatarSize: 48,
-                          frameSize: 56,
+                          avatarSize: compact ? 40 : 44,
+                          frameSize: compact ? 48 : 54,
                           showOnlineDot: thread.isOnline,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Text(
                           thread.displayName,
                           style: GoogleFonts.inter(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
-                            fontSize: 30 / 2,
-                            height: 42 / 15,
+                            fontSize: compact ? 14 : 15,
+                            height: 1.3,
                           ),
                         ),
                         const Spacer(),
@@ -700,7 +763,12 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(22, 16, 22, 14),
+                      padding: EdgeInsets.fromLTRB(
+                        compact ? 14 : 18,
+                        compact ? 12 : 16,
+                        compact ? 14 : 18,
+                        12,
+                      ),
                       child: Column(
                         children: [
                           Expanded(
@@ -716,18 +784,18 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                                         alpha: 0.5,
                                       ),
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
+                                SizedBox(height: compact ? 10 : 14),
                                 for (final message in thread.messages)
                                   _MessageBubble(message: message),
                               ],
                             ),
                           ),
                           const SizedBox(height: 10),
-                          _buildComposer(thread.displayName),
+                          _buildComposer(thread.displayName, compact: compact),
                         ],
                       ),
                     ),
@@ -751,8 +819,8 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                 ),
               ),
               Positioned(
-                top: 12,
-                right: 12,
+                top: 10,
+                right: 10,
                 child: IgnorePointer(
                   ignoring: !_showSettingsPanel,
                   child: AnimatedOpacity(
@@ -780,8 +848,8 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                 ),
               ),
               Positioned(
-                right: 12,
-                bottom: 70,
+                right: 8,
+                bottom: compact ? 58 : 64,
                 child: IgnorePointer(
                   ignoring: !_showGiftPanel,
                   child: AnimatedOpacity(
@@ -794,20 +862,25 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                       offset: _showGiftPanel
                           ? Offset.zero
                           : const Offset(0, 0.08),
-                      child: _GiftPanel(
-                        width: giftPanelWidth,
-                        height: giftPanelHeight,
-                        avatarAsset: thread.avatarAsset,
-                        activeCategory: _activeGiftCategory,
-                        selectedGiftId:
-                            _selectedGiftId ?? _activeGiftItems.first.id,
-                        multiplier: _giftMultiplier,
-                        balance: _giftBalance,
-                        items: _activeGiftItems,
-                        onCategoryChanged: _selectGiftCategory,
-                        onGiftSelected: _selectGift,
-                        onCycleMultiplier: _cycleGiftMultiplier,
-                        onGiftTap: _sendGift,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: giftPanelWidth,
+                          maxHeight: giftPanelHeight,
+                        ),
+                        child: _GiftPanel(
+                          width: giftPanelWidth,
+                          avatarAsset: thread.avatarAsset,
+                          activeCategory: _activeGiftCategory,
+                          selectedGiftId:
+                              _selectedGiftId ?? _activeGiftItems.first.id,
+                          multiplier: _giftMultiplier,
+                          balance: _giftBalance,
+                          items: _activeGiftItems,
+                          onCategoryChanged: _selectGiftCategory,
+                          onGiftSelected: _selectGift,
+                          onCycleMultiplier: _cycleGiftMultiplier,
+                          onGiftTap: _sendGift,
+                        ),
                       ),
                     ),
                   ),
@@ -820,16 +893,16 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     );
   }
 
-  Widget _buildComposer(String displayName) {
+  Widget _buildComposer(String displayName, {required bool compact}) {
     return SizedBox(
-      height: 46,
+      height: compact ? 44 : 46,
       child: TextField(
         controller: _messageController,
         onSubmitted: (_) => _sendMessage(),
         style: GoogleFonts.inter(
           color: Colors.white,
           fontWeight: FontWeight.w600,
-          fontSize: 13,
+          fontSize: compact ? 12 : 13,
         ),
         decoration: InputDecoration(
           filled: true,
@@ -838,25 +911,29 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
           hintStyle: GoogleFonts.inter(
             color: Colors.white.withValues(alpha: 0.7),
             fontWeight: FontWeight.w600,
-            fontSize: 12,
+            fontSize: compact ? 11 : 12,
           ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 11),
+          contentPadding: EdgeInsets.symmetric(vertical: compact ? 10 : 11),
           prefixIcon: Icon(
             Icons.attach_file_rounded,
             color: Colors.white.withValues(alpha: 0.74),
-            size: 20,
+            size: compact ? 18 : 20,
+          ),
+          suffixIconConstraints: BoxConstraints(
+            minWidth: compact ? 88 : 100,
+            maxWidth: compact ? 96 : 108,
           ),
           suffixIcon: SizedBox(
-            width: 110,
+            width: compact ? 96 : 108,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Icon(
                   Icons.emoji_emotions_outlined,
                   color: Colors.white.withValues(alpha: 0.54),
-                  size: 22,
+                  size: compact ? 20 : 22,
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: compact ? 8 : 10),
                 InkWell(
                   borderRadius: BorderRadius.circular(14),
                   onTap: _toggleGiftPanel,
@@ -869,24 +946,24 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                                   ? const Color(0xFF51D76E)
                                   : Colors.white)
                               .withValues(alpha: _showGiftPanel ? 1 : 0.54),
-                      size: 19,
+                      size: compact ? 18 : 19,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: compact ? 8 : 10),
                 InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: _sendMessage,
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
                     child: Icon(
                       Icons.send_rounded,
-                      color: Color(0xFF2F88FF),
-                      size: 20,
+                      color: const Color(0xFF2F88FF),
+                      size: compact ? 18 : 20,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: compact ? 6 : 10),
               ],
             ),
           ),
@@ -1140,7 +1217,8 @@ class _ThreadTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        height: 77,
+        constraints: const BoxConstraints(minHeight: 68),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         color: selected
             ? Colors.white.withValues(alpha: 0.12)
             : Colors.transparent,
@@ -1159,14 +1237,14 @@ class _ThreadTile extends StatelessWidget {
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
                   _FramedAvatar(
                     avatarAsset: thread.avatarAsset,
                     frameAsset: thread.frameAsset,
-                    avatarSize: 48,
-                    frameSize: 60,
+                    avatarSize: 44,
+                    frameSize: 54,
                     unreadCount: thread.unreadCount,
                   ),
                   const SizedBox(width: 10),
@@ -1182,8 +1260,8 @@ class _ThreadTile extends StatelessWidget {
                           style: GoogleFonts.inter(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
-                            fontSize: 30 / 2,
-                            height: 42 / 15,
+                            fontSize: 14,
+                            height: 1.25,
                           ),
                         ),
                         Text(
@@ -1193,8 +1271,8 @@ class _ThreadTile extends StatelessWidget {
                           style: GoogleFonts.inter(
                             color: Colors.white.withValues(alpha: 0.7),
                             fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            height: 22 / 14,
+                            fontSize: 12,
+                            height: 1.25,
                             fontStyle: thread.previewItalic
                                 ? FontStyle.italic
                                 : FontStyle.normal,
@@ -1209,7 +1287,7 @@ class _ThreadTile extends StatelessWidget {
                     style: GoogleFonts.inter(
                       color: Colors.white.withValues(alpha: 0.5),
                       fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   ),
                 ],
@@ -1387,7 +1465,6 @@ class _HeaderIcon extends StatelessWidget {
 
 class _GiftPanel extends StatelessWidget {
   final double width;
-  final double height;
   final String avatarAsset;
   final _GiftCategory activeCategory;
   final String selectedGiftId;
@@ -1401,7 +1478,6 @@ class _GiftPanel extends StatelessWidget {
 
   const _GiftPanel({
     required this.width,
-    required this.height,
     required this.avatarAsset,
     required this.activeCategory,
     required this.selectedGiftId,
@@ -1416,175 +1492,205 @@ class _GiftPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: const Color.fromRGBO(4, 6, 28, 0.88),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 11, 20, 0),
-              child: Row(
-                children: [
-                  ClipOval(
-                    child: SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Image.asset(
-                        avatarAsset,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Container(
-                          color: const Color(0xFF1B274E),
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.person_rounded,
-                            color: Color(0xFF8E98B5),
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final panelWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : width;
+        final panelHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : 420.0;
+        final compact = panelWidth < 360;
+        final tabsPadding = compact ? 16.0 : 22.0;
+        final footerMinHeight = compact ? 64.0 : 52.0;
+
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            width: panelWidth,
+            constraints: BoxConstraints(
+              minHeight: compact ? 260 : 300,
+              maxHeight: panelHeight,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(26, 14, 26, 0),
-              child: Row(
-                children: [
-                  for (final category in _GiftCategory.values)
-                    Expanded(
-                      child: _GiftTabButton(
-                        label: _giftCategoryLabel(category),
-                        active: activeCategory == category,
-                        onTap: () => onCategoryChanged(category),
-                      ),
-                    ),
-                ],
-              ),
+            decoration: BoxDecoration(
+              color: const Color.fromRGBO(4, 6, 28, 0.88),
+              borderRadius: BorderRadius.circular(20),
             ),
-            const SizedBox(height: 14),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: items.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 6,
-                    childAspectRatio: 0.9,
-                  ),
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    return _GiftTile(
-                      item: item,
-                      selected: selectedGiftId == item.id,
-                      onTap: () => onGiftSelected(item.id),
-                    );
-                  },
-                ),
-              ),
-            ),
-            Container(
-              height: 52,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              decoration: const BoxDecoration(
-                color: Color.fromRGBO(255, 255, 255, 0.18),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(20),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.monetization_on_rounded,
-                    color: Color(0xFF8FBFFA),
-                    size: 25,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    balance.toStringAsFixed(2),
-                    style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Recharge',
-                    style: GoogleFonts.inter(
-                      color: const Color.fromRGBO(98, 195, 255, 0.93),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const Spacer(),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(25),
-                    onTap: onCycleMultiplier,
-                    child: Container(
-                      height: 25,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(81, 215, 110, 0.28),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: Row(
-                        children: [
-                          Text(
-                            '$multiplier',
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+                  child: Row(
+                    children: [
+                      ClipOval(
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: Image.asset(
+                            avatarAsset,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              color: const Color(0xFF1B274E),
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.person_rounded,
+                                color: Color(0xFF8E98B5),
+                                size: 18,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 2),
-                          const Icon(
-                            Icons.arrow_drop_down_rounded,
-                            color: Color(0xFF51D76E),
-                            size: 16,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(25),
-                    onTap: onGiftTap,
-                    child: Container(
-                      width: 63,
-                      height: 25,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF51D76E),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Gift',
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
                         ),
                       ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(tabsPadding, 12, tabsPadding, 0),
+                  child: Row(
+                    children: [
+                      for (final category in _GiftCategory.values)
+                        Expanded(
+                          child: _GiftTabButton(
+                            label: _giftCategoryLabel(category),
+                            active: activeCategory == category,
+                            onTap: () => onCategoryChanged(category),
+                            compact: compact,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: items.length,
+                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: compact ? 118 : 132,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 8,
+                        mainAxisExtent: compact ? 106 : 116,
+                      ),
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return _GiftTile(
+                          item: item,
+                          selected: selectedGiftId == item.id,
+                          onTap: () => onGiftSelected(item.id),
+                        );
+                      },
                     ),
                   ),
-                ],
-              ),
+                ),
+                Container(
+                  constraints: BoxConstraints(minHeight: footerMinHeight),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compact ? 12 : 16,
+                    vertical: compact ? 8 : 0,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Color.fromRGBO(255, 255, 255, 0.18),
+                    borderRadius: BorderRadius.vertical(
+                      bottom: Radius.circular(20),
+                    ),
+                  ),
+                  child: compact
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.monetization_on_rounded,
+                                  color: Color(0xFF8FBFFA),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  balance.toStringAsFixed(2),
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Recharge',
+                                  style: GoogleFonts.inter(
+                                    color: const Color.fromRGBO(
+                                      98,
+                                      195,
+                                      255,
+                                      0.93,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                _MultiplierButton(
+                                  multiplier: multiplier,
+                                  onTap: onCycleMultiplier,
+                                  compact: true,
+                                ),
+                                const SizedBox(width: 8),
+                                _GiftSendButton(
+                                  onTap: onGiftTap,
+                                  compact: true,
+                                ),
+                              ],
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            const Icon(
+                              Icons.monetization_on_rounded,
+                              color: Color(0xFF8FBFFA),
+                              size: 24,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              balance.toStringAsFixed(2),
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Recharge',
+                              style: GoogleFonts.inter(
+                                color: const Color.fromRGBO(98, 195, 255, 0.93),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const Spacer(),
+                            _MultiplierButton(
+                              multiplier: multiplier,
+                              onTap: onCycleMultiplier,
+                              compact: false,
+                            ),
+                            const SizedBox(width: 8),
+                            _GiftSendButton(onTap: onGiftTap, compact: false),
+                          ],
+                        ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1593,11 +1699,13 @@ class _GiftTabButton extends StatelessWidget {
   final String label;
   final bool active;
   final VoidCallback onTap;
+  final bool compact;
 
   const _GiftTabButton({
     required this.label,
     required this.active,
     required this.onTap,
+    this.compact = false,
   });
 
   @override
@@ -1614,20 +1722,98 @@ class _GiftTabButton extends StatelessWidget {
               style: GoogleFonts.inter(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
-                fontSize: 16,
+                fontSize: compact ? 13 : 15,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: compact ? 6 : 8),
             AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               height: 3,
-              width: 68,
+              width: compact ? 50 : 60,
               decoration: BoxDecoration(
                 color: active ? const Color(0xFF51D76E) : Colors.transparent,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MultiplierButton extends StatelessWidget {
+  final int multiplier;
+  final VoidCallback onTap;
+  final bool compact;
+
+  const _MultiplierButton({
+    required this.multiplier,
+    required this.onTap,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(25),
+      onTap: onTap,
+      child: Container(
+        height: compact ? 23 : 25,
+        padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 12),
+        decoration: BoxDecoration(
+          color: const Color.fromRGBO(81, 215, 110, 0.28),
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: Row(
+          children: [
+            Text(
+              '$multiplier',
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: compact ? 12 : 14,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              color: const Color(0xFF51D76E),
+              size: compact ? 14 : 16,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GiftSendButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool compact;
+
+  const _GiftSendButton({required this.onTap, required this.compact});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(25),
+      onTap: onTap,
+      child: Container(
+        width: compact ? 56 : 63,
+        height: compact ? 23 : 25,
+        decoration: BoxDecoration(
+          color: const Color(0xFF51D76E),
+          borderRadius: BorderRadius.circular(25),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          'Gift',
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: compact ? 12 : 14,
+          ),
         ),
       ),
     );
@@ -1743,46 +1929,43 @@ class _ChatSettingsPanel extends StatelessWidget {
       color: Colors.transparent,
       child: Container(
         width: width,
-        height: 267,
+        constraints: const BoxConstraints(minHeight: 220),
         decoration: BoxDecoration(
           color: const Color(0xFF2B2A58),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: 12,
-              left: 0,
-              right: 0,
-              child: Text(
-                'Chat settings',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  color: const Color(0xFFFFFDFD),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 22,
-                  height: 33 / 22,
-                ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Chat settings',
+                      style: GoogleFonts.poppins(
+                        color: const Color(0xFFFFFDFD),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close settings',
+                    onPressed: onClose,
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            Positioned(
-              top: 5,
-              right: 5,
-              child: IconButton(
-                tooltip: 'Close settings',
-                onPressed: onClose,
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
-            ),
-            Positioned(
-              left: 34,
-              right: 18,
-              top: 63,
-              child: Row(
+              const SizedBox(height: 6),
+              Row(
                 children: [
                   Expanded(
                     child: Text(
@@ -1791,7 +1974,7 @@ class _ChatSettingsPanel extends StatelessWidget {
                         color: const Color(0xFFFFFDFD),
                         fontWeight: FontWeight.w500,
                         fontSize: 13,
-                        height: 20 / 13,
+                        height: 1.3,
                       ),
                     ),
                   ),
@@ -1801,22 +1984,14 @@ class _ChatSettingsPanel extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-            Positioned(
-              left: 34,
-              right: 34,
-              top: 101,
-              child: Divider(
+              const SizedBox(height: 10),
+              Divider(
                 color: Colors.white.withValues(alpha: 0.5),
                 height: 1,
                 thickness: 1,
               ),
-            ),
-            Positioned(
-              left: 34,
-              right: 34,
-              top: 116,
-              child: InkWell(
+              const SizedBox(height: 10),
+              InkWell(
                 onTap: onCustomBackgroundTap,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1826,26 +2001,19 @@ class _ChatSettingsPanel extends StatelessWidget {
                       color: const Color(0xFFFFFDFD),
                       fontWeight: FontWeight.w500,
                       fontSize: 13,
-                      height: 20 / 13,
+                      height: 1.3,
                     ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              left: 34,
-              right: 34,
-              top: 153,
-              child: Divider(
+              const SizedBox(height: 10),
+              Divider(
                 color: Colors.white.withValues(alpha: 0.5),
                 height: 1,
                 thickness: 1,
               ),
-            ),
-            Positioned(
-              left: 34,
-              top: 170,
-              child: InkWell(
+              const SizedBox(height: 10),
+              InkWell(
                 onTap: onMutedAccountsTap,
                 child: Text(
                   'Muted accounts',
@@ -1853,15 +2021,12 @@ class _ChatSettingsPanel extends StatelessWidget {
                     color: const Color(0xFFFF0A0A),
                     fontWeight: FontWeight.w500,
                     fontSize: 13,
-                    height: 20 / 13,
+                    height: 1.3,
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              left: 34,
-              top: 191,
-              child: InkWell(
+              const SizedBox(height: 8),
+              InkWell(
                 onTap: onBlockedAccountsTap,
                 child: Text(
                   'Blocked accounts',
@@ -1869,12 +2034,12 @@ class _ChatSettingsPanel extends StatelessWidget {
                     color: const Color(0xFFFF0A0A),
                     fontWeight: FontWeight.w500,
                     fontSize: 13,
-                    height: 20 / 13,
+                    height: 1.3,
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1890,14 +2055,14 @@ class _MiniToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(212.886),
+      borderRadius: BorderRadius.circular(100),
       onTap: () => onChanged(!value),
       child: Container(
-        width: 33,
-        height: 13,
+        width: 34,
+        height: 16,
         decoration: BoxDecoration(
-          color: const Color(0xFF303030),
-          borderRadius: BorderRadius.circular(212.886),
+          color: value ? const Color(0xFF1A7B3C) : const Color(0xFF303030),
+          borderRadius: BorderRadius.circular(100),
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.07),
             width: 0.5,
@@ -1908,11 +2073,11 @@ class _MiniToggle extends StatelessWidget {
             AnimatedPositioned(
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOut,
-              left: value ? 21 : 2,
+              left: value ? 20 : 2,
               top: 2,
               child: Container(
-                width: 9,
-                height: 9,
+                width: 12,
+                height: 12,
                 decoration: BoxDecoration(
                   color: const Color(0xFFECECEC),
                   shape: BoxShape.circle,
@@ -1923,8 +2088,8 @@ class _MiniToggle extends StatelessWidget {
                   boxShadow: const [
                     BoxShadow(
                       color: Color.fromRGBO(0, 0, 0, 0.35),
-                      blurRadius: 20.1682,
-                      offset: Offset(-1.12045, 15.6864),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
                     ),
                   ],
                 ),

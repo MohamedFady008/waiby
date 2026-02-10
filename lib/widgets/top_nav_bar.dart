@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
+import 'common/responsive_layout.dart';
 import 'user_menu.dart';
 
 class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
   final AuthController auth;
+  static const double _height = 72;
 
   const TopNavBar({super.key, required this.auth});
 
   @override
-  Size get preferredSize => const Size.fromHeight(88);
+  Size get preferredSize => const Size.fromHeight(_height);
 
   @override
   Widget build(BuildContext context) {
@@ -29,66 +31,75 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
 
     return Material(
       color: Colors.transparent,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: preferredSize.height),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [backgroundTop, backgroundBottom],
-            ),
-            border: Border(
-              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 16,
-                spreadRadius: -6,
-                offset: const Offset(0, 10),
-              ),
-            ],
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [backgroundTop, backgroundBottom],
           ),
-          child: SafeArea(
-            bottom: false,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                child: Row(
+          border: Border(
+            bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 16,
+              spreadRadius: -6,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 760;
+                final tiny = constraints.maxWidth < 620;
+
+                return Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     _Logo(onTap: () => context.go('/')),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: WaibySpacing.s16),
                     Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (final item in navItems) ...[
-                              _NavLink(
-                                label: item.label,
-                                isActive: _isActive(location, item.path),
-                                onTap: () => context.go(item.path),
+                      child: compact
+                          ? _CompactNavMenu(
+                              items: navItems,
+                              location: location,
+                            )
+                          : SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  for (final item in navItems) ...[
+                                    _NavLink(
+                                      label: item.label,
+                                      isActive: _isActive(
+                                        location,
+                                        item.path,
+                                      ),
+                                      onTap: () => context.go(item.path),
+                                    ),
+                                    const SizedBox(width: WaibySpacing.s8),
+                                  ],
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                            ],
-                          ],
-                        ),
-                      ),
+                            ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: WaibySpacing.s12),
                     _buildActions(
                       context,
+                      compact: compact,
+                      tiny: tiny,
                       accentBlue: accentBlue,
                       accentGreen: accentGreen,
                     ),
                   ],
-                ),
-              ),
+                );
+              },
             ),
           ),
         ),
@@ -98,6 +109,8 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
 
   Widget _buildActions(
     BuildContext context, {
+    required bool compact,
+    required bool tiny,
     required Color accentBlue,
     required Color accentGreen,
   }) {
@@ -106,9 +119,12 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
       foregroundColor: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 14 : 18,
+        vertical: compact ? 10 : 12,
+      ),
       textStyle: GoogleFonts.poppins(
-        fontSize: 15,
+        fontSize: compact ? 13 : 15,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.2,
       ),
@@ -118,12 +134,14 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ElevatedButton(
-            onPressed: () => context.go('/become-creator'),
-            style: solidButton,
-            child: const Text('Become an Creator'),
-          ),
-          const SizedBox(width: 10),
+          if (!tiny) ...[
+            ElevatedButton(
+              onPressed: () => context.go('/become-creator'),
+              style: solidButton,
+              child: const Text('Become an Creator'),
+            ),
+            const SizedBox(width: WaibySpacing.s8),
+          ],
           OutlinedButton(
             onPressed: () => context.go('/login'),
             style: solidButton.copyWith(
@@ -131,6 +149,12 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             child: const Text('Login'),
           ),
+          if (tiny) ...[
+            const SizedBox(width: WaibySpacing.s8),
+            _CompactActionMenu(
+              onBecomeCreatorTap: () => context.go('/become-creator'),
+            ),
+          ],
         ],
       );
     }
@@ -138,29 +162,38 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(width: 6),
-        ElevatedButton(
-          onPressed: () => context.go('/become-creator'),
-          style: solidButton,
-          child: const Text('Become an Creator'),
-        ),
-        const SizedBox(width: 6),
+        if (!compact) ...[
+          ElevatedButton(
+            onPressed: () => context.go('/become-creator'),
+            style: solidButton,
+            child: const Text('Become an Creator'),
+          ),
+          const SizedBox(width: WaibySpacing.s8),
+        ],
         IconButton(
           tooltip: "Notifications",
           onPressed: () => context.go('/notifications'),
           icon: const Icon(Icons.notifications_none_rounded),
           color: Colors.white,
-          splashRadius: 24,
+          splashRadius: 20,
+          iconSize: compact ? 20 : 22,
         ),
         IconButton(
           tooltip: "Wallet top up",
           onPressed: () => context.go('/wallet/topup'),
           icon: const Icon(Icons.add_card_outlined),
           color: Colors.white,
-          splashRadius: 24,
+          splashRadius: 20,
+          iconSize: compact ? 20 : 22,
         ),
+        if (compact) ...[
+          _CompactActionMenu(
+            onBecomeCreatorTap: () => context.go('/become-creator'),
+          ),
+          const SizedBox(width: WaibySpacing.s8),
+        ],
         Padding(
-          padding: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.only(right: WaibySpacing.s8),
           child: UserMenu(auth: auth),
         ),
       ],
@@ -173,6 +206,113 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     return location.startsWith('$path/') && path != '/';
   }
 }
+
+class _CompactNavMenu extends StatelessWidget {
+  final List<_NavDestination> items;
+  final String location;
+
+  const _CompactNavMenu({required this.items, required this.location});
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: PopupMenuButton<String>(
+        tooltip: 'Navigation',
+        onSelected: (path) => context.go(path),
+        color: const Color(0xFF0B1023),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        itemBuilder: (context) => [
+          for (final item in items)
+            PopupMenuItem<String>(
+              value: item.path,
+              child: Text(
+                item.label,
+                style: GoogleFonts.poppins(
+                  color: location == item.path
+                      ? const Color(0xFF51D76E)
+                      : Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+        ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: WaibySpacing.s12,
+            vertical: WaibySpacing.s8,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: WaibySpacing.s8),
+              Text(
+                'Menu',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactActionMenu extends StatelessWidget {
+  final VoidCallback onBecomeCreatorTap;
+
+  const _CompactActionMenu({required this.onBecomeCreatorTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_CompactAction>(
+      tooltip: 'More actions',
+      onSelected: (value) {
+        if (value == _CompactAction.becomeCreator) {
+          onBecomeCreatorTap();
+        }
+      },
+      color: const Color(0xFF0B1023),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      itemBuilder: (context) => const [
+        PopupMenuItem<_CompactAction>(
+          value: _CompactAction.becomeCreator,
+          child: Text('Become an Creator'),
+        ),
+      ],
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        alignment: Alignment.center,
+        child: const Icon(Icons.more_horiz_rounded, color: Colors.white),
+      ),
+    );
+  }
+}
+
+enum _CompactAction { becomeCreator }
 
 class _Logo extends StatelessWidget {
   final VoidCallback onTap;
@@ -187,14 +327,14 @@ class _Logo extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Image.asset('assets/logo.png', height: 44, width: 38),
-          const SizedBox(width: 10),
+          Image.asset('assets/logo.png', height: 40, width: 34),
+          const SizedBox(width: WaibySpacing.s8),
           Text(
             'Waiby',
             style: GoogleFonts.poppins(
               color: Colors.white,
               fontWeight: FontWeight.w700,
-              fontSize: 28,
+              fontSize: 24,
               letterSpacing: -0.2,
             ),
           ),
@@ -227,7 +367,7 @@ class _NavLink extends StatelessWidget {
       highlightColor: Colors.white.withValues(alpha: 0.05),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
               ? Colors.white.withValues(alpha: 0.06)
@@ -244,7 +384,7 @@ class _NavLink extends StatelessWidget {
           style: GoogleFonts.poppins(
             color: isActive ? activeColor : baseColor,
             fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-            fontSize: 16,
+            fontSize: 15,
             letterSpacing: 0.1,
           ),
         ),
