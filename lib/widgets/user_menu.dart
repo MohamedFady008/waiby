@@ -83,7 +83,7 @@ class UserMenu extends StatelessWidget {
                 children: [
                   _UserAvatar(
                     photoUrl: auth.photoUrl,
-                    online: auth.online,
+                    online: auth.online.value,
                     onlineColor: accentGreen,
                     ringColor: menuBackground,
                   ),
@@ -152,7 +152,7 @@ class UserMenu extends StatelessWidget {
         PopupMenuItem<_UserMenuAction>(
           value: _UserMenuAction.toggleOnline,
           child: _OnlineStatusRow(
-            online: auth.online,
+            online: auth.online.value,
             onlineColor: accentGreen,
           ),
         ),

@@ -3,7 +3,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../controllers/auth_controller.dart';
@@ -83,10 +84,7 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: auth,
-      builder: (context, _) => _HomeBody(loggedIn: auth.loggedIn),
-    );
+    return Obx(() => _HomeBody(loggedIn: auth.isLoggedIn));
   }
 }
 

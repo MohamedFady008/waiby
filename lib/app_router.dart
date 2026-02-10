@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
-import 'package:waiby/pages/creator_form.dart';
 
 import 'controllers/auth_controller.dart';
 import 'shell/app_shell.dart';
@@ -19,32 +18,35 @@ import 'pages/topup_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/report_issue_page.dart';
-
-final auth = AuthController();
+import 'pages/creator_form.dart';
 
 final router = GoRouter(
   initialLocation: '/',
   routes: [
     // NO TOP NAVBAR HERE
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => LoginPage(auth: auth),
-    ),
-    GoRoute(
-      path: '/signup',
-      builder: (context, state) => SignupPage(auth: auth),
-    ),
+    GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+    GoRoute(path: '/signup', builder: (context, state) => const SignupPage()),
 
     // TOP NAVBAR FOR ALL ROUTES INSIDE SHELL
     ShellRoute(
-      builder: (context, state, child) => AnimatedBuilder(
-        animation: auth,
-        builder: (context, _) => AppShell(auth: auth, child: child),
-      ),
+      builder: (context, state, child) {
+        // الحصول على AuthController من GetX
+        final authController = Get.find<AuthController>();
+
+        // لا نحتاج Obx هنا لأن AppShell ستستخدم Obx داخلياً حسب الحاجة
+        return AppShell(
+          // تمرير الـ controller للتوافق مع الكود القديم
+          auth: authController,
+          child: child,
+        );
+      },
       routes: [
         GoRoute(
           path: '/',
-          builder: (context, state) => HomePage(auth: auth),
+          builder: (context, state) {
+            final authController = Get.find<AuthController>();
+            return HomePage(auth: authController);
+          },
         ),
         GoRoute(
           path: '/explore',
