@@ -1,5 +1,6 @@
 /// ثوابت التطبيق والإعدادات
 /// Application constants and configuration
+library;
 
 class AppConfig {
   // منع إنشاء نسخة من هذا الصنف
