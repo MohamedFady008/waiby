@@ -183,14 +183,11 @@ class UserMenu extends StatelessWidget {
           ),
         ),
       ],
-      child: CircleAvatar(
+      child: _AvatarCircle(
+        photoUrl: auth.photoUrl,
         radius: 15,
-        backgroundImage: auth.photoUrl != null
-            ? NetworkImage(auth.photoUrl!)
-            : null,
-        child: auth.photoUrl == null
-            ? const Icon(Icons.person, size: 17)
-            : null,
+        backgroundColor: Colors.white.withValues(alpha: 0.08),
+        placeholderIconSize: 17,
       ),
     );
   }
@@ -211,21 +208,16 @@ class _UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ImageProvider? avatarImage = photoUrl != null
-        ? NetworkImage(photoUrl!)
-        : null;
     final statusColor = online ? onlineColor : Colors.grey;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        CircleAvatar(
+        _AvatarCircle(
+          photoUrl: photoUrl,
           radius: 38,
           backgroundColor: Colors.white.withValues(alpha: 0.08),
-          backgroundImage: avatarImage,
-          child: avatarImage == null
-              ? const Icon(Icons.person, size: 38, color: Colors.white)
-              : null,
+          placeholderIconSize: 38,
         ),
         Positioned(
           right: -2,
@@ -244,6 +236,46 @@ class _UserAvatar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AvatarCircle extends StatelessWidget {
+  final String? photoUrl;
+  final double radius;
+  final double placeholderIconSize;
+  final Color backgroundColor;
+
+  const _AvatarCircle({
+    required this.photoUrl,
+    required this.radius,
+    required this.placeholderIconSize,
+    this.backgroundColor = Colors.transparent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final size = radius * 2;
+    final hasPhoto = (photoUrl ?? '').trim().isNotEmpty;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
+      clipBehavior: Clip.antiAlias,
+      child: hasPhoto
+          ? Image.network(
+              photoUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(
+                  Icons.person,
+                  size: placeholderIconSize,
+                  color: Colors.white,
+                );
+              },
+            )
+          : Icon(Icons.person, size: placeholderIconSize, color: Colors.white),
     );
   }
 }
