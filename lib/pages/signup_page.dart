@@ -58,7 +58,7 @@ class _SignupPageState extends State<SignupPage> {
           'Account Created',
           'Please check your email to verify your account before signing in.',
           snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.blue.shade600.withOpacity(0.9),
+          backgroundColor: Colors.blue.shade600.withValues(alpha: 0.9),
           colorText: Colors.white,
           duration: const Duration(seconds: 5),
           margin: const EdgeInsets.all(16),
@@ -146,7 +146,7 @@ class _SignupPageState extends State<SignupPage> {
                     _obscurePassword
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     size: 22,
                   ),
                   onPressed: () {
@@ -155,7 +155,7 @@ class _SignupPageState extends State<SignupPage> {
                 ),
                 helperText: 'At least 6 characters',
                 helperStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontSize: 12,
                 ),
               ),
@@ -198,7 +198,7 @@ class _SignupPageState extends State<SignupPage> {
                   'By creating an account, you confirm that you accept our ',
                   style: bodyTextStyle.copyWith(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
                 InkWell(
@@ -206,7 +206,9 @@ class _SignupPageState extends State<SignupPage> {
                     'Coming Soon',
                     'Terms of Use is not implemented yet.',
                     snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.orange.shade600.withOpacity(0.9),
+                    backgroundColor: Colors.orange.shade600.withValues(
+                      alpha: 0.9,
+                    ),
                     colorText: Colors.white,
                     duration: const Duration(seconds: 2),
                     margin: const EdgeInsets.all(16),
@@ -221,7 +223,7 @@ class _SignupPageState extends State<SignupPage> {
                   ' and ',
                   style: bodyTextStyle.copyWith(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
                 InkWell(
@@ -229,7 +231,9 @@ class _SignupPageState extends State<SignupPage> {
                     'Coming Soon',
                     'Privacy Policy is not implemented yet.',
                     snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.orange.shade600.withOpacity(0.9),
+                    backgroundColor: Colors.orange.shade600.withValues(
+                      alpha: 0.9,
+                    ),
                     colorText: Colors.white,
                     duration: const Duration(seconds: 2),
                     margin: const EdgeInsets.all(16),
@@ -244,7 +248,7 @@ class _SignupPageState extends State<SignupPage> {
                   '.',
                   style: bodyTextStyle.copyWith(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
               ],

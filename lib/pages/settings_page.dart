@@ -70,6 +70,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       Expanded(
                         child: SingleChildScrollView(
+                          primary: false,
                           padding: EdgeInsets.all(pagePadding),
                           child: buildSettingsBody(_selectedEntry),
                         ),

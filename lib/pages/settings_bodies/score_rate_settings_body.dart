@@ -21,6 +21,13 @@ class ScoreRateSettingsBody extends StatelessWidget {
         _ActionMetricRowData(label: 'Set up 2 or more services', value: '2/2'),
         _ActionMetricRowData(label: 'Follow 2 or more creators', value: '2/2'),
       ],
+      rulesTitle: 'PROFILE POWER RULES',
+      rules: <String>[
+        'Add your bio to earn 2 score ratings.',
+        'Upload at least 2 photos to your gallery to earn 2 score rating points.',
+        'Activate at least 2 services and earn 2 store rating points.',
+        'Follow at least 2 or more creators.',
+      ],
     ),
     _ActionMetricCardData(
       title: 'VISIBILITY ENGINE',
@@ -31,6 +38,12 @@ class ScoreRateSettingsBody extends StatelessWidget {
         _ActionMetricRowData(label: 'Weekly post made', value: '2/2'),
         _ActionMetricRowData(label: 'Weekly live lauched', value: '3/3'),
         _ActionMetricRowData(label: 'Weekly shared profile', value: '3/3'),
+      ],
+      rulesTitle: 'VISIBILITY ENGINE RULES',
+      rules: <String>[
+        'Create posts and earn 1 rating each (max. 3 in 7 days).',
+        'Create Playground Live rooms and earn 1 rating per launch (up to 3 in 7 days).',
+        'Earn 1 rating per profile share (last 7 days, max. 3).',
       ],
     ),
     _ActionMetricCardData(
@@ -43,6 +56,13 @@ class ScoreRateSettingsBody extends StatelessWidget {
         _ActionMetricRowData(label: 'Fast order take', value: '5/5'),
         _ActionMetricRowData(label: 'Non refund/cancel order', value: '3/3'),
         _ActionMetricRowData(label: 'Weekly active days', value: '2/7'),
+      ],
+      rulesTitle: 'RELIABILITY RANK RULES',
+      rules: <String>[
+        'Reply to messages quickly to maintain a fast reply time score.',
+        'Accept orders promptly to earn fast order take points.',
+        'Avoid refunds and cancellations to keep your score intact.',
+        'Stay active on the platform every day of the week.',
       ],
     ),
     _ActionMetricCardData(
@@ -65,6 +85,13 @@ class ScoreRateSettingsBody extends StatelessWidget {
           label: 'Monthly rating from new customers',
           value: '0/10',
         ),
+      ],
+      rulesTitle: 'BUSINESS IMPACT RULES',
+      rules: <String>[
+        'Earn income on the platform to boost your business impact score.',
+        'Get monthly subscriptions or tips from followers.',
+        'Encourage repeat purchases from new and returning customers.',
+        'Collect ratings from new customers each month.',
       ],
     ),
   ];
@@ -174,6 +201,10 @@ class ScoreRateSettingsBody extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Action Hub Panel
+// ---------------------------------------------------------------------------
+
 class _ActionHubPanel extends StatelessWidget {
   final List<_ActionMetricCardData> cards;
 
@@ -183,7 +214,7 @@ class _ActionHubPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: const Color(0xFF070B1D),
         borderRadius: BorderRadius.circular(6),
@@ -193,8 +224,7 @@ class _ActionHubPanel extends StatelessWidget {
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
-              final compactHeader = constraints.maxWidth < 920;
-              if (compactHeader) {
+              if (constraints.maxWidth < 920) {
                 return const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -204,7 +234,6 @@ class _ActionHubPanel extends StatelessWidget {
                   ],
                 );
               }
-
               return const Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -251,6 +280,10 @@ class _ActionHubPanel extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Headline & Progress Ring
+// ---------------------------------------------------------------------------
+
 class _ActionHubHeadline extends StatelessWidget {
   const _ActionHubHeadline();
 
@@ -283,9 +316,9 @@ class _ActionHubHeadline extends StatelessWidget {
                 height: 1.05,
               ),
             ),
-            Icon(
+            const Icon(
               Icons.arrow_forward_rounded,
-              color: const Color(0xFFF8C34A),
+              color: Color(0xFFF8C34A),
               size: 18,
             ),
             Text(
@@ -313,7 +346,6 @@ class _ActionProgressRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textValue = '${(progress * 100).round()}%';
     return SizedBox(
       width: 190,
       height: 190,
@@ -333,7 +365,7 @@ class _ActionProgressRing extends StatelessWidget {
             ),
           ),
           Text(
-            textValue,
+            '${(progress * 100).round()}%',
             style: GoogleFonts.nunito(
               color: Colors.white,
               fontWeight: FontWeight.w900,
@@ -355,108 +387,94 @@ class _PrimaryActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Ink(
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF2F88FF),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 8,
-                  height: 1,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Icon(
-                Icons.arrow_forward_ios_rounded,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 30,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2F88FF),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.poppins(
                 color: Colors.white,
-                size: 8,
+                fontWeight: FontWeight.w500,
+                fontSize: 8,
+                height: 1,
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: Colors.white,
+              size: 8,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ActionMetricCard extends StatelessWidget {
+// ---------------------------------------------------------------------------
+// Metric Card — simple setState toggle, NO 3-D Transform on Y axis
+// ---------------------------------------------------------------------------
+
+class _ActionMetricCard extends StatefulWidget {
   final _ActionMetricCardData data;
 
   const _ActionMetricCard({required this.data});
 
   @override
+  State<_ActionMetricCard> createState() => _ActionMetricCardState();
+}
+
+class _ActionMetricCardState extends State<_ActionMetricCard> {
+  bool _showRules = false;
+
+  void _toggleRules() => setState(() => _showRules = !_showRules);
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 420,
-      decoration: BoxDecoration(
-        color: const Color(0xFF121826),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF1E2638)),
-      ),
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      transitionBuilder: (child, animation) =>
+          FadeTransition(opacity: animation, child: child),
+      child: _showRules
+          ? _buildBackFace(key: const ValueKey('back'))
+          : _buildFrontFace(key: const ValueKey('front')),
+    );
+  }
+
+  // ---- front ----
+
+  Widget _buildFrontFace({Key? key}) {
+    return _buildCardShell(
+      key: key,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            height: 48,
-            decoration: const BoxDecoration(
-              color: Color(0xFF192030),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                Icon(data.icon, color: const Color(0xFF51D76E), size: 16),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    data.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      height: 1,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildCardHeader(title: widget.data.title),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      data.score,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 28,
-                        height: 1,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    _MetricStatusBadge(status: data.status),
-                  ],
+                Text(
+                  widget.data.score,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 28,
+                    height: 1,
+                  ),
                 ),
+                const SizedBox(width: 10),
+                _MetricStatusBadge(status: widget.data.status),
               ],
             ),
           ),
@@ -464,23 +482,25 @@ class _ActionMetricCard extends StatelessWidget {
             color: const Color(0xFF1D2537).withValues(alpha: 0.9),
             height: 1,
           ),
-          ...data.rows.map((row) => _ActionMetricRow(data: row)),
-          const Spacer(),
+          ...widget.data.rows.map((row) => _ActionMetricRow(data: row)),
+          const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
             child: Row(
-              children: const [
+              children: [
                 _TinyTagButton(
                   label: 'Rules',
                   icon: Icons.settings,
-                  backgroundColor: Color(0xFF2F88FF),
+                  backgroundColor: const Color(0xFF2F88FF),
+                  onTap: _toggleRules,
                 ),
-                Spacer(),
+                const Spacer(),
                 _TinyTagButton(
                   label: 'Check',
                   icon: Icons.chevron_right_rounded,
-                  backgroundColor: Color(0xFF19B375),
+                  backgroundColor: const Color(0xFF19B375),
                   iconAfterLabel: true,
+                  onTap: () {},
                 ),
               ],
             ),
@@ -489,7 +509,158 @@ class _ActionMetricCard extends StatelessWidget {
       ),
     );
   }
+
+  // ---- back ----
+
+  Widget _buildBackFace({Key? key}) {
+    final rules = widget.data.rules;
+    return _buildCardShell(
+      key: key,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCardHeader(title: 'Rules'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
+            child: Text(
+              widget.data.rulesTitle ?? '${widget.data.title} RULES',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                height: 1.2,
+              ),
+            ),
+          ),
+          Divider(
+            color: const Color(0xFF1D2537).withValues(alpha: 0.9),
+            height: 1,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: rules.isEmpty
+                ? Text(
+                    'Rules will be available soon.',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                      height: 1.45,
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < rules.length; i++)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            bottom: i == rules.length - 1 ? 0 : 10,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${i + 1}.',
+                                style: GoogleFonts.poppins(
+                                  color: const Color(0xFFF8C34A),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  height: 1.3,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  rules[i],
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 12,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Row(
+              children: [
+                _TinyTagButton(
+                  label: 'Back',
+                  icon: Icons.undo_rounded,
+                  backgroundColor: const Color(0xFF2F88FF),
+                  onTap: _toggleRules,
+                ),
+                const Spacer(),
+                _TinyTagButton(
+                  label: 'Check',
+                  icon: Icons.chevron_right_rounded,
+                  backgroundColor: const Color(0xFF19B375),
+                  iconAfterLabel: true,
+                  onTap: () {},
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---- helpers ----
+
+  Widget _buildCardHeader({required String title}) {
+    return Container(
+      height: 48,
+      decoration: const BoxDecoration(
+        color: Color(0xFF192030),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Icon(widget.data.icon, color: const Color(0xFF51D76E), size: 16),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                height: 1,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardShell({required Widget child, Key? key}) {
+    return Container(
+      key: key,
+      decoration: BoxDecoration(
+        color: const Color(0xFF121826),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1E2638)),
+      ),
+      child: child,
+    );
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Shared small widgets
+// ---------------------------------------------------------------------------
 
 class _ActionMetricRow extends StatelessWidget {
   final _ActionMetricRowData data;
@@ -579,17 +750,21 @@ class _MetricStatusBadge extends StatelessWidget {
   }
 }
 
+/// Small tag-style action button with explicit button semantics and
+/// mouse cursor feedback for web/desktop.
 class _TinyTagButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color backgroundColor;
   final bool iconAfterLabel;
+  final VoidCallback? onTap;
 
   const _TinyTagButton({
     required this.label,
     required this.icon,
     required this.backgroundColor,
     this.iconAfterLabel = false,
+    this.onTap,
   });
 
   @override
@@ -605,21 +780,32 @@ class _TinyTagButton extends StatelessWidget {
       ),
     );
 
-    final children = iconAfterLabel
+    final rowChildren = iconAfterLabel
         ? <Widget>[labelWidget, const SizedBox(width: 4), iconWidget]
         : <Widget>[iconWidget, const SizedBox(width: 4), labelWidget];
 
-    return Container(
-      height: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(3),
+    return SizedBox(
+      height: 26,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          backgroundColor: backgroundColor,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: rowChildren),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: children),
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Visibility System Info
+// ---------------------------------------------------------------------------
 
 class _VisibilitySystemInfo extends StatelessWidget {
   const _VisibilitySystemInfo();
@@ -660,7 +846,7 @@ class _VisibilitySystemInfo extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            padding: const EdgeInsets.all(24),
             child: Text(
               _infoText,
               style: GoogleFonts.poppins(
@@ -677,6 +863,10 @@ class _VisibilitySystemInfo extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Tier Cards
+// ---------------------------------------------------------------------------
+
 class _TierCardsSection extends StatelessWidget {
   final List<_TierCardData> cards;
 
@@ -686,11 +876,9 @@ class _TierCardsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     const spacing = 8.0;
     final children = <Widget>[];
-    for (var index = 0; index < cards.length; index++) {
-      if (index > 0) {
-        children.add(const SizedBox(width: spacing));
-      }
-      children.add(Expanded(child: _TierCard(data: cards[index])));
+    for (var i = 0; i < cards.length; i++) {
+      if (i > 0) children.add(const SizedBox(width: spacing));
+      children.add(Expanded(child: _TierCard(data: cards[i])));
     }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -727,7 +915,6 @@ class _TierCard extends StatelessWidget {
               ),
             ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
                   width: 28,
@@ -740,13 +927,11 @@ class _TierCard extends StatelessWidget {
                   child: Image.asset(
                     data.iconAsset,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(
-                        Icons.workspace_premium_rounded,
-                        color: Colors.white,
-                        size: 16,
-                      );
-                    },
+                    errorBuilder: (_, error, stackTrace) => const Icon(
+                      Icons.workspace_premium_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -797,6 +982,10 @@ class _TierCard extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Data models & enums
+// ---------------------------------------------------------------------------
+
 enum _MetricStatus { completed, pending }
 
 @immutable
@@ -806,6 +995,8 @@ class _ActionMetricCardData {
   final String score;
   final _MetricStatus status;
   final List<_ActionMetricRowData> rows;
+  final String? rulesTitle;
+  final List<String> rules;
 
   const _ActionMetricCardData({
     required this.title,
@@ -813,6 +1004,8 @@ class _ActionMetricCardData {
     required this.score,
     required this.status,
     required this.rows,
+    this.rulesTitle,
+    this.rules = const <String>[],
   });
 }
 

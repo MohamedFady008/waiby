@@ -20,6 +20,7 @@ import 'pages/notifications_page.dart';
 import 'pages/report_issue_page.dart';
 import 'pages/creator_form.dart';
 import 'pages/creator_guidelines_page.dart';
+import 'pages/influencer_guidelines_page.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -102,6 +103,10 @@ final router = GoRouter(
         GoRoute(
           path: '/become-creator/creator-guidelines',
           builder: (context, state) => const CreatorGuidelinesPage(),
+        ),
+        GoRoute(
+          path: '/settings/influencer-guidelines',
+          builder: (context, state) => const InfluencerGuidelinesPage(),
         ),
       ],
     ),

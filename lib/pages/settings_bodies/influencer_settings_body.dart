@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../widgets/settings_sidebar.dart';
@@ -406,6 +407,10 @@ class _RewardBadge extends StatelessWidget {
 class _GuidelinesSection extends StatelessWidget {
   const _GuidelinesSection();
 
+  void _openGuidelines(BuildContext context) {
+    context.go('/settings/influencer-guidelines');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -423,25 +428,31 @@ class _GuidelinesSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          width: 102,
-          height: 26,
+          width: 122,
+          height: 32,
           child: ElevatedButton(
-            onPressed: () {},
+            onPressed: () => _openGuidelines(context),
             style: ElevatedButton.styleFrom(
               elevation: 0,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               backgroundColor: const Color(0xFF2F88FF),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(5),
               ),
               padding: EdgeInsets.zero,
-              textStyle: GoogleFonts.notoSans(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                height: 1.1,
+            ),
+            child: Center(
+              child: Text(
+                'View Guidelines',
+                style: GoogleFonts.notoSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  height: 1.1,
+                ),
               ),
             ),
-            child: const Text('View Guidelines'),
           ),
         ),
       ],
