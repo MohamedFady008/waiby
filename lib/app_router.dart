@@ -19,6 +19,7 @@ import 'pages/settings_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/report_issue_page.dart';
 import 'pages/creator_form.dart';
+import 'pages/creator_guidelines_page.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -97,6 +98,10 @@ final router = GoRouter(
         GoRoute(
           path: '/become-creator/creator-form',
           builder: (context, state) => const CreatorFormPage(),
+        ),
+        GoRoute(
+          path: '/become-creator/creator-guidelines',
+          builder: (context, state) => const CreatorGuidelinesPage(),
         ),
       ],
     ),
