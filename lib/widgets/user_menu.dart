@@ -183,12 +183,52 @@ class UserMenu extends StatelessWidget {
           ),
         ),
       ],
-      child: _AvatarCircle(
+      child: _SafeCircleAvatar(
         photoUrl: auth.photoUrl,
         radius: 15,
-        backgroundColor: Colors.white.withValues(alpha: 0.08),
-        placeholderIconSize: 17,
+        iconSize: 17,
+        backgroundColor: const Color(0xFF1A2344),
+        iconColor: Colors.white70,
       ),
+    );
+  }
+}
+
+class _SafeCircleAvatar extends StatelessWidget {
+  final String? photoUrl;
+  final double radius;
+  final double iconSize;
+  final Color backgroundColor;
+  final Color iconColor;
+
+  const _SafeCircleAvatar({
+    required this.photoUrl,
+    required this.radius,
+    required this.iconSize,
+    required this.backgroundColor,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedUrl = photoUrl?.trim();
+    final hasValidUrl = trimmedUrl != null && trimmedUrl.isNotEmpty;
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: backgroundColor,
+      child: hasValidUrl
+          ? ClipOval(
+              child: Image.network(
+                trimmedUrl,
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    Icon(Icons.person, size: iconSize, color: iconColor),
+              ),
+            )
+          : Icon(Icons.person, size: iconSize, color: iconColor),
     );
   }
 }
@@ -213,11 +253,12 @@ class _UserAvatar extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        _AvatarCircle(
+        _SafeCircleAvatar(
           photoUrl: photoUrl,
           radius: 38,
+          iconSize: 38,
           backgroundColor: Colors.white.withValues(alpha: 0.08),
-          placeholderIconSize: 38,
+          iconColor: Colors.white,
         ),
         Positioned(
           right: -2,
@@ -236,46 +277,6 @@ class _UserAvatar extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _AvatarCircle extends StatelessWidget {
-  final String? photoUrl;
-  final double radius;
-  final double placeholderIconSize;
-  final Color backgroundColor;
-
-  const _AvatarCircle({
-    required this.photoUrl,
-    required this.radius,
-    required this.placeholderIconSize,
-    this.backgroundColor = Colors.transparent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final size = radius * 2;
-    final hasPhoto = (photoUrl ?? '').trim().isNotEmpty;
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
-      clipBehavior: Clip.antiAlias,
-      child: hasPhoto
-          ? Image.network(
-              photoUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(
-                  Icons.person,
-                  size: placeholderIconSize,
-                  color: Colors.white,
-                );
-              },
-            )
-          : Icon(Icons.person, size: placeholderIconSize, color: Colors.white),
     );
   }
 }

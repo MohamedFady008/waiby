@@ -61,6 +61,45 @@ class AuthService {
   // التحقق من حالة تسجيل الدخول
   bool get isLoggedIn => currentUser != null;
 
+  String _webRedirectUrl() {
+    final uri = Uri.base;
+    return uri
+        .replace(path: '/', queryParameters: <String, String>{}, fragment: '')
+        .toString();
+  }
+
+  bool _hasWebAuthCallbackParams(Uri uri) {
+    return uri.queryParameters.containsKey('code') ||
+        uri.queryParameters.containsKey('error') ||
+        uri.queryParameters.containsKey('error_description');
+  }
+
+  /// Handles OAuth callback on web when deep-link auto detection is disabled.
+  Future<void> completePendingWebAuthFlow() async {
+    if (!kIsWeb) {
+      return;
+    }
+
+    final uri = Uri.base;
+    if (!_hasWebAuthCallbackParams(uri)) {
+      return;
+    }
+
+    try {
+      await _supabase.auth.getSessionFromUrl(uri);
+    } on AuthException catch (e) {
+      final isMissingCodeVerifier = e.message.toLowerCase().contains(
+        'code verifier could not be found in local storage',
+      );
+
+      // During web hot restart, the callback URL can still contain `code`
+      // while the PKCE verifier was already consumed on the first parse.
+      if (!(isMissingCodeVerifier && _supabase.auth.currentSession != null)) {
+        rethrow;
+      }
+    }
+  }
+
   /// تسجيل مستخدم جديد بالبريد الإلكتروني وكلمة المرور
   /// Sign up with email and password
   Future<AuthResult> signUpWithEmail({
@@ -137,7 +176,7 @@ class AuthService {
       if (kIsWeb) {
         await _supabase.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: 'http://localhost:${Uri.base.port}/',
+          redirectTo: _webRedirectUrl(),
         );
         // سيتم التعامل مع الرد عبر authStateChanges
         return AuthResult.success(
@@ -200,7 +239,7 @@ class AuthService {
       if (kIsWeb) {
         await _supabase.auth.signInWithOAuth(
           OAuthProvider.facebook,
-          redirectTo: 'http://localhost:${Uri.base.port}/',
+          redirectTo: _webRedirectUrl(),
         );
         // سيتم التعامل مع الرد عبر authStateChanges
         return AuthResult.success(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -80,7 +81,7 @@ class AuthController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _initAuthListener();
+    unawaited(_initAuthListener());
   }
 
   @override
@@ -91,7 +92,16 @@ class AuthController extends GetxController {
 
   /// تهيئة مستمع حالة المصادقة
   /// Initialize auth state listener
-  void _initAuthListener() {
+  Future<void> _initAuthListener() async {
+    if (kIsWeb) {
+      try {
+        await _authService.completePendingWebAuthFlow();
+      } catch (error) {
+        // Keep startup resilient when callback URL is stale/invalid.
+        errorMessage.value = 'Auth callback failed: $error';
+      }
+    }
+
     // التحقق من الحالة الأولية
     final initialUser = _authService.currentUser;
     if (initialUser != null) {
