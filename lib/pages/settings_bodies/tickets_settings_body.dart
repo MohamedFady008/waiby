@@ -353,30 +353,44 @@ class _SidebarCategoryRow extends StatelessWidget {
   }
 }
 
-class _TicketsContentArea extends StatelessWidget {
+class _TicketsContentArea extends StatefulWidget {
   final List<String> filters;
   final List<_TicketCardData> tickets;
 
   const _TicketsContentArea({required this.filters, required this.tickets});
 
   @override
+  State<_TicketsContentArea> createState() => _TicketsContentAreaState();
+}
+
+class _TicketsContentAreaState extends State<_TicketsContentArea> {
+  _TicketCardData? _selectedTicket;
+
+  void _openTicket(_TicketCardData ticket) {
+    setState(() => _selectedTicket = ticket);
+  }
+
+  void _backToList() {
+    setState(() => _selectedTicket = null);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_selectedTicket != null) {
+      return _TicketDetailsPanel(ticket: _selectedTicket!, onBack: _backToList);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _TicketFiltersBar(filters: filters),
+        _TicketFiltersBar(filters: widget.filters),
         const SizedBox(height: 16),
-        for (var i = 0; i < tickets.length; i++) ...[
+        for (var i = 0; i < widget.tickets.length; i++) ...[
           _TicketCard(
-            ticket: tickets[i],
-            onTap: () => showDialog<void>(
-              context: context,
-              barrierColor: Colors.black.withValues(alpha: 0.72),
-              builder: (dialogContext) =>
-                  _TicketDetailsDialog(ticket: tickets[i]),
-            ),
+            ticket: widget.tickets[i],
+            onTap: () => _openTicket(widget.tickets[i]),
           ),
-          if (i < tickets.length - 1) const SizedBox(height: 16),
+          if (i < widget.tickets.length - 1) const SizedBox(height: 16),
         ],
       ],
     );
@@ -810,335 +824,308 @@ class _TicketCategoryStyle {
   }
 }
 
-class _TicketDetailsDialog extends StatelessWidget {
+class _TicketDetailsPanel extends StatelessWidget {
   final _TicketCardData ticket;
+  final VoidCallback onBack;
 
-  const _TicketDetailsDialog({required this.ticket});
+  const _TicketDetailsPanel({required this.ticket, required this.onBack});
 
   @override
   Widget build(BuildContext context) {
     final details = ticket.details;
     final isMutedStatus = ticket.statusStyle == _TicketStatusStyle.muted;
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 678,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.94,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF0E0F16),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: const Color.fromRGBO(255, 255, 255, 0.12),
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 1029),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E0F16),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color.fromRGBO(255, 255, 255, 0.12)),
+      ),
+      padding: const EdgeInsets.fromLTRB(32, 32, 32, 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Case Detail',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 24,
             ),
           ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(32, 32, 32, 30),
+          const SizedBox(height: 26),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 560;
+              final leftMeta = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Case ID: #${details.caseId}',
+                    style: GoogleFonts.notoSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Text(
+                        'Status',
+                        style: GoogleFonts.notoSans(
+                          color: Colors.white.withValues(alpha: 0.38),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _CaseStatusBadge(
+                        label: ticket.statusLabel,
+                        muted: isMutedStatus,
+                      ),
+                    ],
+                  ),
+                ],
+              );
+
+              final rightMeta = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TicketDetailsMetaLine(
+                    label: 'Type:',
+                    value: '${details.typeLabel}>',
+                  ),
+                  const SizedBox(height: 3),
+                  _TicketDetailsMetaLine(
+                    label: 'Category:',
+                    value: details.categoryLabel,
+                    emphasizedValue: true,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Created: ${details.createdAt}',
+                    style: GoogleFonts.notoSans(
+                      color: Colors.white.withValues(alpha: 0.63),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              );
+
+              if (narrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [leftMeta, const SizedBox(height: 14), rightMeta],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 4, child: leftMeta),
+                  const SizedBox(width: 24),
+                  Expanded(flex: 5, child: rightMeta),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+          Divider(
+            height: 1,
+            thickness: 0.6,
+            color: const Color(0xFF1C2645).withValues(alpha: 0.9),
+          ),
+          const SizedBox(height: 22),
+          Text(
+            'Report Summary',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 24,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF151721),
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(color: const Color.fromRGBO(26, 76, 157, 0.9)),
+            ),
+            child: Text(
+              'False or misleading reports may result in penalties.',
+              style: GoogleFonts.notoSans(
+                color: Colors.white.withValues(alpha: 0.51),
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(22, 14, 22, 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF151721),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Case Detail',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 24,
-                  ),
-                ),
-                const SizedBox(height: 26),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final narrow = constraints.maxWidth < 560;
-                    final leftMeta = Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Case ID: #${details.caseId}',
-                          style: GoogleFonts.notoSans(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Text(
-                              'Status',
-                              style: GoogleFonts.notoSans(
-                                color: Colors.white.withValues(alpha: 0.38),
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            _CaseStatusBadge(
-                              label: ticket.statusLabel,
-                              muted: isMutedStatus,
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-
-                    final rightMeta = Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _TicketDetailsMetaLine(
-                          label: 'Type:',
-                          value: '${details.typeLabel}>',
-                        ),
-                        const SizedBox(height: 3),
-                        _TicketDetailsMetaLine(
-                          label: 'Category:',
-                          value: details.categoryLabel,
-                          emphasizedValue: true,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Created: ${details.createdAt}',
-                          style: GoogleFonts.notoSans(
-                            color: Colors.white.withValues(alpha: 0.63),
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    );
-
-                    if (narrow) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          leftMeta,
-                          const SizedBox(height: 14),
-                          rightMeta,
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 4, child: leftMeta),
-                        const SizedBox(width: 24),
-                        Expanded(flex: 5, child: rightMeta),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 18),
-                Divider(
-                  height: 1,
-                  thickness: 0.6,
-                  color: const Color(0xFF1C2645).withValues(alpha: 0.9),
-                ),
-                const SizedBox(height: 22),
-                Text(
-                  'Report Summary',
+                  'Evidence',
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
-                    fontSize: 24,
+                    fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF151721),
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: const Color.fromRGBO(26, 76, 157, 0.9),
-                    ),
-                  ),
-                  child: Text(
-                    'False or misleading reports may result in penalties.',
-                    style: GoogleFonts.notoSans(
-                      color: Colors.white.withValues(alpha: 0.51),
-                      fontWeight: FontWeight.w400,
-                      fontSize: 10,
-                    ),
+                const SizedBox(height: 10),
+                Text(
+                  details.reportSummary,
+                  style: GoogleFonts.notoSans(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    height: 1.35,
                   ),
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(22, 14, 22, 20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF151721),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                if (details.evidenceItems.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
                     children: [
-                      Text(
-                        'Evidence',
+                      for (var i = 0; i < details.evidenceItems.length; i++)
+                        _EvidencePreviewTile(label: details.evidenceItems[i]),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 22,
+                color: Colors.white.withValues(alpha: 0.51),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  details.evidenceNote,
+                  style: GoogleFonts.notoSans(
+                    color: Colors.white.withValues(alpha: 0.51),
+                    fontWeight: FontWeight.w400,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Divider(
+            height: 1,
+            thickness: 0.6,
+            color: const Color(0xFF1C2645).withValues(alpha: 0.9),
+          ),
+          const SizedBox(height: 22),
+          Text(
+            'Official Response',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 24,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(26, 18, 26, 22),
+            decoration: BoxDecoration(
+              color: const Color(0xFF151721),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.cruelty_free_rounded,
+                      size: 30,
+                      color: Color(0xFF9BE35E),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        details.responseTeam,
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        details.reportSummary,
-                        style: GoogleFonts.notoSans(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w400,
-                          fontSize: 14,
-                          height: 1.35,
-                        ),
-                      ),
-                      if (details.evidenceItems.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: [
-                            for (
-                              var i = 0;
-                              i < details.evidenceItems.length;
-                              i++
-                            )
-                              _EvidencePreviewTile(
-                                label: details.evidenceItems[i],
-                              ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      size: 22,
-                      color: Colors.white.withValues(alpha: 0.51),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        details.evidenceNote,
-                        style: GoogleFonts.notoSans(
-                          color: Colors.white.withValues(alpha: 0.51),
-                          fontWeight: FontWeight.w400,
-                          fontSize: 15,
-                        ),
-                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-                Divider(
-                  height: 1,
-                  thickness: 0.6,
-                  color: const Color(0xFF1C2645).withValues(alpha: 0.9),
-                ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 6),
                 Text(
-                  'Official Response',
-                  style: GoogleFonts.poppins(
+                  details.responseDate,
+                  style: GoogleFonts.notoSans(
+                    color: Colors.white.withValues(alpha: 0.51),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  details.responseBody,
+                  style: GoogleFonts.notoSans(
                     color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 24,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(26, 18, 26, 22),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF151721),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.cruelty_free_rounded,
-                            size: 30,
-                            color: Color(0xFF9BE35E),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              details.responseTeam,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        details.responseDate,
-                        style: GoogleFonts.notoSans(
-                          color: Colors.white.withValues(alpha: 0.51),
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        details.responseBody,
-                        style: GoogleFonts.notoSans(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w400,
-                          fontSize: 14,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 22),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    height: 42,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: const Color(0xFF2F88FF),
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        details.resolutionLabel,
-                        style: GoogleFonts.notoSans(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    height: 1.35,
                   ),
                 ),
               ],
             ),
           ),
-        ),
+          const SizedBox(height: 22),
+          Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              height: 42,
+              child: TextButton(
+                onPressed: onBack,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF2F88FF),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Text(
+                  details.resolutionLabel,
+                  style: GoogleFonts.notoSans(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

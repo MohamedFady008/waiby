@@ -62,10 +62,41 @@ class AuthService {
   bool get isLoggedIn => currentUser != null;
 
   String _webRedirectUrl() {
-    final uri = Uri.base;
-    return uri
-        .replace(path: '/', queryParameters: <String, String>{}, fragment: '')
-        .toString();
+    const override = String.fromEnvironment('WEB_AUTH_REDIRECT_URL');
+    if (override.isNotEmpty) {
+      return override;
+    }
+
+    final uri = Uri.base.replace(
+      path: '/',
+      queryParameters: <String, String>{},
+      fragment: '',
+    );
+
+    if (!kDebugMode) {
+      return uri.toString();
+    }
+
+    final host = uri.host.toLowerCase();
+    final isLocalHost =
+        host == 'localhost' || host == '127.0.0.1' || host == '::1';
+    if (isLocalHost) {
+      return uri.toString();
+    }
+
+    // In debug web, avoid falling back to production callback hosts.
+    const fallbackPort = 3000;
+    final localFallback = Uri(
+      scheme: 'http',
+      host: 'localhost',
+      port: fallbackPort,
+      path: '/',
+    ).toString();
+    debugPrint(
+      'AuthService: non-local web host "$host" detected in debug; '
+      'using fallback redirect URL: $localFallback',
+    );
+    return localFallback;
   }
 
   bool _hasWebAuthCallbackParams(Uri uri) {
