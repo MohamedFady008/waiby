@@ -435,6 +435,14 @@ class _ActionMetricCard extends StatefulWidget {
 }
 
 class _ActionMetricCardState extends State<_ActionMetricCard> {
+  static const double _reliabilityRulesCardHeight = 678;
+  static const double _businessRulesCardHeight = 812;
+  static const Color _rulesBlue = Color(0xFF2F88FF);
+  static const Color _rulesDivider = Color(0xFF1D2537);
+  static const Color _chipGreen = Color(0xFF124C39);
+  static const Color _chipYellow = Color(0xFFF8C34A);
+  static const Color _chipDark = Color(0xFF181A21);
+
   bool _showRules = false;
 
   void _toggleRules() => setState(() => _showRules = !_showRules);
@@ -513,6 +521,13 @@ class _ActionMetricCardState extends State<_ActionMetricCard> {
   // ---- back ----
 
   Widget _buildBackFace({Key? key}) {
+    if (widget.data.title == 'RELIABILITY RANK') {
+      return _buildReliabilityRulesBackFace(key: key);
+    }
+    if (widget.data.title == 'BUSINESS IMPACT') {
+      return _buildBusinessImpactRulesBackFace(key: key);
+    }
+
     final rules = widget.data.rules;
     return _buildCardShell(
       key: key,
@@ -613,6 +628,724 @@ class _ActionMetricCardState extends State<_ActionMetricCard> {
     );
   }
 
+  Widget _buildReliabilityRulesBackFace({Key? key}) {
+    return _buildDetailedRulesBackFace(
+      key: key,
+      cardHeight: _reliabilityRulesCardHeight,
+      title: 'RELIABILITY RANK RULES',
+      sections: [
+        _buildDetailedRulesSection(
+          sectionHeight: 143,
+          chipSpacing: 46,
+          heading: RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.4,
+              ),
+              children: const [
+                TextSpan(text: 'Avg. response time (last 7 days): '),
+                TextSpan(
+                  text: '6m 05s',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+              ],
+            ),
+          ),
+          ranges: const <_RuleRangeData>[
+            _RuleRangeData(
+              label: '<5min',
+              score: '5',
+              color: _chipGreen,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '5-10min',
+              score: '2',
+              color: _chipYellow,
+              width: 50,
+            ),
+            _RuleRangeData(
+              label: '>10min',
+              score: '0',
+              color: _chipDark,
+              width: 44,
+            ),
+          ],
+          body: [
+            Text(
+              'Replies outside these ranges earn 0 rating.',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.45,
+              ),
+            ),
+            Text(
+              'Reply time is not counted while your status is "In order,"'
+              ' "Ilde," or "Offline."',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+        _buildDetailedRulesSection(
+          sectionHeight: 143,
+          chipSpacing: 46,
+          heading: RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.4,
+              ),
+              children: const [
+                TextSpan(text: 'Non refund/cancel orders: '),
+                TextSpan(
+                  text: '0',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+              ],
+            ),
+          ),
+          ranges: const <_RuleRangeData>[
+            _RuleRangeData(
+              label: '<5min',
+              score: '5',
+              color: _chipGreen,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '5-10min',
+              score: '2',
+              color: _chipYellow,
+              width: 50,
+            ),
+            _RuleRangeData(
+              label: '>10min',
+              score: '0',
+              color: _chipDark,
+              width: 44,
+            ),
+          ],
+          body: [
+            Text(
+              'Orders outside these ranges earn 0 rating.',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.45,
+              ),
+            ),
+            Text(
+              'Reply time is not counted while your status is "In order,"'
+              ' "Ilde," or "Offline."',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+        _buildDetailedRulesSection(
+          sectionHeight: 115,
+          chipSpacing: 50,
+          heading: RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.4,
+              ),
+              children: const [
+                TextSpan(text: 'Non refund/cancel order in the last 7 days: '),
+                TextSpan(
+                  text: '6m 05s',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+              ],
+            ),
+          ),
+          ranges: const <_RuleRangeData>[
+            _RuleRangeData(
+              label: '0',
+              score: '3',
+              color: _chipGreen,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '<2',
+              score: '1',
+              color: _chipGreen,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '<3',
+              score: '0',
+              color: _chipDark,
+              width: 42,
+            ),
+          ],
+          body: [
+            Text(
+              'Avoid canceling and refunding ordes',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+        _buildDetailedRulesSection(
+          sectionHeight: 115,
+          chipSpacing: 46,
+          showBottomBorder: true,
+          heading: RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.4,
+              ),
+              children: const [
+                TextSpan(text: 'Active days in the last 7 days: '),
+                TextSpan(
+                  text: '6m 05s',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+              ],
+            ),
+          ),
+          ranges: const <_RuleRangeData>[
+            _RuleRangeData(
+              label: '<5min',
+              score: '6',
+              color: _chipGreen,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '3-5days',
+              score: '3',
+              color: _chipYellow,
+              width: 50,
+            ),
+            _RuleRangeData(
+              label: '<2days',
+              score: '0',
+              color: _chipDark,
+              width: 42,
+            ),
+          ],
+          body: [
+            Text(
+              'A login to Waiby is considered an active day',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBusinessImpactRulesBackFace({Key? key}) {
+    return _buildDetailedRulesBackFace(
+      key: key,
+      cardHeight: _businessRulesCardHeight,
+      title: 'BUSINESS IMPACT RULES',
+      sections: [
+        _buildDetailedRulesSection(
+          sectionHeight: 113,
+          chipSpacing: 17,
+          heading: RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.4,
+              ),
+              children: const [
+                TextSpan(text: 'Total earnings (last 30 days): '),
+                TextSpan(
+                  text: '83.10',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+                TextSpan(text: '\nIncludes all revenue sources'),
+              ],
+            ),
+          ),
+          ranges: const <_RuleRangeData>[
+            _RuleRangeData(
+              label: '<100.00',
+              score: '0',
+              color: _chipDark,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '100-500',
+              score: '5',
+              color: _chipDark,
+              width: 49,
+            ),
+            _RuleRangeData(
+              label: '500-1k',
+              score: '10',
+              color: _chipDark,
+              width: 43,
+            ),
+            _RuleRangeData(
+              label: '1k-3k',
+              score: '15',
+              color: _chipDark,
+              width: 40,
+            ),
+            _RuleRangeData(
+              label: '3k+',
+              score: '25',
+              color: _chipDark,
+              width: 40,
+            ),
+          ],
+        ),
+        _buildDetailedRulesSection(
+          sectionHeight: 113,
+          chipSpacing: 17,
+          heading: RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.4,
+              ),
+              children: const [
+                TextSpan(
+                  text: 'Users who tipped or subscribed in the last 30 days: ',
+                ),
+                TextSpan(
+                  text: '1',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+                TextSpan(
+                  text: '\nIncludes Subscription and tips',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+              ],
+            ),
+          ),
+          ranges: const <_RuleRangeData>[
+            _RuleRangeData(
+              label: '<2',
+              score: '0',
+              color: _chipDark,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '3-6',
+              score: '2',
+              color: _chipDark,
+              width: 49,
+            ),
+            _RuleRangeData(
+              label: '7-12',
+              score: '4',
+              color: _chipDark,
+              width: 43,
+            ),
+            _RuleRangeData(
+              label: '13-20',
+              score: '8',
+              color: _chipDark,
+              width: 40,
+            ),
+            _RuleRangeData(
+              label: '>20',
+              score: '10',
+              color: _chipDark,
+              width: 40,
+            ),
+          ],
+        ),
+        _buildDetailedRulesSection(
+          sectionHeight: 134,
+          chipSpacing: 24,
+          heading: RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.4,
+              ),
+              children: const [
+                TextSpan(
+                  text: 'First-time paid buyers & repeat purchases (30d)\n',
+                ),
+                TextSpan(text: 'New paid buyers: '),
+                TextSpan(
+                  text: '3',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+                TextSpan(text: '\nRepeat buyers: '),
+                TextSpan(
+                  text: '1',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+              ],
+            ),
+          ),
+          ranges: const <_RuleRangeData>[
+            _RuleRangeData(
+              label: '<2',
+              score: '0',
+              color: _chipDark,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '3-5',
+              score: '3',
+              color: _chipDark,
+              width: 49,
+            ),
+            _RuleRangeData(
+              label: '6-10',
+              score: '6',
+              color: _chipDark,
+              width: 43,
+            ),
+            _RuleRangeData(
+              label: '11-15',
+              score: '10',
+              color: _chipDark,
+              width: 40,
+            ),
+          ],
+        ),
+        _buildDetailedRulesSection(
+          sectionHeight: 164,
+          chipSpacing: 24,
+          heading: RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.4,
+              ),
+              children: const [
+                TextSpan(
+                  text:
+                      'Old buyers who completed at least one paid order and\n'
+                      'made a repeat purchase within the last 30 days.\n',
+                ),
+                TextSpan(text: 'Total number of old paid buyers: '),
+                TextSpan(
+                  text: '434',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+                TextSpan(
+                  text:
+                      '\nNumber of buyers who made a repeat purchase in the '
+                      'last 30 days: ',
+                ),
+                TextSpan(
+                  text: '2',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+              ],
+            ),
+          ),
+          ranges: const <_RuleRangeData>[
+            _RuleRangeData(
+              label: '<2',
+              score: '0',
+              color: _chipDark,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '3-5',
+              score: '3',
+              color: _chipDark,
+              width: 49,
+            ),
+            _RuleRangeData(
+              label: '6-10',
+              score: '6',
+              color: _chipDark,
+              width: 43,
+            ),
+            _RuleRangeData(
+              label: '11-15',
+              score: '10',
+              color: _chipDark,
+              width: 40,
+            ),
+          ],
+        ),
+        _buildDetailedRulesSection(
+          sectionHeight: 119,
+          chipSpacing: 24,
+          showBottomBorder: true,
+          heading: RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                height: 1.4,
+              ),
+              children: const [
+                TextSpan(
+                  text:
+                      'Average rating of paid orders from new buyers (last 30 '
+                      'days): ',
+                ),
+                TextSpan(
+                  text: '5',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+                TextSpan(text: ', based on '),
+                TextSpan(
+                  text: '1 reviewed order',
+                  style: TextStyle(color: _rulesBlue),
+                ),
+              ],
+            ),
+          ),
+          ranges: const <_RuleRangeData>[
+            _RuleRangeData(
+              label: '5.0',
+              score: '10',
+              color: _chipDark,
+              width: 42,
+            ),
+            _RuleRangeData(
+              label: '4.1-4.9',
+              score: '5',
+              color: _chipDark,
+              width: 49,
+            ),
+            _RuleRangeData(
+              label: '3.0-4.0',
+              score: '2',
+              color: _chipDark,
+              width: 43,
+            ),
+            _RuleRangeData(
+              label: '<3.0',
+              score: '0',
+              color: _chipDark,
+              width: 40,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailedRulesBackFace({
+    required Key? key,
+    required double cardHeight,
+    required String title,
+    required List<Widget> sections,
+  }) {
+    return SizedBox(
+      height: cardHeight,
+      child: _buildCardShell(
+        key: key,
+        backgroundColor: const Color(0xFF050816),
+        radius: 16,
+        child: Column(
+          children: [
+            _buildDetailedRulesHeader(title: title),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.zero,
+                child: Column(children: sections),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 24, bottom: 28),
+              child: Row(
+                children: [
+                  const Spacer(),
+                  SizedBox(
+                    width: 52,
+                    height: 19,
+                    child: ElevatedButton(
+                      onPressed: _toggleRules,
+                      style: ElevatedButton.styleFrom(
+                        elevation: 0,
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        backgroundColor: const Color(0xFF19B375),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                      child: Text(
+                        'Close',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailedRulesHeader({required String title}) {
+    return Container(
+      height: 54,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0A0F25),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.person_outline_rounded,
+            color: Color(0xFF51D76E),
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                height: 1.1,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailedRulesSection({
+    required Widget heading,
+    required List<_RuleRangeData> ranges,
+    required double sectionHeight,
+    required double chipSpacing,
+    bool showBottomBorder = false,
+    List<Widget> body = const <Widget>[],
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: _rulesDivider.withValues(alpha: 0.28)),
+          bottom: showBottomBorder
+              ? BorderSide(color: _rulesDivider.withValues(alpha: 0.28))
+              : BorderSide.none,
+        ),
+      ),
+      child: SizedBox(
+        height: sectionHeight,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(23, 11, 23, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              heading,
+              const SizedBox(height: 10),
+              Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: chipSpacing,
+                  children: [
+                    for (final range in ranges)
+                      _buildDetailedRange(data: range),
+                  ],
+                ),
+              ),
+              if (body.isNotEmpty) ...[const SizedBox(height: 10), ...body],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailedRange({required _RuleRangeData data}) {
+    return SizedBox(
+      width: data.width,
+      child: Column(
+        children: [
+          Container(
+            width: data.width,
+            height: 16,
+            decoration: BoxDecoration(
+              color: data.color,
+              borderRadius: BorderRadius.circular(5),
+            ),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              data.label,
+              maxLines: 1,
+              overflow: TextOverflow.visible,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+                fontSize: 8,
+                height: 1,
+              ),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            data.score,
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.w400,
+              fontSize: 8,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ---- helpers ----
 
   Widget _buildCardHeader({required String title}) {
@@ -645,12 +1378,17 @@ class _ActionMetricCardState extends State<_ActionMetricCard> {
     );
   }
 
-  Widget _buildCardShell({required Widget child, Key? key}) {
+  Widget _buildCardShell({
+    required Widget child,
+    Key? key,
+    Color backgroundColor = const Color(0xFF121826),
+    double radius = 14,
+  }) {
     return Container(
       key: key,
       decoration: BoxDecoration(
-        color: const Color(0xFF121826),
-        borderRadius: BorderRadius.circular(14),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: const Color(0xFF1E2638)),
       ),
       child: child,
@@ -1015,6 +1753,21 @@ class _ActionMetricRowData {
   final String value;
 
   const _ActionMetricRowData({required this.label, required this.value});
+}
+
+@immutable
+class _RuleRangeData {
+  final String label;
+  final String score;
+  final Color color;
+  final double width;
+
+  const _RuleRangeData({
+    required this.label,
+    required this.score,
+    required this.color,
+    required this.width,
+  });
 }
 
 @immutable
