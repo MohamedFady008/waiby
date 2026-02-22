@@ -1,24 +1,38 @@
-import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
-/// نتيجة عملية المصادقة
-/// Result class for authentication operations
+import '../core/config/app_config.dart';
+import '../data/models/user_profile.dart';
+import '../data/repositories/user_profile_repository.dart';
+
+/// Result class for authentication operations.
 class AuthResult {
   final bool success;
   final String? message;
   final User? user;
   final String? errorCode;
+  final bool requiresEmailVerification;
 
-  AuthResult({required this.success, this.message, this.user, this.errorCode});
+  AuthResult({
+    required this.success,
+    this.message,
+    this.user,
+    this.errorCode,
+    this.requiresEmailVerification = false,
+  });
 
-  factory AuthResult.success({User? user, String? message}) {
+  factory AuthResult.success({
+    User? user,
+    String? message,
+    bool requiresEmailVerification = false,
+  }) {
     return AuthResult(
       success: true,
       user: user,
-      message: message ?? 'تمت العملية بنجاح',
+      message: message ?? 'Operation completed successfully.',
+      requiresEmailVerification: requiresEmailVerification,
     );
   }
 
@@ -27,461 +41,604 @@ class AuthResult {
   }
 }
 
-/// خدمة المصادقة المتكاملة مع Supabase
-/// Comprehensive authentication service using Supabase
+/// Comprehensive authentication service backed by Firebase Auth + Firestore.
 class AuthService {
-  // الحصول على نسخة Supabase Client
-  final SupabaseClient _supabase = Supabase.instance.client;
+  AuthService({
+    FirebaseAuth? auth,
+    GoogleSignIn? googleSignIn,
+    UserProfileRepository? userProfileRepository,
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _googleSignIn = !kIsWeb
+           ? (googleSignIn ??
+                 GoogleSignIn(
+                   serverClientId: AppConfig.googleServerClientId.isNotEmpty
+                       ? AppConfig.googleServerClientId
+                       : null,
+                   scopes: const ['email', 'profile'],
+                 ))
+           : null,
+       _userProfileRepository =
+           userProfileRepository ?? UserProfileRepository();
 
-  // إعداد Google Sign-In مع Web Client ID الخاص بـ Supabase
-  // يجب استبدال هذا بالـ Client ID الخاص بمشروعك
-  late final GoogleSignIn _googleSignIn;
+  final FirebaseAuth _auth;
+  final GoogleSignIn? _googleSignIn;
+  final UserProfileRepository _userProfileRepository;
 
-  AuthService() {
-    _googleSignIn = GoogleSignIn(
-      // Web Client ID من Google Cloud Console
-      // يجب الحصول عليه من إعدادات OAuth في Supabase Dashboard
-      clientId: kIsWeb
-          ? '782633293030-ei377tcui7t15nmcvivpnvss9r65f655.apps.googleusercontent.com'
-          : null,
-      // serverClientId غير مدعوم على الويب
-      serverClientId: kIsWeb
-          ? null
-          : '782633293030-ei377tcui7t15nmcvivpnvss9r65f655.apps.googleusercontent.com',
-      scopes: ['email', 'profile'],
-    );
-  }
+  UserProfile? _cachedProfile;
 
-  // الحصول على المستخدم الحالي
-  User? get currentUser => _supabase.auth.currentUser;
+  User? get currentUser => _auth.currentUser;
 
-  // الاستماع لتغييرات حالة المصادقة
-  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  // التحقق من حالة تسجيل الدخول
   bool get isLoggedIn => currentUser != null;
 
-  String _webRedirectUrl() {
-    const override = String.fromEnvironment('WEB_AUTH_REDIRECT_URL');
-    if (override.isNotEmpty) {
-      return override;
-    }
+  /// Kept for API compatibility with previous web flow implementation.
+  Future<void> completePendingWebAuthFlow() async {}
 
-    final uri = Uri.base.replace(
-      path: '/',
-      queryParameters: <String, String>{},
-      fragment: '',
-    );
-
-    if (!kDebugMode) {
-      return uri.toString();
-    }
-
-    final host = uri.host.toLowerCase();
-    final isLocalHost =
-        host == 'localhost' || host == '127.0.0.1' || host == '::1';
-    if (isLocalHost) {
-      return uri.toString();
-    }
-
-    // In debug web, avoid falling back to production callback hosts.
-    const fallbackPort = 3000;
-    final localFallback = Uri(
-      scheme: 'http',
-      host: 'localhost',
-      port: fallbackPort,
-      path: '/',
-    ).toString();
-    debugPrint(
-      'AuthService: non-local web host "$host" detected in debug; '
-      'using fallback redirect URL: $localFallback',
-    );
-    return localFallback;
-  }
-
-  bool _hasWebAuthCallbackParams(Uri uri) {
-    return uri.queryParameters.containsKey('code') ||
-        uri.queryParameters.containsKey('error') ||
-        uri.queryParameters.containsKey('error_description');
-  }
-
-  /// Handles OAuth callback on web when deep-link auto detection is disabled.
-  Future<void> completePendingWebAuthFlow() async {
-    if (!kIsWeb) {
+  Future<void> preloadCurrentUserProfile() async {
+    final user = currentUser;
+    if (user == null) {
+      _cachedProfile = null;
       return;
     }
-
-    final uri = Uri.base;
-    if (!_hasWebAuthCallbackParams(uri)) {
-      return;
-    }
-
-    try {
-      await _supabase.auth.getSessionFromUrl(uri);
-    } on AuthException catch (e) {
-      final isMissingCodeVerifier = e.message.toLowerCase().contains(
-        'code verifier could not be found in local storage',
-      );
-
-      // During web hot restart, the callback URL can still contain `code`
-      // while the PKCE verifier was already consumed on the first parse.
-      if (!(isMissingCodeVerifier && _supabase.auth.currentSession != null)) {
-        rethrow;
-      }
-    }
+    _cachedProfile = await _userProfileRepository.fetchById(user.uid);
   }
 
-  /// تسجيل مستخدم جديد بالبريد الإلكتروني وكلمة المرور
-  /// Sign up with email and password
   Future<AuthResult> signUpWithEmail({
     required String email,
     required String password,
     String? name,
   }) async {
     try {
-      final AuthResponse response = await _supabase.auth.signUp(
+      final credential = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
-        data: name != null ? {'full_name': name.trim()} : null,
       );
 
-      if (response.user != null) {
-        // تحقق إذا كان المستخدم بحاجة لتأكيد البريد الإلكتروني
-        if (response.user!.emailConfirmedAt == null) {
-          return AuthResult.success(
-            user: response.user,
-            message:
-                'تم إنشاء الحساب بنجاح. يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب.',
-          );
-        }
-        return AuthResult.success(
-          user: response.user,
-          message: 'تم إنشاء الحساب وتسجيل الدخول بنجاح!',
+      final user = credential.user;
+      if (user == null) {
+        return AuthResult.failure(
+          message: 'Failed to create account. Please try again.',
         );
       }
 
-      return AuthResult.failure(
-        message: 'فشل في إنشاء الحساب. يرجى المحاولة مرة أخرى.',
+      final cleanedName = name?.trim();
+      if (cleanedName != null && cleanedName.isNotEmpty) {
+        await user.updateDisplayName(cleanedName);
+      }
+
+      await user.reload();
+      final refreshedUser = _auth.currentUser ?? user;
+
+      await _ensureUserProfileDocument(
+        user: refreshedUser,
+        preferredName: cleanedName,
       );
-    } on AuthException catch (e) {
+
+      if (AuthConfig.requireEmailConfirmation && !refreshedUser.emailVerified) {
+        await refreshedUser.sendEmailVerification();
+        await _auth.signOut();
+        return AuthResult.success(
+          user: refreshedUser,
+          requiresEmailVerification: true,
+          message:
+              'Account created successfully. Please verify your email before signing in.',
+        );
+      }
+
+      return AuthResult.success(
+        user: refreshedUser,
+        message: 'Account created and signed in successfully.',
+      );
+    } on FirebaseAuthException catch (e) {
       return _handleAuthException(e);
     } catch (e) {
-      return AuthResult.failure(message: 'حدث خطأ غير متوقع: ${e.toString()}');
+      return AuthResult.failure(message: 'Unexpected error: ${e.toString()}');
     }
   }
 
-  /// تسجيل الدخول بالبريد الإلكتروني وكلمة المرور
-  /// Sign in with email and password
   Future<AuthResult> signInWithEmail({
     required String email,
     required String password,
   }) async {
     try {
-      final AuthResponse response = await _supabase.auth.signInWithPassword(
+      final credential = await _auth.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
 
-      if (response.user != null) {
-        return AuthResult.success(
-          user: response.user,
-          message: 'تم تسجيل الدخول بنجاح!',
+      var user = credential.user;
+      if (user == null) {
+        return AuthResult.failure(
+          message: 'Failed to sign in. Please check your credentials.',
         );
       }
 
-      return AuthResult.failure(
-        message: 'فشل في تسجيل الدخول. يرجى التحقق من بياناتك.',
-      );
-    } on AuthException catch (e) {
+      await user.reload();
+      user = _auth.currentUser ?? user;
+
+      if (AuthConfig.requireEmailConfirmation && !user.emailVerified) {
+        await user.sendEmailVerification();
+        await _auth.signOut();
+        return AuthResult.failure(
+          message: 'Please verify your email before signing in.',
+          errorCode: 'EMAIL_NOT_VERIFIED',
+        );
+      }
+
+      await _ensureUserProfileDocument(user: user);
+
+      return AuthResult.success(user: user, message: 'Signed in successfully.');
+    } on FirebaseAuthException catch (e) {
       return _handleAuthException(e);
     } catch (e) {
-      return AuthResult.failure(message: 'حدث خطأ غير متوقع: ${e.toString()}');
+      return AuthResult.failure(message: 'Unexpected error: ${e.toString()}');
     }
   }
 
-  /// تسجيل الدخول عبر حساب Google
-  /// Sign in with Google account
   Future<AuthResult> signInWithGoogle() async {
     try {
-      // على الويب، نستخدم Supabase OAuth بدلاً من google_sign_in
+      UserCredential credential;
+
       if (kIsWeb) {
-        await _supabase.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: _webRedirectUrl(),
-        );
-        // سيتم التعامل مع الرد عبر authStateChanges
-        return AuthResult.success(
-          message: 'جارٍ التوجيه لتسجيل الدخول عبر Google...',
-        );
-      }
-
-      // على الموبايل، نستخدم google_sign_in
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
-      if (googleUser == null) {
-        return AuthResult.failure(
-          message: 'تم إلغاء تسجيل الدخول عبر Google',
-          errorCode: 'CANCELLED',
-        );
-      }
-
-      // الحصول على بيانات المصادقة
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final String? idToken = googleAuth.idToken;
-      final String? accessToken = googleAuth.accessToken;
-
-      if (idToken == null) {
-        return AuthResult.failure(
-          message: 'فشل في الحصول على رمز المصادقة من Google',
-        );
-      }
-
-      // تسجيل الدخول في Supabase باستخدام رمز Google
-      final AuthResponse response = await _supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-
-      if (response.user != null) {
-        return AuthResult.success(
-          user: response.user,
-          message: 'تم تسجيل الدخول عبر Google بنجاح!',
-        );
-      }
-
-      return AuthResult.failure(message: 'فشل في تسجيل الدخول عبر Google');
-    } on AuthException catch (e) {
-      return _handleAuthException(e);
-    } catch (e) {
-      return AuthResult.failure(
-        message: 'حدث خطأ أثناء تسجيل الدخول عبر Google: ${e.toString()}',
-      );
-    }
-  }
-
-  /// تسجيل الدخول عبر حساب Facebook
-  /// Sign in with Facebook account
-  Future<AuthResult> signInWithFacebook() async {
-    try {
-      // على الويب، نستخدم Supabase OAuth بدلاً من flutter_facebook_auth
-      if (kIsWeb) {
-        await _supabase.auth.signInWithOAuth(
-          OAuthProvider.facebook,
-          redirectTo: _webRedirectUrl(),
-        );
-        // سيتم التعامل مع الرد عبر authStateChanges
-        return AuthResult.success(
-          message: 'جارٍ التوجيه لتسجيل الدخول عبر Facebook...',
-        );
-      }
-
-      // على الموبايل، نستخدم flutter_facebook_auth
-      final LoginResult result = await FacebookAuth.instance.login(
-        permissions: ['email', 'public_profile'],
-      );
-
-      switch (result.status) {
-        case LoginStatus.success:
-          final AccessToken accessToken = result.accessToken!;
-
-          // تسجيل الدخول في Supabase باستخدام رمز Facebook
-          final AuthResponse response = await _supabase.auth.signInWithIdToken(
-            provider: OAuthProvider.facebook,
-            idToken: accessToken.tokenString,
-          );
-
-          if (response.user != null) {
-            return AuthResult.success(
-              user: response.user,
-              message: 'تم تسجيل الدخول عبر Facebook بنجاح!',
-            );
-          }
-
+        final provider = GoogleAuthProvider()..addScope('email');
+        credential = await _auth.signInWithPopup(provider);
+      } else {
+        final googleSignIn = _googleSignIn;
+        if (googleSignIn == null) {
           return AuthResult.failure(
-            message: 'فشل في تسجيل الدخول عبر Facebook',
+            message: 'Google Sign-In is not initialized on this platform.',
           );
+        }
 
-        case LoginStatus.cancelled:
+        final googleUser = await googleSignIn.signIn();
+        if (googleUser == null) {
           return AuthResult.failure(
-            message: 'تم إلغاء تسجيل الدخول عبر Facebook',
+            message: 'Google sign-in was cancelled.',
             errorCode: 'CANCELLED',
           );
+        }
 
-        case LoginStatus.failed:
-          return AuthResult.failure(
-            message: result.message ?? 'فشل في تسجيل الدخول عبر Facebook',
-          );
-
-        case LoginStatus.operationInProgress:
-          return AuthResult.failure(
-            message: 'عملية تسجيل الدخول قيد التنفيذ بالفعل',
-          );
-      }
-    } on AuthException catch (e) {
-      return _handleAuthException(e);
-    } catch (e) {
-      return AuthResult.failure(
-        message: 'حدث خطأ أثناء تسجيل الدخول عبر Facebook: ${e.toString()}',
-      );
-    }
-  }
-
-  /// تسجيل الخروج
-  /// Sign out from all providers
-  Future<AuthResult> signOut() async {
-    try {
-      // تسجيل الخروج من Google إذا كان مسجل الدخول
-      if (await _googleSignIn.isSignedIn()) {
-        await _googleSignIn.signOut();
+        final googleAuth = await googleUser.authentication;
+        final firebaseCredential = GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+          accessToken: googleAuth.accessToken,
+        );
+        credential = await _auth.signInWithCredential(firebaseCredential);
       }
 
-      // تسجيل الخروج من Facebook
-      await FacebookAuth.instance.logOut();
+      final user = credential.user;
+      if (user == null) {
+        return AuthResult.failure(message: 'Failed to sign in with Google.');
+      }
 
-      // تسجيل الخروج من Supabase
-      await _supabase.auth.signOut();
-
-      return AuthResult.success(message: 'تم تسجيل الخروج بنجاح');
-    } catch (e) {
-      return AuthResult.failure(
-        message: 'حدث خطأ أثناء تسجيل الخروج: ${e.toString()}',
-      );
-    }
-  }
-
-  /// إعادة تعيين كلمة المرور
-  /// Send password reset email
-  Future<AuthResult> resetPassword(String email) async {
-    try {
-      await _supabase.auth.resetPasswordForEmail(
-        email.trim(),
-        redirectTo: 'io.supabase.waiby://reset-password/',
-      );
+      await _ensureUserProfileDocument(user: user);
 
       return AuthResult.success(
-        message: 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني',
+        user: user,
+        message: 'Signed in with Google successfully.',
       );
-    } on AuthException catch (e) {
+    } on FirebaseAuthException catch (e) {
       return _handleAuthException(e);
     } catch (e) {
-      return AuthResult.failure(message: 'حدث خطأ: ${e.toString()}');
+      return AuthResult.failure(
+        message: 'Error signing in with Google: ${e.toString()}',
+      );
     }
   }
 
-  /// تحديث كلمة المرور
-  /// Update user password
+  Future<AuthResult> signInWithFacebook() async {
+    try {
+      UserCredential credential;
+
+      if (kIsWeb) {
+        final provider = FacebookAuthProvider()..addScope('email');
+        credential = await _auth.signInWithPopup(provider);
+      } else {
+        final loginResult = await FacebookAuth.instance.login(
+          permissions: const ['email', 'public_profile'],
+        );
+
+        switch (loginResult.status) {
+          case LoginStatus.success:
+            final accessToken = loginResult.accessToken;
+            if (accessToken == null) {
+              return AuthResult.failure(
+                message: 'Failed to get Facebook access token.',
+              );
+            }
+            final facebookCredential = FacebookAuthProvider.credential(
+              accessToken.tokenString,
+            );
+            credential = await _auth.signInWithCredential(facebookCredential);
+            break;
+          case LoginStatus.cancelled:
+            return AuthResult.failure(
+              message: 'Facebook sign-in was cancelled.',
+              errorCode: 'CANCELLED',
+            );
+          case LoginStatus.failed:
+            return AuthResult.failure(
+              message:
+                  loginResult.message ?? 'Failed to sign in with Facebook.',
+            );
+          case LoginStatus.operationInProgress:
+            return AuthResult.failure(
+              message: 'Facebook sign-in is already in progress.',
+            );
+        }
+      }
+
+      final user = credential.user;
+      if (user == null) {
+        return AuthResult.failure(message: 'Failed to sign in with Facebook.');
+      }
+
+      await _ensureUserProfileDocument(user: user);
+
+      return AuthResult.success(
+        user: user,
+        message: 'Signed in with Facebook successfully.',
+      );
+    } on FirebaseAuthException catch (e) {
+      return _handleAuthException(e);
+    } catch (e) {
+      return AuthResult.failure(
+        message: 'Error signing in with Facebook: ${e.toString()}',
+      );
+    }
+  }
+
+  Future<AuthResult> signOut() async {
+    try {
+      try {
+        final googleSignIn = _googleSignIn;
+        if (!kIsWeb &&
+            googleSignIn != null &&
+            await googleSignIn.isSignedIn()) {
+          await googleSignIn.signOut();
+        }
+      } catch (_) {
+        // Ignore provider sign-out issues, Firebase signOut is the source of truth.
+      }
+
+      try {
+        await FacebookAuth.instance.logOut();
+      } catch (_) {
+        // Ignore provider sign-out issues, Firebase signOut is the source of truth.
+      }
+
+      await _auth.signOut();
+      _cachedProfile = null;
+
+      return AuthResult.success(message: 'Signed out successfully.');
+    } catch (e) {
+      return AuthResult.failure(message: 'Error signing out: ${e.toString()}');
+    }
+  }
+
+  Future<AuthResult> resetPassword(String email) async {
+    try {
+      final trimmedEmail = email.trim();
+      final continueUrl = AppConfig.resetPasswordContinueUrl;
+
+      if (continueUrl.isNotEmpty) {
+        await _auth.sendPasswordResetEmail(
+          email: trimmedEmail,
+          actionCodeSettings: ActionCodeSettings(
+            url: continueUrl,
+            handleCodeInApp: false,
+          ),
+        );
+      } else {
+        await _auth.sendPasswordResetEmail(email: trimmedEmail);
+      }
+
+      return AuthResult.success(
+        message: 'Password reset link was sent to your email.',
+      );
+    } on FirebaseAuthException catch (e) {
+      return _handleAuthException(e);
+    } catch (e) {
+      return AuthResult.failure(message: 'Unexpected error: ${e.toString()}');
+    }
+  }
+
   Future<AuthResult> updatePassword(String newPassword) async {
     try {
-      await _supabase.auth.updateUser(UserAttributes(password: newPassword));
+      final user = currentUser;
+      if (user == null) {
+        return AuthResult.failure(message: 'You must be signed in first.');
+      }
 
-      return AuthResult.success(message: 'تم تحديث كلمة المرور بنجاح');
-    } on AuthException catch (e) {
+      await user.updatePassword(newPassword);
+      return AuthResult.success(message: 'Password updated successfully.');
+    } on FirebaseAuthException catch (e) {
       return _handleAuthException(e);
     } catch (e) {
-      return AuthResult.failure(message: 'حدث خطأ: ${e.toString()}');
+      return AuthResult.failure(message: 'Unexpected error: ${e.toString()}');
     }
   }
 
-  /// تحديث بيانات المستخدم
-  /// Update user profile data
   Future<AuthResult> updateUserProfile({
     String? name,
     String? avatarUrl,
     Map<String, dynamic>? additionalData,
   }) async {
     try {
-      final Map<String, dynamic> data = {};
+      final user = currentUser;
+      if (user == null) {
+        return AuthResult.failure(message: 'You must be signed in first.');
+      }
 
-      if (name != null) data['full_name'] = name;
-      if (avatarUrl != null) data['avatar_url'] = avatarUrl;
-      if (additionalData != null) data.addAll(additionalData);
+      final cleanedName = name?.trim();
+      final cleanedAvatar = avatarUrl?.trim();
 
-      await _supabase.auth.updateUser(UserAttributes(data: data));
+      if (cleanedName != null && cleanedName.isNotEmpty) {
+        await user.updateDisplayName(cleanedName);
+      }
+
+      if (cleanedAvatar != null && cleanedAvatar.isNotEmpty) {
+        await user.updatePhotoURL(cleanedAvatar);
+      }
+
+      await user.reload();
+      final refreshedUser = _auth.currentUser ?? user;
+
+      final metadata = <String, dynamic>{
+        ...(_cachedProfile?.metadata ?? const <String, dynamic>{}),
+        if (additionalData != null) ...additionalData,
+      };
+      if (cleanedName != null && cleanedName.isNotEmpty) {
+        metadata['full_name'] = cleanedName;
+        metadata['name'] = cleanedName;
+      }
+      if (cleanedAvatar != null && cleanedAvatar.isNotEmpty) {
+        metadata['avatar_url'] = cleanedAvatar;
+        metadata['picture'] = cleanedAvatar;
+      }
+
+      await _userProfileRepository
+          .updateFields(refreshedUser.uid, <String, dynamic>{
+            if (cleanedName != null && cleanedName.isNotEmpty)
+              'full_name': cleanedName,
+            if (cleanedAvatar != null && cleanedAvatar.isNotEmpty)
+              'avatar_url': cleanedAvatar,
+            'email': refreshedUser.email,
+            'email_verified': refreshedUser.emailVerified,
+            'providers': _providerIds(refreshedUser),
+            'metadata': metadata,
+          });
+
+      _cachedProfile = await _userProfileRepository.fetchById(
+        refreshedUser.uid,
+      );
 
       return AuthResult.success(
-        user: currentUser,
-        message: 'تم تحديث البيانات بنجاح',
+        user: refreshedUser,
+        message: 'Profile updated successfully.',
       );
-    } on AuthException catch (e) {
+    } on FirebaseAuthException catch (e) {
       return _handleAuthException(e);
     } catch (e) {
-      return AuthResult.failure(message: 'حدث خطأ: ${e.toString()}');
+      return AuthResult.failure(message: 'Unexpected error: ${e.toString()}');
     }
   }
 
-  /// إعادة إرسال رسالة التأكيد
-  /// Resend confirmation email
   Future<AuthResult> resendConfirmationEmail(String email) async {
     try {
-      await _supabase.auth.resend(type: OtpType.signup, email: email.trim());
+      final user = currentUser;
+      if (user == null) {
+        return AuthResult.failure(
+          message: 'Please sign in first to resend verification email.',
+        );
+      }
 
-      return AuthResult.success(message: 'تم إرسال رسالة التأكيد مرة أخرى');
-    } on AuthException catch (e) {
+      final userEmail = user.email?.trim().toLowerCase();
+      final requestedEmail = email.trim().toLowerCase();
+      if (userEmail != null &&
+          requestedEmail.isNotEmpty &&
+          userEmail != requestedEmail) {
+        return AuthResult.failure(
+          message: 'Signed in email does not match the requested email.',
+        );
+      }
+
+      await user.sendEmailVerification();
+      return AuthResult.success(
+        message: 'Verification email has been sent again.',
+      );
+    } on FirebaseAuthException catch (e) {
       return _handleAuthException(e);
     } catch (e) {
-      return AuthResult.failure(message: 'حدث خطأ: ${e.toString()}');
+      return AuthResult.failure(message: 'Unexpected error: ${e.toString()}');
     }
   }
 
-  /// معالجة أخطاء المصادقة
-  /// Handle authentication exceptions with user-friendly messages
-  AuthResult _handleAuthException(AuthException e) {
-    String message;
-    String errorCode = e.statusCode ?? 'UNKNOWN';
-
-    // ترجمة رسائل الخطأ الشائعة
-    switch (e.message.toLowerCase()) {
-      case 'invalid login credentials':
-        message =
-            'بيانات الدخول غير صحيحة. تحقق من البريد الإلكتروني وكلمة المرور.';
-        break;
-      case 'user already registered':
-        message = 'هذا البريد الإلكتروني مسجل مسبقاً. يرجى تسجيل الدخول.';
-        break;
-      case 'email not confirmed':
-        message = 'يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول.';
-        break;
-      case 'invalid email':
-        message = 'البريد الإلكتروني غير صالح.';
-        break;
-      case 'weak password':
-        message = 'كلمة المرور ضعيفة جداً. استخدم كلمة مرور أقوى.';
-        break;
-      case 'too many requests':
-        message = 'محاولات كثيرة جداً. يرجى الانتظار قليلاً.';
-        break;
-      case 'user not found':
-        message = 'لا يوجد حساب بهذا البريد الإلكتروني.';
-        break;
-      default:
-        message = e.message;
+  Future<void> updateOnlineStatus(bool isOnline) async {
+    final user = currentUser;
+    if (user == null) {
+      return;
     }
-
-    return AuthResult.failure(message: message, errorCode: errorCode);
+    await _userProfileRepository.updateFields(user.uid, <String, dynamic>{
+      'is_online': isOnline,
+    });
+    _cachedProfile = _cachedProfile?.copyWith(isOnline: isOnline);
   }
 
-  /// الحصول على بيانات المستخدم الإضافية
-  /// Get user metadata
   Map<String, dynamic>? getUserMetadata() {
-    return currentUser?.userMetadata;
+    final user = currentUser;
+    if (user == null) {
+      return null;
+    }
+
+    final metadata = <String, dynamic>{
+      ...(_cachedProfile?.metadata ?? const <String, dynamic>{}),
+    };
+
+    final displayName = _cachedProfile?.fullName ?? user.displayName;
+    final avatarUrl = _cachedProfile?.avatarUrl ?? user.photoURL;
+
+    if (displayName != null && displayName.isNotEmpty) {
+      metadata['full_name'] = displayName;
+      metadata['name'] = displayName;
+    }
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      metadata['avatar_url'] = avatarUrl;
+      metadata['picture'] = avatarUrl;
+    }
+
+    return metadata;
   }
 
-  /// الحصول على اسم المستخدم
-  /// Get user display name
   String? getUserDisplayName() {
-    final metadata = getUserMetadata();
-    return metadata?['full_name'] ??
-        metadata?['name'] ??
-        currentUser?.email?.split('@').first;
+    final profileName = _cachedProfile?.fullName;
+    if (profileName != null && profileName.isNotEmpty) {
+      return profileName;
+    }
+    final authName = currentUser?.displayName;
+    if (authName != null && authName.isNotEmpty) {
+      return authName;
+    }
+    return currentUser?.email?.split('@').first;
   }
 
-  /// الحصول على صورة المستخدم
-  /// Get user avatar URL
   String? getUserAvatarUrl() {
-    final metadata = getUserMetadata();
-    return metadata?['avatar_url'] ?? metadata?['picture'];
+    final profileAvatar = _cachedProfile?.avatarUrl;
+    if (profileAvatar != null && profileAvatar.isNotEmpty) {
+      return profileAvatar;
+    }
+    final authAvatar = currentUser?.photoURL;
+    if (authAvatar != null && authAvatar.isNotEmpty) {
+      return authAvatar;
+    }
+    return null;
+  }
+
+  Future<void> _ensureUserProfileDocument({
+    required User user,
+    String? preferredName,
+  }) async {
+    final existing = await _userProfileRepository.fetchById(user.uid);
+
+    final displayName = preferredName?.trim().isNotEmpty == true
+        ? preferredName!.trim()
+        : (user.displayName?.trim().isNotEmpty == true
+              ? user.displayName!.trim()
+              : existing?.fullName);
+
+    final avatarUrl = user.photoURL?.trim().isNotEmpty == true
+        ? user.photoURL!.trim()
+        : existing?.avatarUrl;
+
+    final metadata = <String, dynamic>{
+      ...(existing?.metadata ?? const <String, dynamic>{}),
+      if (displayName != null && displayName.isNotEmpty)
+        'full_name': displayName,
+      if (displayName != null && displayName.isNotEmpty) 'name': displayName,
+      if (avatarUrl != null && avatarUrl.isNotEmpty) 'avatar_url': avatarUrl,
+      if (avatarUrl != null && avatarUrl.isNotEmpty) 'picture': avatarUrl,
+    };
+
+    final profile = UserProfile(
+      id: user.uid,
+      email: user.email ?? existing?.email,
+      fullName: displayName,
+      avatarUrl: avatarUrl,
+      emailVerified: user.emailVerified,
+      providers: _providerIds(user),
+      isOnline: existing?.isOnline ?? true,
+      metadata: metadata,
+      createdAt: existing?.createdAt,
+    );
+
+    await _userProfileRepository.upsert(profile);
+    _cachedProfile = profile;
+  }
+
+  List<String> _providerIds(User user) {
+    final providers =
+        user.providerData
+            .map((provider) => provider.providerId)
+            .where((id) => id.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return providers;
+  }
+
+  AuthResult _handleAuthException(FirebaseAuthException e) {
+    final normalized = e.code.toLowerCase();
+    switch (normalized) {
+      case 'invalid-login-credentials':
+      case 'invalid-credential':
+      case 'wrong-password':
+        return AuthResult.failure(
+          message: 'Invalid email or password.',
+          errorCode: normalized,
+        );
+      case 'user-not-found':
+        return AuthResult.failure(
+          message: 'No account was found for this email.',
+          errorCode: normalized,
+        );
+      case 'email-already-in-use':
+        return AuthResult.failure(
+          message: 'This email is already registered.',
+          errorCode: normalized,
+        );
+      case 'weak-password':
+        return AuthResult.failure(
+          message: 'Password is too weak. Use a stronger password.',
+          errorCode: normalized,
+        );
+      case 'invalid-email':
+        return AuthResult.failure(
+          message: 'Email format is not valid.',
+          errorCode: normalized,
+        );
+      case 'user-disabled':
+        return AuthResult.failure(
+          message: 'This user account has been disabled.',
+          errorCode: normalized,
+        );
+      case 'too-many-requests':
+        return AuthResult.failure(
+          message: 'Too many attempts. Please wait and try again later.',
+          errorCode: normalized,
+        );
+      case 'network-request-failed':
+        return AuthResult.failure(
+          message: 'Network error. Please check your internet connection.',
+          errorCode: normalized,
+        );
+      case 'operation-not-allowed':
+        return AuthResult.failure(
+          message: 'This authentication method is not enabled.',
+          errorCode: normalized,
+        );
+      case 'requires-recent-login':
+        return AuthResult.failure(
+          message: 'Please sign in again and retry this sensitive operation.',
+          errorCode: normalized,
+        );
+      case 'popup-closed-by-user':
+      case 'web-context-cancelled':
+        return AuthResult.failure(
+          message: 'The authentication flow was cancelled.',
+          errorCode: 'CANCELLED',
+        );
+      case 'account-exists-with-different-credential':
+        return AuthResult.failure(
+          message:
+              'An account already exists with a different sign-in provider for this email.',
+          errorCode: normalized,
+        );
+      default:
+        return AuthResult.failure(
+          message: e.message ?? 'Authentication failed.',
+          errorCode: normalized,
+        );
+    }
   }
 }
