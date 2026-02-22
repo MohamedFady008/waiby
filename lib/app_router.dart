@@ -6,7 +6,9 @@ import 'shell/app_shell.dart';
 
 import 'pages/home_page.dart';
 import 'pages/explore_page.dart';
-import 'pages/pricing_page.dart';
+import 'pages/playground_page.dart';
+import 'pages/create_room_page.dart';
+import 'pages/live_room_page.dart';
 import 'pages/about_page.dart';
 import 'pages/login_page.dart';
 import 'pages/signup_page.dart';
@@ -55,9 +57,18 @@ final router = GoRouter(
           builder: (context, state) => const ExplorePage(),
         ),
         GoRoute(
-          path: '/pricing',
-          builder: (context, state) => const PricingPage(),
+          path: '/playground',
+          builder: (context, state) => const PlaygroundPage(),
         ),
+        GoRoute(
+          path: '/playground/create-room',
+          builder: (context, state) => const CreateRoomPage(),
+        ),
+        GoRoute(
+          path: '/playground/live-room',
+          builder: (context, state) => const LiveRoomPage(),
+        ),
+        GoRoute(path: '/pricing', redirect: (context, state) => '/playground'),
         GoRoute(path: '/about', builder: (context, state) => const AboutPage()),
         GoRoute(
           path: '/become-creator',

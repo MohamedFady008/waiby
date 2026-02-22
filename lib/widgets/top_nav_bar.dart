@@ -22,7 +22,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     const accentGreen = Color(0xFF51D76E);
     const navItems = <_NavDestination>[
       _NavDestination('Social', '/explore'),
-      _NavDestination('Playground', '/pricing'),
+      _NavDestination('Playground', '/playground'),
       _NavDestination('FAQ', '/about'),
     ];
 
@@ -66,10 +66,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
                     const SizedBox(width: WaibySpacing.s16),
                     Expanded(
                       child: compact
-                          ? _CompactNavMenu(
-                              items: navItems,
-                              location: location,
-                            )
+                          ? _CompactNavMenu(items: navItems, location: location)
                           : SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: Row(
@@ -77,10 +74,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
                                   for (final item in navItems) ...[
                                     _NavLink(
                                       label: item.label,
-                                      isActive: _isActive(
-                                        location,
-                                        item.path,
-                                      ),
+                                      isActive: _isActive(location, item.path),
                                       onTap: () => context.go(item.path),
                                     ),
                                     const SizedBox(width: WaibySpacing.s8),

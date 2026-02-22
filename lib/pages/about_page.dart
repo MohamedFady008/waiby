@@ -32,7 +32,7 @@ class _AboutPageState extends State<AboutPage> {
         context.go('/explore');
         break;
       case WaibyFooterLink.playground:
-        context.go('/pricing');
+        context.go('/playground');
         break;
       case WaibyFooterLink.faq:
         context.go('/about');
