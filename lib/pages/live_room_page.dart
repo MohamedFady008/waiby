@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/chat_sidebar.dart';
@@ -11,57 +12,73 @@ class LiveRoomPage extends StatelessWidget {
 
   const LiveRoomPage({super.key, this.isHost = false});
 
+  Future<void> _onBackInvoked(BuildContext context) async {
+    final shouldLeave = await _showLeaveLiveDialog(context, isHost: isHost);
+    if (!shouldLeave || !context.mounted) return;
+    context.go('/playground');
+  }
+
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, c) {
-        final w = c.maxWidth;
-        final h = c.maxHeight;
-        final showRail = w >= 1320;
-        const railWidth = 84.0;
-        const railGap = 12.0;
-        final pad = w >= 1500
-            ? 20.0
-            : w >= 1100
-            ? 14.0
-            : 8.0;
-        final contentW = math.min(
-          1720.0,
-          math.max(300.0, w - (pad * 2) - (showRail ? railWidth + railGap : 0)),
-        );
-
-        return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF0C122D), Color(0xFF050816)],
+    return PopScope<void>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _onBackInvoked(context);
+      },
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final w = c.maxWidth;
+          final h = c.maxHeight;
+          final showRail = w >= 1320;
+          const railWidth = 84.0;
+          const railGap = 12.0;
+          final pad = w >= 1500
+              ? 20.0
+              : w >= 1100
+              ? 14.0
+              : 8.0;
+          final contentW = math.min(
+            1720.0,
+            math.max(
+              300.0,
+              w - (pad * 2) - (showRail ? railWidth + railGap : 0),
             ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: SizedBox(
-                    width: contentW,
-                    height: h,
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(pad, 22, pad, 16),
-                      child: _LiveShell(isHost: isHost),
+          );
+
+          return Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF0C122D), Color(0xFF050816)],
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      width: contentW,
+                      height: h,
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(pad, 22, pad, 16),
+                        child: _LiveShell(isHost: isHost),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (showRail)
-                Padding(
-                  padding: EdgeInsets.only(right: pad),
-                  child: const _LiveRail(),
-                ),
-            ],
-          ),
-        );
-      },
+                if (showRail)
+                  Padding(
+                    padding: EdgeInsets.only(right: pad),
+                    child: const _LiveRail(),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -569,6 +586,16 @@ class _CenterColumnState extends State<_CenterColumn> {
     });
   }
 
+  Future<void> _onLeavePressed() async {
+    _closeSettingsMenu();
+    final shouldLeave = await _showLeaveLiveDialog(
+      context,
+      isHost: widget.isHost,
+    );
+    if (!shouldLeave || !mounted) return;
+    context.go('/playground');
+  }
+
   Widget _settingRow({
     required String label,
     required bool value,
@@ -1005,10 +1032,17 @@ class _CenterColumnState extends State<_CenterColumn> {
         Row(
           children: [
             const Spacer(),
-            Icon(
-              Icons.logout_rounded,
-              color: const Color(0xFF942424),
-              size: widget.compact ? 24 : 28,
+            IconButton(
+              onPressed: _onLeavePressed,
+              tooltip: 'Leave live stream',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              splashRadius: widget.compact ? 20 : 22,
+              icon: Icon(
+                Icons.logout_rounded,
+                color: const Color(0xFF942424),
+                size: widget.compact ? 24 : 28,
+              ),
             ),
           ],
         ),
@@ -1089,6 +1123,7 @@ class _CenterColumnState extends State<_CenterColumn> {
               Icons.call_end_rounded,
               const Color(0xFF691D1D),
               Colors.white,
+              onTap: _onLeavePressed,
             ),
           ],
           h: widget.compact ? 40 : 42,
@@ -1329,6 +1364,120 @@ Widget _chatLogPanel({required bool compact}) {
       ],
     ),
   );
+}
+
+Future<bool> _showLeaveLiveDialog(
+  BuildContext context, {
+  required bool isHost,
+}) async {
+  final confirmLeave = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    barrierColor: Colors.black.withValues(alpha: 0.64),
+    builder: (dialogContext) {
+      final width = MediaQuery.sizeOf(dialogContext).width;
+      final compact = width < 560;
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(horizontal: compact ? 16 : 24),
+        child: Container(
+          constraints: BoxConstraints(maxWidth: compact ? 320 : 460),
+          padding: EdgeInsets.fromLTRB(
+            compact ? 18 : 24,
+            compact ? 20 : 24,
+            compact ? 18 : 24,
+            compact ? 18 : 20,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFF26293B),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: const Color(0xFF2F88FF),
+                size: compact ? 62 : 74,
+              ),
+              SizedBox(height: compact ? 10 : 12),
+              Text(
+                'You are leaving the\nlive stream',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: compact ? 24 : 32,
+                  height: 1.15,
+                ),
+              ),
+              if (isHost) ...[
+                SizedBox(height: compact ? 8 : 10),
+                Text(
+                  'As host, leaving now will end the live stream for everyone.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w500,
+                    fontSize: compact ? 12 : 14,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+              SizedBox(height: compact ? 16 : 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: compact ? 42 : 48,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Color(0xFF2F88FF)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          textStyle: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            fontSize: compact ? 15 : 17,
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: compact ? 10 : 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: compact ? 42 : 48,
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF2F88FF),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          textStyle: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            fontSize: compact ? 15 : 17,
+                          ),
+                        ),
+                        child: const Text('Confirm'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+  return confirmLeave ?? false;
 }
 
 class _LiveRail extends StatelessWidget {
