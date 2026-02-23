@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/chat_sidebar.dart';
@@ -321,7 +322,8 @@ class _CreateRoomSurface extends StatelessWidget {
                   width: 112,
                   height: 32,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () =>
+                        context.go('/playground/live-room?role=host'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2F88FF),
                       foregroundColor: Colors.white,
