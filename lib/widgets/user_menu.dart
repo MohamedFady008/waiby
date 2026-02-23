@@ -39,13 +39,13 @@ class UserMenu extends StatelessWidget {
             context.go('/profile/${Uri.encodeComponent(auth.userId)}');
             break;
           case _UserMenuAction.dashboard:
-            context.go('/dashboard');
+            context.go('/settings?tab=dashboard');
             break;
           case _UserMenuAction.wallet:
-            context.go('/wallet');
+            context.go('/settings?tab=wallet');
             break;
           case _UserMenuAction.settings:
-            context.go('/settings');
+            context.go('/settings?tab=dashboard');
             break;
           case _UserMenuAction.toggleOnline:
             auth.toggleOnline();
@@ -55,7 +55,7 @@ class UserMenu extends StatelessWidget {
             context.go('/');
             break;
           case _UserMenuAction.reportIssue:
-            context.go('/report');
+            context.go('/settings?tab=tickets');
             break;
         }
       },

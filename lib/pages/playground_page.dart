@@ -142,25 +142,30 @@ class _PlaygroundToolbar extends StatelessWidget {
           _SectionButtonData(label: 'Shop', section: _PlaygroundSection.shop),
         ];
 
-        final sectionWrap = Wrap(
-          spacing: 12,
-          runSpacing: 10,
-          children: [
-            for (final button in sectionButtons)
-              _SectionButton(
-                label: button.label,
-                selected: activeSection == button.section,
-                onTap: () => onSectionChanged(button.section),
-              ),
-          ],
+        final sectionRow = SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var index = 0; index < sectionButtons.length; index++) ...[
+                if (index > 0) const SizedBox(width: 12),
+                _SectionButton(
+                  label: sectionButtons[index].label,
+                  selected: activeSection == sectionButtons[index].section,
+                  onTap: () => onSectionChanged(sectionButtons[index].section),
+                ),
+              ],
+            ],
+          ),
         );
 
         if (narrow) {
-          return Column(
+          return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
+
             children: [
-              sectionWrap,
-              const SizedBox(height: 12),
+              Expanded(child: sectionRow),
+              const SizedBox(width: 12),
               _CreateRoomButton(height: buttonHeight),
             ],
           );
@@ -169,7 +174,7 @@ class _PlaygroundToolbar extends StatelessWidget {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(child: sectionWrap),
+            Expanded(child: sectionRow),
             _CreateRoomButton(height: buttonHeight),
           ],
         );
@@ -428,7 +433,8 @@ class _LiveRoomCard extends StatelessWidget {
                     width: 58,
                     height: 24,
                     child: ElevatedButton(
-                      onPressed: () => context.go('/playground/live-room'),
+                      onPressed: () =>
+                          context.go('/playground/live-room?role=joiner'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF51D76E),
                         foregroundColor: Colors.white,

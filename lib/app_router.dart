@@ -14,12 +14,8 @@ import 'pages/login_page.dart';
 import 'pages/signup_page.dart';
 import 'pages/become_creator_page.dart';
 import 'pages/profile_page.dart';
-import 'pages/dashboard_page.dart';
-import 'pages/wallet_page.dart';
 import 'pages/topup_page.dart';
 import 'pages/settings_page.dart';
-import 'pages/notifications_page.dart';
-import 'pages/report_issue_page.dart';
 import 'pages/creator_form.dart';
 import 'pages/creator_guidelines_page.dart';
 import 'pages/influencer_guidelines_page.dart';
@@ -66,7 +62,11 @@ final router = GoRouter(
         ),
         GoRoute(
           path: '/playground/live-room',
-          builder: (context, state) => const LiveRoomPage(),
+          builder: (context, state) {
+            final role = state.uri.queryParameters['role'];
+            final isHost = role == 'host';
+            return LiveRoomPage(isHost: isHost);
+          },
         ),
         GoRoute(path: '/pricing', redirect: (context, state) => '/playground'),
         GoRoute(path: '/about', builder: (context, state) => const AboutPage()),
@@ -84,28 +84,14 @@ final router = GoRouter(
               ProfilePage(userId: state.pathParameters['userId']),
         ),
         GoRoute(
-          path: '/dashboard',
-          builder: (context, state) => const DashboardPage(),
-        ),
-        GoRoute(
-          path: '/wallet',
-          builder: (context, state) => const WalletPage(),
-        ),
-        GoRoute(
           path: '/wallet/topup',
           builder: (context, state) => const TopupPage(),
         ),
         GoRoute(
           path: '/settings',
-          builder: (context, state) => const SettingsPage(),
-        ),
-        GoRoute(
-          path: '/notifications',
-          builder: (context, state) => const NotificationsPage(),
-        ),
-        GoRoute(
-          path: '/report',
-          builder: (context, state) => const ReportIssuePage(),
+          builder: (context, state) => SettingsPage(
+            initialSelectedKey: state.uri.queryParameters['tab'],
+          ),
         ),
         GoRoute(
           path: '/become-creator/creator-form',
