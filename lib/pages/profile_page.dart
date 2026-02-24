@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿import 'dart:math' as math;
+=======
+import 'dart:math' as math;
+>>>>>>> mohamed-pransh
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -6,6 +10,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../controllers/auth_controller.dart';
+<<<<<<< HEAD
+=======
+import '../widgets/user_avatar_with_frame.dart';
+>>>>>>> mohamed-pransh
 import '../widgets/chat_sidebar.dart';
 import '../widgets/common/responsive_layout.dart';
 
@@ -25,6 +33,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
+=======
+    final profileUserId =
+        _resolveTargetUserId(widget.userId) ?? _currentUserId();
+>>>>>>> mohamed-pransh
     final userName = _resolveUserName(widget.userId);
     final isViewingOtherAccount = _isViewingOtherAccount(widget.userId);
 
@@ -67,6 +80,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     constraints: BoxConstraints(maxWidth: contentWidth),
                     child: _ProfileBody(
                       userName: userName,
+<<<<<<< HEAD
+=======
+                      profileUserId: profileUserId,
+>>>>>>> mohamed-pransh
                       width: width,
                       isViewingOtherAccount: isViewingOtherAccount,
                       selectedTab: _selectedTab,
@@ -87,11 +104,29 @@ class _ProfilePageState extends State<ProfilePage> {
         );
       },
     );
+<<<<<<< HEAD
+=======
+  }
+
+  String? _currentUserId() {
+    if (!Get.isRegistered<AuthController>()) {
+      return null;
+    }
+    final userId = Get.find<AuthController>().userId.trim();
+    if (userId.isEmpty || userId == 'U-00000') {
+      return null;
+    }
+    return userId;
+>>>>>>> mohamed-pransh
   }
 }
 
 class _ProfileBody extends StatelessWidget {
   final String userName;
+<<<<<<< HEAD
+=======
+  final String? profileUserId;
+>>>>>>> mohamed-pransh
   final double width;
   final bool isViewingOtherAccount;
   final _ProfileTab selectedTab;
@@ -99,6 +134,10 @@ class _ProfileBody extends StatelessWidget {
 
   const _ProfileBody({
     required this.userName,
+<<<<<<< HEAD
+=======
+    required this.profileUserId,
+>>>>>>> mohamed-pransh
     required this.width,
     required this.isViewingOtherAccount,
     required this.selectedTab,
@@ -194,7 +233,15 @@ class _ProfileBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+<<<<<<< HEAD
         _Hero(userName: userName, isViewingOtherAccount: isViewingOtherAccount),
+=======
+        _Hero(
+          userName: userName,
+          profileUserId: profileUserId,
+          isViewingOtherAccount: isViewingOtherAccount,
+        ),
+>>>>>>> mohamed-pransh
         const SizedBox(height: 22),
         _Tabs(selectedTab: selectedTab, onSelect: onSelectTab),
         const SizedBox(height: 16),
@@ -244,9 +291,20 @@ class _BackdropGlow extends StatelessWidget {
 
 class _Hero extends StatelessWidget {
   final String userName;
+<<<<<<< HEAD
   final bool isViewingOtherAccount;
 
   const _Hero({required this.userName, required this.isViewingOtherAccount});
+=======
+  final String? profileUserId;
+  final bool isViewingOtherAccount;
+
+  const _Hero({
+    required this.userName,
+    required this.profileUserId,
+    required this.isViewingOtherAccount,
+  });
+>>>>>>> mohamed-pransh
 
   @override
   Widget build(BuildContext context) {
@@ -332,7 +390,14 @@ class _Hero extends StatelessWidget {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+<<<<<<< HEAD
                                 _ProfileAvatar(size: avatarSize),
+=======
+                                _ProfileAvatar(
+                                  size: avatarSize,
+                                  userId: profileUserId,
+                                ),
+>>>>>>> mohamed-pransh
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: _ProfileIdentity(
@@ -353,7 +418,14 @@ class _Hero extends StatelessWidget {
                       : Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
+<<<<<<< HEAD
                             _ProfileAvatar(size: avatarSize),
+=======
+                            _ProfileAvatar(
+                              size: avatarSize,
+                              userId: profileUserId,
+                            ),
+>>>>>>> mohamed-pransh
                             const SizedBox(width: 18),
                             Expanded(
                               child: _ProfileIdentity(
@@ -388,6 +460,7 @@ class _Hero extends StatelessWidget {
 
 class _ProfileAvatar extends StatelessWidget {
   final double size;
+<<<<<<< HEAD
 
   const _ProfileAvatar({required this.size});
 
@@ -427,6 +500,21 @@ class _ProfileAvatar extends StatelessWidget {
           ),
         ],
       ),
+=======
+  final String? userId;
+
+  const _ProfileAvatar({required this.size, this.userId});
+
+  @override
+  Widget build(BuildContext context) {
+    return UserAvatarWithFrame(
+      userId: userId,
+      size: size,
+      frameScale: 1.30,
+      borderColor: const Color(0xFFFFA2D0),
+      borderWidth: 3,
+      fallbackAsset: 'assets/pp6.png',
+>>>>>>> mohamed-pransh
     );
   }
 }
@@ -3517,11 +3605,27 @@ String? _resolveTargetUserId(String? raw) {
 
 String _resolveUserName(String? raw) {
   final normalized = _resolveTargetUserId(raw);
+<<<<<<< HEAD
   if (normalized == null) {
     return 'LaKimi';
   }
 
   return normalized;
+=======
+  if (normalized != null) {
+    return normalized;
+  }
+
+  if (Get.isRegistered<AuthController>()) {
+    final auth = Get.find<AuthController>();
+    final preferred = auth.userName.trim();
+    if (preferred.isNotEmpty && preferred != 'User') {
+      return preferred;
+    }
+  }
+
+  return 'LaKimi';
+>>>>>>> mohamed-pransh
 }
 
 class _ServiceItem {

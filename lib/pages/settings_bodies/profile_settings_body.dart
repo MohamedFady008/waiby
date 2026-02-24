@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../services/frame_store_service.dart';
+import '../../widgets/user_avatar_with_frame.dart';
 import '../../widgets/settings_sidebar.dart';
 
 const List<String> _tabs = <String>[
@@ -335,8 +338,60 @@ class _MyProfileTab extends StatelessWidget {
   }
 }
 
-class _EditProfileTab extends StatelessWidget {
+class _EditProfileTab extends StatefulWidget {
   const _EditProfileTab();
+
+  @override
+  State<_EditProfileTab> createState() => _EditProfileTabState();
+}
+
+class _EditProfileTabState extends State<_EditProfileTab> {
+  final FrameStoreService _frameStoreService = FrameStoreService();
+  bool _removingFrame = false;
+
+  Future<void> _removeFrame() async {
+    if (_removingFrame) {
+      return;
+    }
+
+    setState(() => _removingFrame = true);
+    try {
+      await _frameStoreService.setActiveFrame(null);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile frame removed.'),
+          backgroundColor: Color(0xFF2E7D32),
+        ),
+      );
+    } on FrameStoreException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: const Color(0xFFB43A3A),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not remove frame right now.'),
+          backgroundColor: Color(0xFFB43A3A),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _removingFrame = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -346,9 +401,15 @@ class _EditProfileTab extends StatelessWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _Btn.blue('Change Frame'),
+            _Btn.blue(
+              'Change Frame',
+              onPressed: () => context.go('/settings?tab=store'),
+            ),
             const SizedBox(width: 6),
-            _Btn.gray('Remove Frame'),
+            _Btn.gray(
+              _removingFrame ? 'Removing...' : 'Remove Frame',
+              onPressed: _removingFrame ? null : _removeFrame,
+            ),
           ],
         ),
         body: const Column(
@@ -1497,26 +1558,30 @@ class _Btn extends StatelessWidget {
   final String label;
   final Color color;
   final EdgeInsets padding;
+  final VoidCallback? onPressed;
 
-  const _Btn._(this.label, this.color, this.padding);
+  const _Btn._(this.label, this.color, this.padding, this.onPressed);
 
-  const _Btn.blue(String label)
+  const _Btn.blue(String label, {VoidCallback? onPressed})
     : this._(
         label,
         const Color(0xFF2F88FF),
         const EdgeInsets.symmetric(horizontal: 18),
+        onPressed,
       );
-  const _Btn.gray(String label)
+  const _Btn.gray(String label, {VoidCallback? onPressed})
     : this._(
         label,
         const Color(0xFF2B2D31),
         const EdgeInsets.symmetric(horizontal: 16),
+        onPressed,
       );
-  const _Btn.red(String label)
+  const _Btn.red(String label, {VoidCallback? onPressed})
     : this._(
         label,
         const Color(0xFFFF0000),
         const EdgeInsets.symmetric(horizontal: 16),
+        onPressed,
       );
 
   @override
@@ -1524,7 +1589,7 @@ class _Btn extends StatelessWidget {
     return SizedBox(
       height: 32,
       child: ElevatedButton(
-        onPressed: () {},
+        onPressed: onPressed ?? () {},
         style: ElevatedButton.styleFrom(
           elevation: 0,
           backgroundColor: color,
@@ -1553,21 +1618,12 @@ class _Avatar extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          padding: const EdgeInsets.all(2),
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF8EFA4E), Color(0xFF3CA52E)],
-            ),
-          ),
-          child: ClipOval(
-            child: Image.asset('assets/pp4.png', fit: BoxFit.cover),
-          ),
+        const UserAvatarWithFrame(
+          size: 80,
+          frameScale: 1.30,
+          borderWidth: 2,
+          borderColor: Color(0xFF8EFA4E),
+          fallbackAsset: 'assets/pp4.png',
         ),
         Positioned(
           left: 2,

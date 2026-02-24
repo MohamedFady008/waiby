@@ -1,9 +1,15 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../services/topup_checkout_service.dart';
 import '../widgets/chat_sidebar.dart';
 import '../widgets/common/responsive_layout.dart';
 import '../widgets/waiby_footer.dart';
@@ -16,9 +22,29 @@ class TopupPage extends StatefulWidget {
 }
 
 class _TopupPageState extends State<TopupPage> {
-  double _budsBalance = 0;
+  final TopupCheckoutService _checkoutService = TopupCheckoutService();
 
-  Future<void> _buyPack(_RechargePack pack) async {
+  String? _pendingPackId;
+  bool _handledCheckoutReturnStatus = false;
+  String? _syncedUserId;
+  bool _syncingWalletBalance = false;
+  TopupWalletSnapshot? _walletFallback;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_handledCheckoutReturnStatus) {
+      return;
+    }
+    _handledCheckoutReturnStatus = true;
+    _handleCheckoutReturnStatus();
+  }
+
+  Future<void> _buyPack(User user, _RechargePack pack) async {
+    if (_pendingPackId != null) {
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => _ConfirmPurchaseDialog(pack: pack),
@@ -28,7 +54,254 @@ class _TopupPageState extends State<TopupPage> {
       return;
     }
 
-    setState(() => _budsBalance += pack.totalBuds);
+    setState(() => _pendingPackId = pack.id);
+
+    try {
+      final topupPageUrl = _buildWebReturnUrl();
+      final session = await _checkoutService.createCheckoutSession(
+        packId: pack.id,
+        successUrl: topupPageUrl,
+        cancelUrl: topupPageUrl,
+      );
+
+      await _checkoutService.openCheckout(session.checkoutUrl);
+      if (!kIsWeb && mounted) {
+        _showSnackbar(
+          'Stripe checkout opened in your browser. Your Buds balance updates after payment success.',
+        );
+      }
+    } on TopupCheckoutException catch (error) {
+      if (!mounted) return;
+      _showSnackbar(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackbar('Could not start checkout. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _pendingPackId = null);
+      }
+    }
+  }
+
+  Uri? _buildWebReturnUrl() {
+    if (!kIsWeb) {
+      return null;
+    }
+    return Uri.base.replace(path: '/wallet/topup', query: null, fragment: null);
+  }
+
+  void _handleCheckoutReturnStatus() {
+    final uri = GoRouterState.of(context).uri;
+    final status = uri.queryParameters['status'];
+    if (status == null || status.isEmpty) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_processCheckoutReturnStatus(uri));
+    });
+  }
+
+  Future<void> _processCheckoutReturnStatus(Uri uri) async {
+    if (!mounted) {
+      return;
+    }
+
+    final checkoutStatus = (uri.queryParameters['status'] ?? '')
+        .trim()
+        .toLowerCase();
+    switch (checkoutStatus) {
+      case 'success':
+        final sessionId = (uri.queryParameters['session_id'] ?? '').trim();
+        if (sessionId.isEmpty) {
+          _showSnackbar(
+            'Payment submitted. Buds are added only after Stripe confirms success.',
+            isError: false,
+          );
+          break;
+        }
+
+        try {
+          final confirmation = await _checkoutService.confirmCheckoutSession(
+            checkoutSessionId: sessionId,
+          );
+          if (!mounted) {
+            return;
+          }
+
+          if (confirmation.fulfilled) {
+            final addedBudsLabel = _formatBuds(confirmation.totalBuds);
+            if (confirmation.wallet != null) {
+              setState(() => _walletFallback = confirmation.wallet);
+            } else {
+              setState(() {
+                _walletFallback = TopupWalletSnapshot(
+                  budsBalance: confirmation.balanceBuds,
+                  incomeBalanceUsd: _walletFallback?.incomeBalanceUsd ?? 0,
+                  onHoldUsd: _walletFallback?.onHoldUsd ?? 0,
+                  gemsBalance: _walletFallback?.gemsBalance ?? 0,
+                  gemDustBalance: _walletFallback?.gemDustBalance ?? 0,
+                );
+              });
+            }
+            _showSnackbar(
+              'Payment confirmed. $addedBudsLabel Buds were added successfully.',
+              isError: false,
+            );
+            try {
+              final syncedWallet = await _checkoutService.syncMyWallet();
+              if (mounted) {
+                setState(() => _walletFallback = syncedWallet);
+              }
+            } catch (_) {
+              // Ignore temporary sync errors after successful confirmation.
+            }
+          } else {
+            switch (confirmation.status) {
+              case 'pending':
+              case 'processing':
+                _showSnackbar(
+                  'Payment is processing. Buds will be added after Stripe confirms it.',
+                  isError: false,
+                );
+                break;
+              case 'failed':
+              case 'cancelled':
+              case 'expired':
+                _showSnackbar(
+                  'Payment was not successful (${confirmation.status}). No Buds were added.',
+                );
+                break;
+              default:
+                _showSnackbar('Payment status: ${confirmation.status}');
+            }
+          }
+        } on TopupCheckoutException catch (error) {
+          if (!mounted) {
+            return;
+          }
+          _showSnackbar(error.message);
+        } catch (_) {
+          if (!mounted) {
+            return;
+          }
+          _showSnackbar(
+            'Could not confirm payment status yet. Please refresh.',
+          );
+        }
+        break;
+      case 'cancelled':
+        _showSnackbar('Payment was cancelled. No Buds were added.');
+        break;
+      default:
+        _showSnackbar('Payment status: $checkoutStatus');
+    }
+
+    if (!mounted) {
+      return;
+    }
+    if (uri.queryParameters.isNotEmpty) {
+      context.replace('/wallet/topup');
+    }
+  }
+
+  void _showSnackbar(String message, {bool isError = true}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError
+            ? const Color(0xFFB43A3A)
+            : const Color(0xFF2E7D32),
+      ),
+    );
+  }
+
+  double _walletBalanceFromData(Map<String, dynamic>? data) {
+    final raw = data?['buds_balance'] ?? data?['balance_buds'];
+    if (raw is num) {
+      return raw.toDouble();
+    }
+    if (raw is String) {
+      return double.tryParse(raw) ?? 0;
+    }
+    return 0;
+  }
+
+  Widget _buildRechargeBody() {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      initialData: FirebaseAuth.instance.currentUser,
+      builder: (context, authSnapshot) {
+        final user = authSnapshot.data;
+        if (user == null) {
+          _syncedUserId = null;
+          _walletFallback = null;
+          return _RechargeBody(
+            budsBalance: 0,
+            pendingPackId: _pendingPackId,
+            walletStreamIssue: false,
+            onBuyTap: (_) {
+              _showSnackbar('Please sign in before buying Buds.');
+              context.go('/login');
+            },
+          );
+        }
+
+        _syncWalletBalanceOnce(user);
+
+        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('wallets')
+              .doc(user.uid)
+              .snapshots(includeMetadataChanges: true),
+          builder: (context, walletSnapshot) {
+            final walletDoc = walletSnapshot.data;
+            final walletData = walletDoc?.data();
+            final liveBudsBalance = _walletBalanceFromData(walletData);
+            final hasLiveWalletData = walletDoc != null && walletData != null;
+            final useFallback =
+                _walletFallback != null &&
+                (walletSnapshot.hasError ||
+                    !hasLiveWalletData ||
+                    walletDoc.metadata.isFromCache);
+            final budsBalance = useFallback
+                ? _walletFallback!.budsBalance
+                : liveBudsBalance;
+
+            return _RechargeBody(
+              budsBalance: budsBalance,
+              pendingPackId: _pendingPackId,
+              walletStreamIssue: walletSnapshot.hasError,
+              onBuyTap: (pack) => unawaited(_buyPack(user, pack)),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _syncWalletBalanceOnce(User user) {
+    if (_syncingWalletBalance) {
+      return;
+    }
+    if (_syncedUserId == user.uid) {
+      return;
+    }
+
+    _syncedUserId = user.uid;
+    _syncingWalletBalance = true;
+    unawaited(() async {
+      try {
+        final syncedWallet = await _checkoutService.syncMyWallet();
+        if (mounted) {
+          setState(() => _walletFallback = syncedWallet);
+        }
+      } catch (_) {
+        // Keep UI responsive even if sync endpoint is temporarily unavailable.
+      } finally {
+        _syncingWalletBalance = false;
+      }
+    }());
   }
 
   @override
@@ -66,10 +339,7 @@ class _TopupPageState extends State<TopupPage> {
                         horizontalPadding + reservedSidebarSpace,
                         72,
                       ),
-                      child: _RechargeBody(
-                        budsBalance: _budsBalance,
-                        onBuyTap: _buyPack,
-                      ),
+                      child: _buildRechargeBody(),
                     ),
                     const WaibyFooter(),
                   ],
@@ -105,9 +375,16 @@ class _TopupPageState extends State<TopupPage> {
 
 class _RechargeBody extends StatelessWidget {
   final double budsBalance;
+  final String? pendingPackId;
+  final bool walletStreamIssue;
   final ValueChanged<_RechargePack> onBuyTap;
 
-  const _RechargeBody({required this.budsBalance, required this.onBuyTap});
+  const _RechargeBody({
+    required this.budsBalance,
+    required this.pendingPackId,
+    required this.walletStreamIssue,
+    required this.onBuyTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +400,7 @@ class _RechargeBody extends StatelessWidget {
         final wideLayout = width >= 980;
         final titleSize = compact ? 38.0 : 46.0;
         final subtitleSize = compact ? 16.0 : 20.0;
+        final checkoutInProgress = pendingPackId != null;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -162,6 +440,43 @@ class _RechargeBody extends StatelessWidget {
                 height: 1.25,
               ),
             ),
+            const SizedBox(height: 10),
+            Text(
+              '1 USD = 1 Bud | 0% deposit fee | Buds are non-withdrawable',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                color: Colors.white.withValues(alpha: 0.62),
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+                height: 1.2,
+              ),
+            ),
+            if (walletStreamIssue) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Live wallet updates are temporarily unavailable. Showing server-synced balance.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFFFFD180),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  height: 1.2,
+                ),
+              ),
+            ],
+            if (checkoutInProgress) ...[
+              const SizedBox(height: 14),
+              Text(
+                'Opening Stripe checkout...',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFF51D76E),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  height: 1.2,
+                ),
+              ),
+            ],
             SizedBox(height: compact ? 28 : 42),
             if (wideLayout)
               Row(
@@ -170,6 +485,7 @@ class _RechargeBody extends StatelessWidget {
                   Expanded(
                     child: _RechargeGrid(
                       packs: nonFeaturedPacks,
+                      pendingPackId: pendingPackId,
                       onBuyTap: onBuyTap,
                     ),
                   ),
@@ -178,18 +494,24 @@ class _RechargeBody extends StatelessWidget {
                     width: 290,
                     child: _FeaturedRechargeCard(
                       pack: featuredPack,
+                      pendingPackId: pendingPackId,
                       onBuyTap: onBuyTap,
                     ),
                   ),
                 ],
               )
             else ...[
-              _RechargeGrid(packs: nonFeaturedPacks, onBuyTap: onBuyTap),
+              _RechargeGrid(
+                packs: nonFeaturedPacks,
+                pendingPackId: pendingPackId,
+                onBuyTap: onBuyTap,
+              ),
               const SizedBox(height: 24),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 350),
                 child: _FeaturedRechargeCard(
                   pack: featuredPack,
+                  pendingPackId: pendingPackId,
                   onBuyTap: onBuyTap,
                 ),
               ),
@@ -203,9 +525,14 @@ class _RechargeBody extends StatelessWidget {
 
 class _RechargeGrid extends StatelessWidget {
   final List<_RechargePack> packs;
+  final String? pendingPackId;
   final ValueChanged<_RechargePack> onBuyTap;
 
-  const _RechargeGrid({required this.packs, required this.onBuyTap});
+  const _RechargeGrid({
+    required this.packs,
+    required this.pendingPackId,
+    required this.onBuyTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +552,11 @@ class _RechargeGrid extends StatelessWidget {
               .map(
                 (pack) => SizedBox(
                   width: cardWidth,
-                  child: _RechargePackCard(pack: pack, onBuyTap: onBuyTap),
+                  child: _RechargePackCard(
+                    pack: pack,
+                    pendingPackId: pendingPackId,
+                    onBuyTap: onBuyTap,
+                  ),
                 ),
               )
               .toList(growable: false),
@@ -237,9 +568,14 @@ class _RechargeGrid extends StatelessWidget {
 
 class _RechargePackCard extends StatelessWidget {
   final _RechargePack pack;
+  final String? pendingPackId;
   final ValueChanged<_RechargePack> onBuyTap;
 
-  const _RechargePackCard({required this.pack, required this.onBuyTap});
+  const _RechargePackCard({
+    required this.pack,
+    required this.pendingPackId,
+    required this.onBuyTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -249,6 +585,8 @@ class _RechargePackCard extends StatelessWidget {
         builder: (context, constraints) {
           final w = constraints.maxWidth;
           final h = constraints.maxHeight;
+          final isThisPackPending = pendingPackId == pack.id;
+          final isAnyPackPending = pendingPackId != null;
 
           return Stack(
             children: [
@@ -315,8 +653,10 @@ class _RechargePackCard extends StatelessWidget {
                       SizedBox(
                         width: 116,
                         child: _BuyChipButton(
-                          label: 'Buy ${pack.priceLabel}',
-                          onTap: () => onBuyTap(pack),
+                          label: isThisPackPending
+                              ? 'Processing...'
+                              : 'Buy ${pack.priceLabel}',
+                          onTap: isAnyPackPending ? null : () => onBuyTap(pack),
                           compact: true,
                         ),
                       ),
@@ -334,12 +674,20 @@ class _RechargePackCard extends StatelessWidget {
 
 class _FeaturedRechargeCard extends StatelessWidget {
   final _RechargePack pack;
+  final String? pendingPackId;
   final ValueChanged<_RechargePack> onBuyTap;
 
-  const _FeaturedRechargeCard({required this.pack, required this.onBuyTap});
+  const _FeaturedRechargeCard({
+    required this.pack,
+    required this.pendingPackId,
+    required this.onBuyTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isThisPackPending = pendingPackId == pack.id;
+    final isAnyPackPending = pendingPackId != null;
+
     return AspectRatio(
       aspectRatio: 387 / 594,
       child: Stack(
@@ -409,8 +757,10 @@ class _FeaturedRechargeCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 30),
                   _FeaturedBuyButton(
-                    label: 'Buy ${pack.priceLabel}',
-                    onTap: () => onBuyTap(pack),
+                    label: isThisPackPending
+                        ? 'Processing...'
+                        : 'Buy ${pack.priceLabel}',
+                    onTap: isAnyPackPending ? null : () => onBuyTap(pack),
                   ),
                   const SizedBox(height: 66),
                 ],
@@ -425,12 +775,14 @@ class _FeaturedRechargeCard extends StatelessWidget {
 
 class _FeaturedBuyButton extends StatelessWidget {
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _FeaturedBuyButton({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -455,16 +807,19 @@ class _FeaturedBuyButton extends StatelessWidget {
               ),
             ],
           ),
-          child: Center(
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-                letterSpacing: -0.22,
-                height: 1.08,
+          child: Opacity(
+            opacity: enabled ? 1 : 0.65,
+            child: Center(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  letterSpacing: -0.22,
+                  height: 1.08,
+                ),
               ),
             ),
           ),
@@ -476,7 +831,7 @@ class _FeaturedBuyButton extends StatelessWidget {
 
 class _BuyChipButton extends StatelessWidget {
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool compact;
 
   const _BuyChipButton({
@@ -487,6 +842,8 @@ class _BuyChipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final enabled = onTap != null;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -521,15 +878,18 @@ class _BuyChipButton extends StatelessWidget {
               ),
             ],
           ),
-          child: Center(
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 10,
-                letterSpacing: compact ? -0.15 : -0.1,
-                height: 1.05,
+          child: Opacity(
+            opacity: enabled ? 1 : 0.65,
+            child: Center(
+              child: Text(
+                label,
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                  letterSpacing: compact ? -0.15 : -0.1,
+                  height: 1.05,
+                ),
               ),
             ),
           ),
@@ -647,6 +1007,18 @@ class _ConfirmPurchaseDialog extends StatelessWidget {
                   height: 1.15,
                 ),
               ),
+              const SizedBox(height: 6),
+              Text(
+                'Buds are platform prepaid credits and cannot be withdrawn or refunded to card.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.notoSans(
+                  color: Colors.white.withValues(alpha: 0.68),
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                  letterSpacing: -0.1,
+                  height: 1.2,
+                ),
+              ),
               const SizedBox(height: 26),
               SizedBox(
                 width: double.infinity,
@@ -691,13 +1063,13 @@ class _RechargePack {
   final String id;
   final double buds;
   final double bonusBuds;
-  final String priceLabel;
+  final double priceUsd;
   final bool isFeatured;
 
   const _RechargePack({
     required this.id,
     required this.buds,
-    required this.priceLabel,
+    required this.priceUsd,
     this.bonusBuds = 0,
     this.isFeatured = false,
   });
@@ -707,6 +1079,7 @@ class _RechargePack {
   String get budsLabel => _formatBuds(buds);
   String get bonusLabel => _formatBuds(bonusBuds);
   String get totalBudsLabel => _formatBuds(totalBuds);
+  String get priceLabel => '${priceUsd.toStringAsFixed(2)}\$';
 }
 
 String _formatBuds(double value) {
@@ -717,15 +1090,15 @@ String _formatBuds(double value) {
 }
 
 const List<_RechargePack> _rechargePacks = <_RechargePack>[
-  _RechargePack(id: 'mini', buds: 9.99, priceLabel: '10.00\$'),
-  _RechargePack(id: 'small', buds: 30, priceLabel: '30.00\$'),
-  _RechargePack(id: 'medium', buds: 250, bonusBuds: 5, priceLabel: '250.00\$'),
-  _RechargePack(id: 'large', buds: 500, bonusBuds: 10, priceLabel: '250.00\$'),
+  _RechargePack(id: 'mini', buds: 9.99, priceUsd: 9.99),
+  _RechargePack(id: 'small', buds: 30, priceUsd: 30),
+  _RechargePack(id: 'medium', buds: 250, bonusBuds: 5, priceUsd: 250),
+  _RechargePack(id: 'large', buds: 500, bonusBuds: 10, priceUsd: 500),
   _RechargePack(
     id: 'featured',
     buds: 100,
     bonusBuds: 2,
-    priceLabel: '100.00\$',
+    priceUsd: 100,
     isFeatured: true,
   ),
 ];

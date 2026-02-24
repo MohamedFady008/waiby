@@ -1,28 +1,210 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../services/frame_store_service.dart';
 import '../../widgets/settings_sidebar.dart';
 
-class StoreSettingsBody extends StatelessWidget {
+class StoreSettingsBody extends StatefulWidget {
   final SettingsSidebarMenuEntry entry;
 
   const StoreSettingsBody({super.key, required this.entry});
 
   @override
+  State<StoreSettingsBody> createState() => _StoreSettingsBodyState();
+}
+
+class _StoreSettingsBodyState extends State<StoreSettingsBody> {
+  final FrameStoreService _frameStoreService = FrameStoreService();
+
+  FrameStoreState? _storeState;
+  String? _loadingUserId;
+  String? _pendingFrameId;
+  bool _isLoading = false;
+  String? _loadError;
+
+  @override
   Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      initialData: FirebaseAuth.instance.currentUser,
+      builder: (context, authSnapshot) {
+        final user = authSnapshot.data;
+        if (user == null) {
+          _loadingUserId = null;
+          _storeState = null;
+          _pendingFrameId = null;
+          return _StoreSignedOutHint(
+            onSignInTap: () => context.go('/login'),
+            onTopupTap: () => context.go('/wallet/topup'),
+          );
+        }
+
+        if (_loadingUserId != user.uid && !_isLoading) {
+          unawaited(_loadStoreState(user.uid));
+        }
+
+        return _buildStoreContent(context, user.uid);
+      },
+    );
+  }
+
+  Widget _buildStoreContent(BuildContext context, String uid) {
+    final state = _storeState;
+    if (state == null && _isLoading) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2.4));
+    }
+
+    if (state == null) {
+      return _StoreLoadErrorCard(
+        message: _loadError ?? 'Could not load store right now.',
+        onRetry: () => _loadStoreState(uid),
+      );
+    }
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1820),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            _StoreHeroBanner(),
-            SizedBox(height: 26),
-            _StoreHeader(),
-            SizedBox(height: 24),
-            _StoreFramesGrid(),
+          children: [
+            const _StoreHeroBanner(),
+            const SizedBox(height: 26),
+            _StoreHeader(
+              budsBalance: state.wallet.budsBalance,
+              onTopupTap: () => context.go('/wallet/topup'),
+            ),
+            if (_loadError != null) ...[
+              const SizedBox(height: 14),
+              Text(
+                _loadError!,
+                style: GoogleFonts.poppins(
+                  color: const Color(0xFFFFC107),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            _StoreFramesGrid(
+              frames: state.frames,
+              pendingFrameId: _pendingFrameId,
+              onFrameTap: (frame) => unawaited(_handleFrameTap(frame)),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _loadStoreState(String uid) async {
+    final switchingUser = _loadingUserId != uid;
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+      _loadingUserId = uid;
+      if (switchingUser) {
+        _storeState = null;
+        _pendingFrameId = null;
+      }
+    });
+
+    try {
+      final state = await _frameStoreService.getMyFrameStoreState();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _storeState = state;
+      });
+    } on FrameStoreException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loadError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loadError = 'Could not load store right now.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleFrameTap(FrameStoreItem frame) async {
+    if (_pendingFrameId != null || _storeState == null) {
+      return;
+    }
+
+    if (frame.active) {
+      return;
+    }
+
+    if (!frame.owned && frame.priceBuds > _storeState!.wallet.budsBalance) {
+      _showSnackbar('Not enough Buds. Please recharge your wallet first.');
+      return;
+    }
+
+    if (!frame.owned) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => _FramePurchaseDialog(frame: frame),
+      );
+      if (confirmed != true) {
+        return;
+      }
+    }
+
+    setState(() => _pendingFrameId = frame.id);
+
+    try {
+      final nextState = frame.owned
+          ? await _frameStoreService.setActiveFrame(frame.id)
+          : await _frameStoreService.purchaseFrame(frame.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _storeState = nextState);
+      _showSnackbar(
+        frame.owned
+            ? 'Frame equipped successfully.'
+            : 'Frame purchased and equipped successfully.',
+        isError: false,
+      );
+    } on FrameStoreException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackbar(error.message);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackbar('Could not complete this action right now.');
+    } finally {
+      if (mounted) {
+        setState(() => _pendingFrameId = null);
+      }
+    }
+  }
+
+  void _showSnackbar(String message, {bool isError = true}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError
+            ? const Color(0xFFB43A3A)
+            : const Color(0xFF2E7D32),
       ),
     );
   }
@@ -57,19 +239,17 @@ class _StoreHeroBanner extends StatelessWidget {
                 ),
               ),
             ),
-            const Align(
-              alignment: Alignment.bottomCenter,
+            Align(
+              alignment: Alignment.centerLeft,
               child: Padding(
-                padding: EdgeInsets.only(bottom: 14),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _CarouselDot(active: true),
-                    SizedBox(width: 11),
-                    _CarouselDot(),
-                    SizedBox(width: 11),
-                    _CarouselDot(),
-                  ],
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Store: Profile Frames',
+                  style: GoogleFonts.poppins(
+                    color: const Color(0xFF0A204A),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 24,
+                  ),
                 ),
               ),
             ),
@@ -80,26 +260,11 @@ class _StoreHeroBanner extends StatelessWidget {
   }
 }
 
-class _CarouselDot extends StatelessWidget {
-  final bool active;
-
-  const _CarouselDot({this.active = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 6,
-      height: 6,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: active ? const Color(0xFF0C1AAD) : const Color(0xFF8A7C7C),
-      ),
-    );
-  }
-}
-
 class _StoreHeader extends StatelessWidget {
-  const _StoreHeader();
+  final double budsBalance;
+  final VoidCallback onTopupTap;
+
+  const _StoreHeader({required this.budsBalance, required this.onTopupTap});
 
   @override
   Widget build(BuildContext context) {
@@ -133,10 +298,9 @@ class _StoreHeader extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Activate VIP to unlock an extra discount on cosmetic '
-                    'items',
+                    'Bought frames can be equipped from Store or Edit Profile.',
                     style: GoogleFonts.inter(
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: Colors.white.withValues(alpha: 0.56),
                       fontWeight: FontWeight.w500,
                       fontStyle: FontStyle.italic,
                       fontSize: 10,
@@ -170,7 +334,7 @@ class _StoreHeader extends StatelessWidget {
                 const _CoinGlyph(size: 15),
                 const SizedBox(width: 6),
                 Text(
-                  '13.59',
+                  budsBalance.toStringAsFixed(2),
                   style: GoogleFonts.inter(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -181,25 +345,28 @@ class _StoreHeader extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 5),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Recharge',
-                  style: GoogleFonts.inter(
-                    color: const Color(0xFF51D76E),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                    height: 1,
+            InkWell(
+              onTap: onTopupTap,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Recharge',
+                    style: GoogleFonts.inter(
+                      color: const Color(0xFF51D76E),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      height: 1,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 14,
-                  color: Color(0xFF51D76E),
-                ),
-              ],
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 14,
+                    color: Color(0xFF51D76E),
+                  ),
+                ],
+              ),
             ),
           ],
         );
@@ -224,7 +391,15 @@ class _StoreHeader extends StatelessWidget {
 }
 
 class _StoreFramesGrid extends StatelessWidget {
-  const _StoreFramesGrid();
+  final List<FrameStoreItem> frames;
+  final String? pendingFrameId;
+  final ValueChanged<FrameStoreItem> onFrameTap;
+
+  const _StoreFramesGrid({
+    required this.frames,
+    required this.pendingFrameId,
+    required this.onFrameTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -254,11 +429,15 @@ class _StoreFramesGrid extends StatelessWidget {
         return Wrap(
           spacing: gap,
           runSpacing: gap,
-          children: _storeFrames
+          children: frames
               .map(
                 (frame) => SizedBox(
                   width: cardWidth,
-                  child: _StoreFrameCard(data: frame),
+                  child: _StoreFrameCard(
+                    data: frame,
+                    pending: pendingFrameId == frame.id,
+                    onTap: () => onFrameTap(frame),
+                  ),
                 ),
               )
               .toList(growable: false),
@@ -269,12 +448,27 @@ class _StoreFramesGrid extends StatelessWidget {
 }
 
 class _StoreFrameCard extends StatelessWidget {
-  final _StoreFrameData data;
+  final FrameStoreItem data;
+  final bool pending;
+  final VoidCallback onTap;
 
-  const _StoreFrameCard({required this.data});
+  const _StoreFrameCard({
+    required this.data,
+    required this.pending,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final actionLabel = pending
+        ? 'Processing...'
+        : data.active
+        ? 'Using'
+        : data.owned
+        ? 'Use'
+        : 'Buy for';
+    final canTap = !pending && !data.active;
+
     return Stack(
       children: [
         Container(
@@ -284,10 +478,10 @@ class _StoreFrameCard extends StatelessWidget {
             color: const Color(0xFF141D35),
             borderRadius: BorderRadius.circular(5),
             border: Border.all(
-              color: data.selected
+              color: data.active
                   ? const Color(0xFF51D76E)
                   : Colors.white.withValues(alpha: 0.14),
-              width: data.selected ? 1.1 : 0.7,
+              width: data.active ? 1.1 : 0.7,
             ),
             boxShadow: const [
               BoxShadow(
@@ -324,7 +518,7 @@ class _StoreFrameCard extends StatelessWidget {
                           ),
                         ),
                         Image.asset(
-                          data.frameAsset,
+                          data.assetPath,
                           width: 110,
                           height: 110,
                           fit: BoxFit.contain,
@@ -347,11 +541,18 @@ class _StoreFrameCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 13),
-              _BuyButtons(data: data),
+              _FrameActionButtons(
+                actionLabel: actionLabel,
+                priceLabel: data.priceBuds.toStringAsFixed(2),
+                showPrice: !data.owned && !data.active,
+                showGiftButton: !data.owned && data.giftable,
+                enabled: canTap,
+                onTap: onTap,
+              ),
             ],
           ),
         ),
-        if (data.selected)
+        if (data.active)
           const Positioned(
             left: 7,
             top: 4,
@@ -366,51 +567,71 @@ class _StoreFrameCard extends StatelessWidget {
   }
 }
 
-class _BuyButtons extends StatelessWidget {
-  final _StoreFrameData data;
+class _FrameActionButtons extends StatelessWidget {
+  final String actionLabel;
+  final String priceLabel;
+  final bool showPrice;
+  final bool showGiftButton;
+  final bool enabled;
+  final VoidCallback onTap;
 
-  const _BuyButtons({required this.data});
+  const _FrameActionButtons({
+    required this.actionLabel,
+    required this.priceLabel,
+    required this.showPrice,
+    required this.showGiftButton,
+    required this.enabled,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final buyButton = Expanded(
-      child: Container(
-        height: 29,
-        decoration: BoxDecoration(
-          color: const Color(0xFF2F88FF),
-          borderRadius: BorderRadius.circular(3),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Buy for',
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                height: 1,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(3),
+        child: Container(
+          height: 29,
+          decoration: BoxDecoration(
+            color: enabled
+                ? const Color(0xFF2F88FF)
+                : const Color(0xFF42516B).withValues(alpha: 0.75),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                actionLabel,
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  height: 1,
+                ),
               ),
-            ),
-            const SizedBox(width: 5),
-            const _CoinGlyph(size: 12),
-            const SizedBox(width: 5),
-            Text(
-              data.priceLabel,
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                height: 1,
-              ),
-            ),
-          ],
+              if (showPrice) ...[
+                const SizedBox(width: 5),
+                const _CoinGlyph(size: 12),
+                const SizedBox(width: 5),
+                Text(
+                  priceLabel,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
 
-    if (data.selected || !data.showGiftButton) {
+    if (!showGiftButton) {
       return Row(children: [buyButton]);
     }
 
@@ -422,7 +643,7 @@ class _BuyButtons extends StatelessWidget {
           width: 24,
           height: 29,
           decoration: BoxDecoration(
-            color: const Color(0xFF2F88FF),
+            color: const Color(0xFF2F88FF).withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(3),
           ),
           child: const Icon(
@@ -464,106 +685,197 @@ class _CoinGlyph extends StatelessWidget {
   }
 }
 
-@immutable
-class _StoreFrameData {
-  final String name;
-  final String frameAsset;
-  final String priceLabel;
-  final bool selected;
-  final bool showGiftButton;
+class _StoreSignedOutHint extends StatelessWidget {
+  final VoidCallback onSignInTap;
+  final VoidCallback onTopupTap;
 
-  const _StoreFrameData({
-    required this.name,
-    required this.frameAsset,
-    required this.priceLabel,
-    this.selected = false,
-    this.showGiftButton = true,
+  const _StoreSignedOutHint({
+    required this.onSignInTap,
+    required this.onTopupTap,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 820),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: const Color(0x1AFFFFFF),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Sign in to use the Store',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 24,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Buy profile frames with Buds, equip your active frame, and show it across your profile.',
+                style: GoogleFonts.poppins(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  ElevatedButton(
+                    onPressed: onSignInTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2F88FF),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Sign in'),
+                  ),
+                  ElevatedButton(
+                    onPressed: onTopupTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0C2444),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Open Top-up'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-const List<_StoreFrameData> _storeFrames = <_StoreFrameData>[
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/nautic_ring.png',
-    priceLabel: '9.99',
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/goldbutterfly.png',
-    priceLabel: '9.99',
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/happy_sprinkles.png',
-    priceLabel: '9.99',
-    showGiftButton: false,
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/lotus_aura.png',
-    priceLabel: '15.99',
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/lolita_pearl.png',
-    priceLabel: '9.99',
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/steam_pipe.png',
-    priceLabel: '9.99',
-    showGiftButton: false,
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/golden.png',
-    priceLabel: '9.99',
-    selected: true,
-    showGiftButton: false,
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/aqua_ring.png',
-    priceLabel: '9.99',
-    showGiftButton: false,
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/luminova.png',
-    priceLabel: '9.99',
-    selected: true,
-    showGiftButton: false,
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/kittybloom.png',
-    priceLabel: '15.99',
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/aurealux_emblem.png',
-    priceLabel: '15.99',
-    selected: true,
-    showGiftButton: false,
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/moumou.png',
-    priceLabel: '9.99',
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/boblin_treasure.png',
-    priceLabel: '9.99',
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/demon1.png',
-    priceLabel: '9.99',
-  ),
-  _StoreFrameData(
-    name: 'Nautic Ring',
-    frameAsset: 'assets/medals/sugarland.png',
-    priceLabel: '15.99',
-  ),
-];
+class _StoreLoadErrorCard extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _StoreLoadErrorCard({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 720),
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: const Color(0x1AFFFFFF),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              style: GoogleFonts.poppins(
+                color: const Color(0xFFFF8A8A),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2F88FF),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FramePurchaseDialog extends StatelessWidget {
+  final FrameStoreItem frame;
+
+  const _FramePurchaseDialog({required this.frame});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF171C29),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Confirm Purchase',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 24,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Buy "${frame.name}" for ${frame.priceBuds.toStringAsFixed(2)} Buds?',
+                style: GoogleFonts.poppins(
+                  color: Colors.white.withValues(alpha: 0.88),
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Purchased frame will be equipped immediately and can be changed later in Edit Profile.',
+                style: GoogleFonts.poppins(
+                  color: Colors.white.withValues(alpha: 0.66),
+                  fontWeight: FontWeight.w500,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2F88FF),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Buy'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

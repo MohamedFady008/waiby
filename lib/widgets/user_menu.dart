@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
+import 'user_avatar_with_frame.dart';
 
 class UserMenu extends StatelessWidget {
   final AuthController auth;
@@ -82,6 +83,7 @@ class UserMenu extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _UserAvatar(
+                    userId: auth.userId,
                     photoUrl: auth.photoUrl,
                     online: auth.online.value,
                     onlineColor: accentGreen,
@@ -184,6 +186,7 @@ class UserMenu extends StatelessWidget {
         ),
       ],
       child: _SafeCircleAvatar(
+        userId: auth.userId,
         photoUrl: auth.photoUrl,
         radius: 15,
         iconSize: 17,
@@ -195,6 +198,7 @@ class UserMenu extends StatelessWidget {
 }
 
 class _SafeCircleAvatar extends StatelessWidget {
+  final String? userId;
   final String? photoUrl;
   final double radius;
   final double iconSize;
@@ -202,6 +206,7 @@ class _SafeCircleAvatar extends StatelessWidget {
   final Color iconColor;
 
   const _SafeCircleAvatar({
+    this.userId,
     required this.photoUrl,
     required this.radius,
     required this.iconSize,
@@ -211,35 +216,33 @@ class _SafeCircleAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trimmedUrl = photoUrl?.trim();
-    final hasValidUrl = trimmedUrl != null && trimmedUrl.isNotEmpty;
-
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: backgroundColor,
-      child: hasValidUrl
-          ? ClipOval(
-              child: Image.network(
-                trimmedUrl,
-                width: radius * 2,
-                height: radius * 2,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    Icon(Icons.person, size: iconSize, color: iconColor),
-              ),
-            )
-          : Icon(Icons.person, size: iconSize, color: iconColor),
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: UserAvatarWithFrame(
+        userId: userId,
+        size: radius * 2,
+        frameScale: 1.36,
+        fallbackAvatarUrl: photoUrl,
+        fallbackIcon: Icons.person,
+        fallbackIconColor: iconColor,
+        fallbackBackground: backgroundColor,
+      ),
     );
   }
 }
 
 class _UserAvatar extends StatelessWidget {
+  final String? userId;
   final String? photoUrl;
   final bool online;
   final Color onlineColor;
   final Color ringColor;
 
   const _UserAvatar({
+    this.userId,
     required this.photoUrl,
     required this.online,
     required this.onlineColor,
@@ -254,6 +257,7 @@ class _UserAvatar extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         _SafeCircleAvatar(
+          userId: userId,
           photoUrl: photoUrl,
           radius: 38,
           iconSize: 38,
