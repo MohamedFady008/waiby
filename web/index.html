@@ -31,6 +31,26 @@
 
   <title>waiby</title>
   <link rel="manifest" href="manifest.json">
+  <script>
+    // Use local Firebase web SDK modules to avoid runtime CDN import failures.
+    window.flutterfire_ignore_scripts = ['core', 'auth', 'firestore'];
+  </script>
+  <script type="module">
+    const sdkPath = './firebasejs/12.7.0';
+    window.__flutterfireModulesReady = (async () => {
+      const [core, auth, firestore] = await Promise.all([
+        import(`${sdkPath}/firebase-app.js`),
+        import(`${sdkPath}/firebase-auth.js`),
+        import(`${sdkPath}/firebase-firestore.js`),
+      ]);
+      window.firebase_core = core;
+      window.firebase_auth = auth;
+      window.firebase_firestore = firestore;
+    })().catch((error) => {
+      console.error('Failed to preload local Firebase web SDK modules.', error);
+      throw error;
+    });
+  </script>
 </head>
 <body>
   <style>
@@ -42,6 +62,6 @@
       background: #050816;
     }
   </style>
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="flutter_bootstrap.js" defer></script>
 </body>
 </html>
