@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'app_router.dart';
 import 'controllers/auth_controller.dart';
+import 'controllers/creator_form_controller.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -26,6 +27,7 @@ void main() async {
   }
 
   Get.put(AuthController(), permanent: true);
+  Get.lazyPut(() => CreatorFormController(), fenix: true);
   runApp(const MyApp());
 }
 
