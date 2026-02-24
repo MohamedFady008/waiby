@@ -1,0 +1,314 @@
+WAIBY  —  Payments,  Risk  &  Tax  
+Handling
+ 
+Overview
+ 
+Purpose  
+This  document  explains,  in  a  clear  and  regulator-friendly  manner,  how  money  flows  through  
+WAIBY,
+ 
+how
+ 
+payments
+ 
+and
+ 
+payouts
+ 
+are
+ 
+handled,
+ 
+and
+ 
+how
+ 
+the
+ 
+platform
+ 
+mitigates
+ 
+financial,
+ 
+fraud,
+ 
+and
+ 
+compliance
+ 
+risks.
+ 
+Audience  
+Legal  counsel,  payment  service  providers  (PSPs),  banks,  auditors,  and  tax  authorities.  
+Design  Principles  
+Transparency,  simplicity,  auditability,  and  risk  containment.  
+ 
+1.  Platform  Role  in  Payments  
+WAIBY  operates  as  a  managed  marketplace  and  acts  as  the  commercial  intermediary  for  
+all
+ 
+transactions
+ 
+processed
+ 
+on
+ 
+the
+ 
+platform.
+ 
+●  Customers  pay  WAIBY  directly  for  services,  subscriptions,  and  digital  interactions.  
+ ●  WAIBY  collects  and  processes  all  customer  payments.  
+ ●  WAIBY  later  pays  creators  their  earnings,  net  of  applicable  platform  fees,  holds,  
+and
+ 
+adjustments
+.
+ 
+ 
+This  structure  ensures:  
+●  Clear  accountability  for  customers  
+ ●  Centralized  compliance  and  invoicing  
+ ●  Reduced  fraud  and  chargeback  exposure  
+ 
+ 
+2.  Base  Currency  &  Accounting  Model  
+2.1  Single  Source  of  Truth  
+WAIBY  operates  internally  exclusively  in  USD  (United  States  Dollars) .  
+All  internal  records  —  including  balances,  orders,  subscriptions,  fees,  refunds,  and  payouts  
+—
+ 
+are
+ 
+denominated
+ 
+and
+ 
+reconciled
+ 
+in
+ 
+USD.
+ 
+2.2  External  Currency  Conversion  
+Customers  may  pay  using  other  currencies  (e.g.  EUR,  MXN).  
+●  Currency  conversion  occurs  at  checkout  via  the  payment  provider.  
+ ●  Internally,  all  transactions  are  recorded  only  in  USD.  
+ 
+This  simplifies  reconciliation  and  regulatory  reporting.  
+ 
+3.  Internal  Monetary  Units  
+3.1  Buds  (Prepaid  Spending  Credits)  
+Buds  are  WAIBY’s  internal  prepaid  spending  unit.  
+●  1  USD  =  1  Bud  (fixed)  
+ ●  Buds  are  prepaid  and  stored  in  the  user  account  
+ 
+Key  characteristics:  
+●  Buds  are  not  withdrawable  
+ ●  Buds  are  not  refundable  to  the  original  payment  method  
+ ●  Buds  are  usable  only  within  the  WAIBY  platform  
+ 
+Purpose:  
+●  Reduce  payment  friction  
+ ●  Limit  chargeback  exposure  
+ 
+●  Improve  transaction  security  
+ 
+ 
+3.2  Wallet  Balance  (Income)  
+Wallet  Balance  represents  withdrawable  USD  earnings .  
+It  is  used  for:  
+●  Creator  income  
+ ●  Approved  internal  refunds  
+ ●  Subscription  and  digital  item  earnings  
+ 
+Wallet  Balance  is  strictly  separated  from  Buds.  
+ 
+4.  Payment  Methods  (Deposits)  
+Customers  may  purchase  Buds  using  the  following  regulated  methods:  
+4.1  Card  Payments  
+●  Visa  
+ ●  Mastercard  
+ 
+Characteristics:  
+●  Instant  delivery  
+ ●  Higher  chargeback  risk  
+ ●  Subject  to  enhanced  fraud  monitoring  
+ 
+4.2  PayPal  
+●  Widely  trusted  global  method  
+ ●  Dispute-capable  
+ 
+●  Integrated  fraud  controls  
+ 
+Cryptocurrency  deposits  are  not  supported  for  purchasing  Buds.  
+ 
+5.  Deposit  Fees  &  Bonuses  
+●  WAIBY  applies  0%  deposit  fees  
+ ●  Users  receive  the  exact  USD  value  in  Buds  
+ 
+Optional  incentives:  
+●  First-deposit  bonuses  
+ ●  Promotional  Bud  bonuses  
+ 
+Bonuses:  
+●  Are  non-withdrawable  
+ ●  Are  subject  to  anti-abuse  controls  
+ 
+ 
+6.  Orders,  Subscriptions  &  Funds  Handling  
+6.1  One-Time  Orders  
+●  Buds  are  deducted  from  the  customer  balance  
+ ●  The  corresponding  USD  value  is  placed  into  escrow  
+ ●  Funds  are  released  upon  order  completion,  subject  to  risk  controls  
+ 
+6.2  Creator  Subscriptions  
+●  Subscriptions  are  billed  on  a  recurring  basis  
+ ●  Payment  is  collected  upfront  by  WAIBY  
+ 
+●  Platform  fees  are  applied  immediately  
+ ●  Net  earnings  are  credited  to  the  creator’s  Wallet  Balance  
+ 
+Subscriptions  do  not  use  escrow,  as  access  is  granted  immediately.  
+ 
+7.  Platform  Fees  
+7.1  Creator  Platform  Fee  (Subscriptions,  Gifts  &  Wishlist  Items)  
+A  10%  platform  fee  applies  to:  
+●  Creator  subscriptions  
+ ●  Wishlist  purchases  
+ ●  Gifts  and  supporter  payments  
+ 
+Example:  
+ 
+Subscription
+ 
+price:
+ 
+$9.99
+ 
+ 
+Platform
+ 
+fee
+ 
+(10%):
+ 
+$1.00
+ 
+ 
+Creator
+ 
+Wallet
+ 
+Balance
+ 
+credited:
+ 
+$8.99
+ 
+Creators  always  see  net  earnings  in  their  transaction  history.  
+ 
+7.2  Creator  Withdrawal  Fee  
+Withdrawals  from  Wallet  Balance  are  subject  to  a  15%  withdrawal  fee .  
+This  fee  covers:  
+●  Payment  processing  
+ ●  Fraud  and  chargeback  risk  
+ ●  Platform  operations  
+ 
+ 
+7.3  Cryptocurrency  Withdrawal  Surcharge  (Optional)  
+Creators  may  optionally  withdraw  earnings  via  cryptocurrency  (USDT).  
+●  Cryptocurrency  withdrawals  incur  an  additional  6%  processing  surcharge  
+ ●  This  reflects:  
+ ○  Blockchain  fees  
+ ○  Volatility  exposure  
+ ○  Compliance  and  operational  overhead  
+ 
+Total  crypto  withdrawal  fees  may  therefore  be  higher  than  standard  payouts.  
+ 
+8.  Withdrawals,  Holds  &  Risk  Controls  
+8.1  Availability  Delays  
+To  protect  the  platform  from  chargebacks  and  fraud:  
+●  Withdrawals  are  not  instant  by  default  
+ ●  Earnings  may  be  subject  to  time-based  availability  holds  
+ ●  Hold  durations  vary  based  on  account  history  and  risk  signals  
+ 
+8.2  Rolling  Reserves  
+In  certain  cases,  a  portion  of  earnings  may  be  temporarily  held  as  a  rolling  reserve .  
+●  Reserves  are  released  automatically  over  time  
+ ●  Reserves  are  used  to  offset  confirmed  payment  disputes  when  necessary  
+ 
+These  mechanisms  are  standard  marketplace  risk  controls.  
+ 
+9.  Refund  Handling  
+9.1  Internal  Refund  Destination  
+All  approved  refunds  are  credited  to  the  user’s  Wallet  Balance .  
+Refunds  are  not  returned  to  the  original  payment  method .  
+9.2  External  Payment  Disputes  
+If  a  user  initiates  a  chargeback  or  external  dispute:  
+●  WAIBY  cooperates  with  the  payment  provider  
+ ●  The  associated  account  may  be  restricted  or  terminated  
+ ●  Internal  balances  may  be  frozen  to  prevent  abuse  
+ 
+ 
+10.  Chargebacks  &  Abuse  Prevention  
+Chargebacks  are  treated  as  high-risk  events .  
+WAIBY  may  apply:  
+●  Account  restrictions  
+ ●  Deposit  limitations  
+ ●  Withdrawal  holds  
+ ●  Permanent  bans  in  cases  of  repeated  abuse  
+ 
+In  some  cases,  account  restoration  may  require  a  one-time  non-withdrawable  digital  
+purchase
+ 
+to
+ 
+offset
+ 
+operational
+ 
+risk.
+ 
+ 
+11.  Tax  Handling  (High-Level)  
+11.1  Marketplace  Tax  Position  
+WAIBY  is  designed  to  operate  as  the  commercial  point  of  sale  for  customers.  
+This  allows:  
+●  Centralized  tax  handling  
+ 
+●  Clear  customer  invoicing  
+ ●  Reduced  compliance  burden  for  creators  
+ 
+Creators  act  as  independent  service  providers  under  WAIBY’s  marketplace  framework.  
+ 
+11.2  VAT  /  Sales  Tax  
+Where  legally  required:  
+●  Taxes  may  be  included  in  customer  pricing  
+ ●  WAIBY  may  collect  and  remit  applicable  taxes  
+ 
+Tax  treatment  depends  on  jurisdiction,  user  location,  and  applicable  laws.  
+Final  implementation  is  aligned  with  legal  and  tax  advisors.  
+ 
+12.  Auditability  &  Record  Keeping  
+WAIBY  maintains  detailed  records  of:  
+●  Payments  and  deposits  
+ ●  Orders  and  subscriptions  
+ ●  Fees,  holds,  and  reserves  
+ ●  Refunds  and  disputes  
+ ●  Payouts  and  withdrawals  
+ 
+Records  are  retained  in  accordance  with  legal  and  regulatory  requirements.  
+ 
+13.  Compliance  Philosophy  
+WAIBY’s  payment  system  is  designed  to:  
+●  Minimize  fraud  and  abuse  
+ ●  Protect  customers  and  creators  
+ ●  Meet  PSP  and  banking  requirements  
+ ●  Scale  safely  across  jurisdictions  
+ 
+Financial  clarity  and  traceability  are  treated  as  core  infrastructure,  not  optional  
+features.
+ 
+ 

@@ -1,23 +1,31 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'app_router.dart';
 import 'controllers/auth_controller.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // تهيئة Supabase
-  await Supabase.initialize(
-    url: 'https://oszuukbnfgcnzmjlzvox.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zenV1a2JuZmdjbnptamx6dm94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA1NDA5OTcsImV4cCI6MjA4NjExNjk5N30.CYcH4Wt_nqTv44I2UupWTHJdmyid_bic51t4l675K8A',
-  );
+  // Fonts are not bundled locally in this project, so keep runtime fetch on.
+  GoogleFonts.config.allowRuntimeFetching = true;
 
-  // تسجيل AuthController كـ GetX dependency
+  // Keep Firestore cache usable when connection is unstable.
+  try {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+  } catch (_) {
+    // Ignore when settings cannot be changed on hot restarts.
+  }
+
   Get.put(AuthController(), permanent: true);
-
   runApp(const MyApp());
 }
 
@@ -26,6 +34,14 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!GoogleFonts.config.allowRuntimeFetching) {
+      GoogleFonts.config.allowRuntimeFetching = true;
+    }
+
+    if (!Get.isRegistered<AuthController>()) {
+      Get.put(AuthController(), permanent: true);
+    }
+
     return GetMaterialApp.router(
       debugShowCheckedModeBanner: false,
       routerDelegate: router.routerDelegate,

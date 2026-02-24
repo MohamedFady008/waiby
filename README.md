@@ -1,16 +1,16 @@
 # waiby
 
-A new Flutter project.
+Flutter + GetX app migrated to Firebase.
 
-## Getting Started
+## Migration Docs
 
-This project is a starting point for a Flutter application.
+- Runtime and environment setup: `docs/firebase_migration.md`
+- Supabase table migration script: `tool/migrate_supabase_to_firestore.dart`
+- Firebase env sample: `.env.firebase.example.json`
+- Stripe top-up setup: `docs/stripe_topup_setup.md`
 
-A few resources to get you started if this is your first Flutter project:
+## Run
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter run --dart-define-from-file=.env.firebase.json
+```

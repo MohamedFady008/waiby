@@ -79,7 +79,7 @@ class _LoginPageState extends State<LoginPage> {
       'Coming Soon',
       '$label is not implemented yet.',
       snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.orange.shade600.withOpacity(0.9),
+      backgroundColor: Colors.orange.shade600.withValues(alpha: 0.9),
       colorText: Colors.white,
       duration: const Duration(seconds: 2),
       margin: const EdgeInsets.all(16),
@@ -96,7 +96,7 @@ class _LoginPageState extends State<LoginPage> {
         'Info',
         'Please enter your email first',
         snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.blue.shade600.withOpacity(0.9),
+        backgroundColor: Colors.blue.shade600.withValues(alpha: 0.9),
         colorText: Colors.white,
         duration: const Duration(seconds: 2),
         margin: const EdgeInsets.all(16),
@@ -174,7 +174,7 @@ class _LoginPageState extends State<LoginPage> {
                     _obscurePassword
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     size: 22,
                   ),
                   onPressed: () {
@@ -270,18 +270,22 @@ class _LoginPageState extends State<LoginPage> {
             // الفاصل
             Row(
               children: [
-                Expanded(child: Divider(color: Colors.white.withOpacity(0.15))),
+                Expanded(
+                  child: Divider(color: Colors.white.withValues(alpha: 0.15)),
+                ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Text(
                     'or continue with',
                     style: bodyTextStyle.copyWith(
                       fontSize: 13,
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                     ),
                   ),
                 ),
-                Expanded(child: Divider(color: Colors.white.withOpacity(0.15))),
+                Expanded(
+                  child: Divider(color: Colors.white.withValues(alpha: 0.15)),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -328,7 +332,7 @@ class _LoginPageState extends State<LoginPage> {
                   'By creating an account, you confirm that you accept our ',
                   style: bodyTextStyle.copyWith(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
                 InkWell(
@@ -342,7 +346,7 @@ class _LoginPageState extends State<LoginPage> {
                   ' and ',
                   style: bodyTextStyle.copyWith(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
                 InkWell(
@@ -356,7 +360,7 @@ class _LoginPageState extends State<LoginPage> {
                   '.',
                   style: bodyTextStyle.copyWith(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.55),
+                    color: Colors.white.withValues(alpha: 0.55),
                   ),
                 ),
               ],
@@ -388,15 +392,15 @@ class _SocialIconButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          splashColor: Colors.white.withOpacity(0.08),
-          highlightColor: Colors.white.withOpacity(0.05),
+          splashColor: Colors.white.withValues(alpha: 0.08),
+          highlightColor: Colors.white.withValues(alpha: 0.05),
           onTap: onPressed,
           child: Ink(
             width: 52,
             height: 52,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.18)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
             ),
             child: Center(child: FaIcon(icon, size: 20, color: Colors.white)),
           ),

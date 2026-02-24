@@ -7,14 +7,48 @@ import 'settings_bodies/settings_body_selector.dart';
 import '../widgets/settings_sidebar.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, this.initialSelectedKey});
+
+  final String? initialSelectedKey;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  String _selectedKey = SettingsSidebarDefaults.topEntries.first.key;
+  late String _selectedKey;
+
+  static String _normalizeSelectedKey(String? key) {
+    if (key == null) {
+      return SettingsSidebarDefaults.topEntries.first.key;
+    }
+
+    final hasKey = SettingsSidebarDefaults.allEntries.any(
+      (entry) => entry.key == key,
+    );
+    if (!hasKey) {
+      return SettingsSidebarDefaults.topEntries.first.key;
+    }
+
+    return key;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedKey = _normalizeSelectedKey(widget.initialSelectedKey);
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.initialSelectedKey == widget.initialSelectedKey) {
+      return;
+    }
+
+    _selectedKey = _normalizeSelectedKey(widget.initialSelectedKey);
+  }
 
   SettingsSidebarMenuEntry get _selectedEntry => SettingsSidebarDefaults
       .allEntries
@@ -70,6 +104,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       Expanded(
                         child: SingleChildScrollView(
+                          primary: false,
                           padding: EdgeInsets.all(pagePadding),
                           child: buildSettingsBody(_selectedEntry),
                         ),

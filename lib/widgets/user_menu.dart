@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
+import 'user_avatar_with_frame.dart';
 
 class UserMenu extends StatelessWidget {
   final AuthController auth;
@@ -39,13 +40,13 @@ class UserMenu extends StatelessWidget {
             context.go('/profile/${Uri.encodeComponent(auth.userId)}');
             break;
           case _UserMenuAction.dashboard:
-            context.go('/dashboard');
+            context.go('/settings?tab=dashboard');
             break;
           case _UserMenuAction.wallet:
-            context.go('/wallet');
+            context.go('/settings?tab=wallet');
             break;
           case _UserMenuAction.settings:
-            context.go('/settings');
+            context.go('/settings?tab=dashboard');
             break;
           case _UserMenuAction.toggleOnline:
             auth.toggleOnline();
@@ -55,7 +56,7 @@ class UserMenu extends StatelessWidget {
             context.go('/');
             break;
           case _UserMenuAction.reportIssue:
-            context.go('/report');
+            context.go('/settings?tab=tickets');
             break;
         }
       },
@@ -82,6 +83,7 @@ class UserMenu extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _UserAvatar(
+                    userId: auth.userId,
                     photoUrl: auth.photoUrl,
                     online: auth.online.value,
                     onlineColor: accentGreen,
@@ -183,23 +185,64 @@ class UserMenu extends StatelessWidget {
           ),
         ),
       ],
-      child: _AvatarCircle(
+      child: _SafeCircleAvatar(
+        userId: auth.userId,
         photoUrl: auth.photoUrl,
         radius: 15,
-        backgroundColor: Colors.white.withValues(alpha: 0.08),
-        placeholderIconSize: 17,
+        iconSize: 17,
+        backgroundColor: const Color(0xFF1A2344),
+        iconColor: Colors.white70,
+      ),
+    );
+  }
+}
+
+class _SafeCircleAvatar extends StatelessWidget {
+  final String? userId;
+  final String? photoUrl;
+  final double radius;
+  final double iconSize;
+  final Color backgroundColor;
+  final Color iconColor;
+
+  const _SafeCircleAvatar({
+    this.userId,
+    required this.photoUrl,
+    required this.radius,
+    required this.iconSize,
+    required this.backgroundColor,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: UserAvatarWithFrame(
+        userId: userId,
+        size: radius * 2,
+        frameScale: 1.36,
+        fallbackAvatarUrl: photoUrl,
+        fallbackIcon: Icons.person,
+        fallbackIconColor: iconColor,
+        fallbackBackground: backgroundColor,
       ),
     );
   }
 }
 
 class _UserAvatar extends StatelessWidget {
+  final String? userId;
   final String? photoUrl;
   final bool online;
   final Color onlineColor;
   final Color ringColor;
 
   const _UserAvatar({
+    this.userId,
     required this.photoUrl,
     required this.online,
     required this.onlineColor,
@@ -213,11 +256,13 @@ class _UserAvatar extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        _AvatarCircle(
+        _SafeCircleAvatar(
+          userId: userId,
           photoUrl: photoUrl,
           radius: 38,
+          iconSize: 38,
           backgroundColor: Colors.white.withValues(alpha: 0.08),
-          placeholderIconSize: 38,
+          iconColor: Colors.white,
         ),
         Positioned(
           right: -2,
@@ -236,46 +281,6 @@ class _UserAvatar extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _AvatarCircle extends StatelessWidget {
-  final String? photoUrl;
-  final double radius;
-  final double placeholderIconSize;
-  final Color backgroundColor;
-
-  const _AvatarCircle({
-    required this.photoUrl,
-    required this.radius,
-    required this.placeholderIconSize,
-    this.backgroundColor = Colors.transparent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final size = radius * 2;
-    final hasPhoto = (photoUrl ?? '').trim().isNotEmpty;
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
-      clipBehavior: Clip.antiAlias,
-      child: hasPhoto
-          ? Image.network(
-              photoUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(
-                  Icons.person,
-                  size: placeholderIconSize,
-                  color: Colors.white,
-                );
-              },
-            )
-          : Icon(Icons.person, size: placeholderIconSize, color: Colors.white),
     );
   }
 }
