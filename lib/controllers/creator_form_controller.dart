@@ -428,33 +428,90 @@ class CreatorFormController extends GetxController {
 
   void _showError(String message) {
     errorMessage.value = message;
-    if (Get.context == null) return;
-    Get.snackbar(
-      'Error',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
+    _showFeedbackSnackbar(
+      title: 'Error',
+      message: message,
       backgroundColor: Colors.red.shade600.withValues(alpha: 0.9),
-      colorText: Colors.white,
-      duration: const Duration(seconds: 4),
-      margin: const EdgeInsets.all(16),
-      borderRadius: 12,
-      icon: const Icon(Icons.error_outline, color: Colors.white),
+      icon: Icons.error_outline,
     );
   }
 
   void _showSuccess(String message) {
     successMessage.value = message;
-    if (Get.context == null) return;
+    _showFeedbackSnackbar(
+      title: 'Success',
+      message: message,
+      backgroundColor: Colors.green.shade600.withValues(alpha: 0.9),
+      icon: Icons.check_circle_outline,
+    );
+  }
+
+  void _showFeedbackSnackbar({
+    required String title,
+    required String message,
+    required Color backgroundColor,
+    required IconData icon,
+  }) {
+    final context = Get.context;
+    if (context != null) {
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger != null) {
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: backgroundColor,
+            duration: const Duration(seconds: 4),
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            content: Row(
+              children: [
+                Icon(icon, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        message,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (Get.overlayContext == null) {
+      return;
+    }
+
     Get.snackbar(
-      'Success',
+      title,
       message,
       snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.green.shade600.withValues(alpha: 0.9),
+      backgroundColor: backgroundColor,
       colorText: Colors.white,
       duration: const Duration(seconds: 4),
       margin: const EdgeInsets.all(16),
       borderRadius: 12,
-      icon: const Icon(Icons.check_circle_outline, color: Colors.white),
+      icon: Icon(icon, color: Colors.white),
     );
   }
 }

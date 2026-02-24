@@ -478,16 +478,12 @@ class _LegalAcknowledgementSection extends StatelessWidget {
           .where((e) => e != null)
           .firstOrNull;
       if (firstError != null) {
-        Get.snackbar(
-          'Validation Error',
-          firstError,
-          snackPosition: SnackPosition.BOTTOM,
+        _showFormSnackbar(
+          context,
+          title: 'Validation Error',
+          message: firstError,
           backgroundColor: Colors.orange.shade700.withValues(alpha: 0.9),
-          colorText: Colors.white,
-          duration: const Duration(seconds: 3),
-          margin: const EdgeInsets.all(16),
-          borderRadius: 12,
-          icon: const Icon(Icons.warning_amber_rounded, color: Colors.white),
+          icon: Icons.warning_amber_rounded,
         );
       }
       return;
@@ -495,16 +491,12 @@ class _LegalAcknowledgementSection extends StatelessWidget {
 
     // Verify identity document is uploaded.
     if (!controller.identityUploaded.value) {
-      Get.snackbar(
-        'Identity Required',
-        'Please upload your identity document before submitting.',
-        snackPosition: SnackPosition.BOTTOM,
+      _showFormSnackbar(
+        context,
+        title: 'Identity Required',
+        message: 'Please upload your identity document before submitting.',
         backgroundColor: Colors.orange.shade700.withValues(alpha: 0.9),
-        colorText: Colors.white,
-        duration: const Duration(seconds: 3),
-        margin: const EdgeInsets.all(16),
-        borderRadius: 12,
-        icon: const Icon(Icons.upload_file_rounded, color: Colors.white),
+        icon: Icons.upload_file_rounded,
       );
       return;
     }
@@ -512,6 +504,71 @@ class _LegalAcknowledgementSection extends StatelessWidget {
     // Show the Creator Guidelines dialog.
     _showCreatorGuidelinesDialog(context);
   }
+}
+
+void _showFormSnackbar(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required Color backgroundColor,
+  IconData? icon,
+}) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger != null) {
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: backgroundColor,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, color: Colors.white),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(message, style: const TextStyle(color: Colors.white)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return;
+  }
+
+  final overlayContext = Get.overlayContext;
+  if (overlayContext == null) {
+    return;
+  }
+
+  Get.snackbar(
+    title,
+    message,
+    snackPosition: SnackPosition.BOTTOM,
+    backgroundColor: backgroundColor,
+    colorText: Colors.white,
+    duration: const Duration(seconds: 3),
+    margin: const EdgeInsets.all(16),
+    borderRadius: 12,
+    icon: icon == null ? null : Icon(icon, color: Colors.white),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1076,7 +1133,7 @@ class _IdentityVerificationCard extends StatelessWidget {
             final uploading = controller.isUploading.value;
 
             return GestureDetector(
-              onTap: uploading ? null : () => _pickFile(controller),
+              onTap: uploading ? null : () => _pickFile(context, controller),
               child: Container(
                 width: double.infinity,
                 constraints: const BoxConstraints(minHeight: 180),
@@ -1285,7 +1342,10 @@ class _IdentityVerificationCard extends StatelessWidget {
     );
   }
 
-  Future<void> _pickFile(CreatorFormController controller) async {
+  Future<void> _pickFile(
+    BuildContext context,
+    CreatorFormController controller,
+  ) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -1293,17 +1353,17 @@ class _IdentityVerificationCard extends StatelessWidget {
         withData: true,
       );
 
+      if (!context.mounted) return;
       if (result == null || result.files.isEmpty) return;
 
       final file = result.files.first;
       final bytes = file.bytes;
       if (bytes == null || bytes.isEmpty) {
-        Get.snackbar(
-          'Error',
-          'Could not read the selected file.',
-          snackPosition: SnackPosition.BOTTOM,
+        _showFormSnackbar(
+          context,
+          title: 'Error',
+          message: 'Could not read the selected file.',
           backgroundColor: Colors.red.shade600.withValues(alpha: 0.9),
-          colorText: Colors.white,
         );
         return;
       }
@@ -1333,12 +1393,12 @@ class _IdentityVerificationCard extends StatelessWidget {
         mimeType: mimeType,
       );
     } catch (e) {
-      Get.snackbar(
-        'Error',
-        'Failed to pick file: $e',
-        snackPosition: SnackPosition.BOTTOM,
+      if (!context.mounted) return;
+      _showFormSnackbar(
+        context,
+        title: 'Error',
+        message: 'Failed to pick file: $e',
         backgroundColor: Colors.red.shade600.withValues(alpha: 0.9),
-        colorText: Colors.white,
       );
     }
   }
