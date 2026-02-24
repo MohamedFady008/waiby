@@ -548,7 +548,7 @@ class _VisitorHeroActions extends StatelessWidget {
     Widget topRow() {
       return Row(
         children: [
-          Container(
+          SizedBox(
             width: iconPanelWidth,
             height: iconPanelHeight,
 
