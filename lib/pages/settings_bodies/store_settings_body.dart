@@ -37,6 +37,8 @@ class _StoreSettingsBodyState extends State<StoreSettingsBody> {
           _loadingUserId = null;
           _storeState = null;
           _pendingFrameId = null;
+          _isLoading = false;
+          _loadError = null;
           return _StoreSignedOutHint(
             onSignInTap: () => context.go('/login'),
             onTopupTap: () => context.go('/wallet/topup'),
@@ -44,12 +46,22 @@ class _StoreSettingsBodyState extends State<StoreSettingsBody> {
         }
 
         if (_loadingUserId != user.uid && !_isLoading) {
-          unawaited(_loadStoreState(user.uid));
+          _scheduleLoadStoreState(user.uid);
+          return const Center(child: CircularProgressIndicator(strokeWidth: 2.4));
         }
 
         return _buildStoreContent(context, user.uid);
       },
     );
+  }
+
+  void _scheduleLoadStoreState(String uid) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _loadingUserId == uid || _isLoading) {
+        return;
+      }
+      unawaited(_loadStoreState(uid));
+    });
   }
 
   Widget _buildStoreContent(BuildContext context, String uid) {
