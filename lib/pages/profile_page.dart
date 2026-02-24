@@ -6,9 +6,12 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../controllers/auth_controller.dart';
-import '../widgets/user_avatar_with_frame.dart';
+import '../data/models/user_profile.dart';
+import '../data/repositories/user_profile_repository.dart';
 import '../widgets/chat_sidebar.dart';
 import '../widgets/common/responsive_layout.dart';
+import '../data/models/profile_tab_models.dart';
+import '../data/repositories/profile_tabs_repository.dart';
 
 enum _ProfileTab { services, wishlist, gallery, posts }
 
@@ -23,13 +26,13 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   _ProfileTab _selectedTab = _ProfileTab.services;
+  final UserProfileRepository _userProfileRepository = UserProfileRepository();
 
   @override
   Widget build(BuildContext context) {
-    final profileUserId =
-        _resolveTargetUserId(widget.userId) ?? _currentUserId();
-    final userName = _resolveUserName(widget.userId);
-    final isViewingOtherAccount = _isViewingOtherAccount(widget.userId);
+    final profileUserId = _resolveProfileUserId(widget.userId);
+    final fallbackUserName = _resolveUserName(widget.userId);
+    final isViewingOtherAccount = _isViewingOtherAccount(profileUserId);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -68,14 +71,40 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: contentWidth),
-                    child: _ProfileBody(
-                      userName: userName,
-                      profileUserId: profileUserId,
-                      width: width,
-                      isViewingOtherAccount: isViewingOtherAccount,
-                      selectedTab: _selectedTab,
-                      onSelectTab: (tab) => setState(() => _selectedTab = tab),
-                    ),
+                    child: profileUserId == null
+                        ? _ProfileBody(
+                            userName: fallbackUserName,
+                            profileUserId: null,
+                            width: width,
+                            isViewingOtherAccount: isViewingOtherAccount,
+                            selectedTab: _selectedTab,
+                            onSelectTab: (tab) =>
+                                setState(() => _selectedTab = tab),
+                          )
+                        : StreamBuilder<UserProfile?>(
+                            stream: _userProfileRepository.watchById(
+                              profileUserId,
+                            ),
+                            builder: (context, snapshot) {
+                              final resolvedName = snapshot.data?.fullName
+                                  ?.trim();
+                              final userName =
+                                  resolvedName != null &&
+                                      resolvedName.isNotEmpty
+                                  ? resolvedName
+                                  : fallbackUserName;
+
+                              return _ProfileBody(
+                                userName: userName,
+                                profileUserId: profileUserId,
+                                width: width,
+                                isViewingOtherAccount: isViewingOtherAccount,
+                                selectedTab: _selectedTab,
+                                onSelectTab: (tab) =>
+                                    setState(() => _selectedTab = tab),
+                              );
+                            },
+                          ),
                   ),
                 ),
               ),
@@ -91,17 +120,6 @@ class _ProfilePageState extends State<ProfilePage> {
         );
       },
     );
-  }
-
-  String? _currentUserId() {
-    if (!Get.isRegistered<AuthController>()) {
-      return null;
-    }
-    final userId = Get.find<AuthController>().userId.trim();
-    if (userId.isEmpty || userId == 'U-00000') {
-      return null;
-    }
-    return userId;
   }
 }
 
@@ -127,16 +145,23 @@ class _ProfileBody extends StatelessWidget {
     final desktop = width >= 1260;
     final tablet = width >= 920 && !desktop;
 
-    final middleColumn = const Column(
+    final middleColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [_ServiceDetailsCard(), SizedBox(height: 14), _ReviewsCard()],
+      children: [
+        _ServiceDetailsCard(profileUserId: profileUserId),
+        const SizedBox(height: 14),
+        _ReviewsCard(profileUserId: profileUserId),
+      ],
     );
 
     final servicesLayout = desktop
         ? Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(width: 280, child: _ServicesMenuPanel()),
+              SizedBox(
+                width: 280,
+                child: _ServicesMenuPanel(profileUserId: profileUserId),
+              ),
               const SizedBox(width: 20),
               Expanded(child: middleColumn),
               const SizedBox(width: 20),
@@ -155,7 +180,10 @@ class _ProfileBody extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(width: 242, child: _ServicesMenuPanel()),
+                  SizedBox(
+                    width: 242,
+                    child: _ServicesMenuPanel(profileUserId: profileUserId),
+                  ),
                   const SizedBox(width: 14),
                   Expanded(child: middleColumn),
                 ],
@@ -175,13 +203,13 @@ class _ProfileBody extends StatelessWidget {
         : Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _ServicesMenuPanel(),
+              _ServicesMenuPanel(profileUserId: profileUserId),
               const SizedBox(height: 12),
-              const _ServiceDetailsCard(),
+              _ServiceDetailsCard(profileUserId: profileUserId),
               const SizedBox(height: 12),
               _ActionPanel(isViewingOtherAccount: isViewingOtherAccount),
               const SizedBox(height: 12),
-              const _ReviewsCard(),
+              _ReviewsCard(profileUserId: profileUserId),
             ],
           );
 
@@ -193,17 +221,19 @@ class _ProfileBody extends StatelessWidget {
       case _ProfileTab.wishlist:
         tabBody = _WishlistTabContent(
           isViewingOtherAccount: isViewingOtherAccount,
+          profileUserId: profileUserId,
         );
         break;
       case _ProfileTab.gallery:
         tabBody = _GalleryTabContent(
           isViewingOtherAccount: isViewingOtherAccount,
+          profileUserId: profileUserId,
         );
         break;
       case _ProfileTab.posts:
-        tabBody = const _EmptyProfileTab(
-          title: 'Posts',
-          message: 'Posts will appear here.',
+        tabBody = _PostsTabContent(
+          isViewingOtherAccount: isViewingOtherAccount,
+          profileUserId: profileUserId,
         );
         break;
     }
@@ -211,11 +241,7 @@ class _ProfileBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Hero(
-          userName: userName,
-          profileUserId: profileUserId,
-          isViewingOtherAccount: isViewingOtherAccount,
-        ),
+        _Hero(userName: userName, isViewingOtherAccount: isViewingOtherAccount),
         const SizedBox(height: 22),
         _Tabs(selectedTab: selectedTab, onSelect: onSelectTab),
         const SizedBox(height: 16),
@@ -265,14 +291,9 @@ class _BackdropGlow extends StatelessWidget {
 
 class _Hero extends StatelessWidget {
   final String userName;
-  final String? profileUserId;
   final bool isViewingOtherAccount;
 
-  const _Hero({
-    required this.userName,
-    required this.profileUserId,
-    required this.isViewingOtherAccount,
-  });
+  const _Hero({required this.userName, required this.isViewingOtherAccount});
 
   @override
   Widget build(BuildContext context) {
@@ -358,10 +379,7 @@ class _Hero extends StatelessWidget {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _ProfileAvatar(
-                                  size: avatarSize,
-                                  userId: profileUserId,
-                                ),
+                                _ProfileAvatar(size: avatarSize),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: _ProfileIdentity(
@@ -382,10 +400,7 @@ class _Hero extends StatelessWidget {
                       : Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            _ProfileAvatar(
-                              size: avatarSize,
-                              userId: profileUserId,
-                            ),
+                            _ProfileAvatar(size: avatarSize),
                             const SizedBox(width: 18),
                             Expanded(
                               child: _ProfileIdentity(
@@ -420,19 +435,45 @@ class _Hero extends StatelessWidget {
 
 class _ProfileAvatar extends StatelessWidget {
   final double size;
-  final String? userId;
 
-  const _ProfileAvatar({required this.size, this.userId});
+  const _ProfileAvatar({required this.size});
 
   @override
   Widget build(BuildContext context) {
-    return UserAvatarWithFrame(
-      userId: userId,
-      size: size,
-      frameScale: 1.30,
-      borderColor: const Color(0xFFFFA2D0),
-      borderWidth: 3,
-      fallbackAsset: 'assets/pp6.png',
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFFFA2D0), width: 3),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipOval(
+            child: Image.asset(
+              'assets/pp6.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Container(
+                color: const Color(0xFF213258),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.person_rounded,
+                  color: Colors.white.withValues(alpha: 0.75),
+                  size: size * 0.48,
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: Image.asset(
+              'assets/medals/lolita_pearl.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -554,7 +595,7 @@ class _VisitorHeroActions extends StatelessWidget {
     Widget topRow() {
       return Row(
         children: [
-          Container(
+          SizedBox(
             width: iconPanelWidth,
             height: iconPanelHeight,
 
@@ -797,8 +838,12 @@ enum _WishlistSubtab { wishes, gifters }
 
 class _WishlistTabContent extends StatefulWidget {
   final bool isViewingOtherAccount;
+  final String? profileUserId;
 
-  const _WishlistTabContent({required this.isViewingOtherAccount});
+  const _WishlistTabContent({
+    required this.isViewingOtherAccount,
+    required this.profileUserId,
+  });
 
   @override
   State<_WishlistTabContent> createState() => _WishlistTabContentState();
@@ -806,13 +851,74 @@ class _WishlistTabContent extends StatefulWidget {
 
 class _WishlistTabContentState extends State<_WishlistTabContent> {
   _WishlistSubtab _selectedSubtab = _WishlistSubtab.wishes;
+  final ProfileTabsRepository _repository = ProfileTabsRepository();
+
+  Future<void> _handleCreateWish() async {
+    final profileUserId = widget.profileUserId;
+    if (profileUserId == null || profileUserId.trim().isEmpty) {
+      _showProfileDataUnavailable(context);
+      return;
+    }
+
+    final draft = await _showAddWishDialog(context);
+    if (draft == null) {
+      return;
+    }
+
+    try {
+      await _repository.createWishlistItem(
+        profileUserId,
+        ProfileWishlistItem(
+          id: '',
+          title: draft.title,
+          subtitle: draft.subtitle,
+          price: draft.price,
+          progress: 0,
+          imageAsset: 'assets/login.png',
+          highlighted: draft.highlighted,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showProfileActionError(context, 'Failed to save wish.');
+    }
+  }
+
+  Future<void> _handleEditWish(_WishlistItem item) async {
+    final profileUserId = widget.profileUserId;
+    if (profileUserId == null ||
+        profileUserId.trim().isEmpty ||
+        item.id == null) {
+      _showProfileDataUnavailable(context);
+      return;
+    }
+
+    final draft = await _showEditWishDialog(context, item);
+    if (draft == null) {
+      return;
+    }
+
+    try {
+      await _repository.updateWishlistItem(
+        profileUserId,
+        item.id!,
+        title: draft.title,
+        subtitle: draft.subtitle,
+        price: draft.price,
+        highlighted: draft.highlighted,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      _showProfileActionError(context, 'Failed to update wish.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final addWishButton = SizedBox(
       height: 40,
       child: ElevatedButton(
-        onPressed: () => _showAddWishDialog(context),
+        onPressed: _handleCreateWish,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF5AD977),
           foregroundColor: Colors.white,
@@ -884,7 +990,12 @@ class _WishlistTabContentState extends State<_WishlistTabContent> {
         ),
         const SizedBox(height: 14),
         if (_selectedSubtab == _WishlistSubtab.wishes)
-          _WishesGrid(isViewingOtherAccount: widget.isViewingOtherAccount)
+          _WishesGrid(
+            isViewingOtherAccount: widget.isViewingOtherAccount,
+            profileUserId: widget.profileUserId,
+            repository: _repository,
+            onEditWish: _handleEditWish,
+          )
         else
           const _GiftersGrid(),
       ],
@@ -934,37 +1045,84 @@ class _WishlistSubtabButton extends StatelessWidget {
 
 class _WishesGrid extends StatelessWidget {
   final bool isViewingOtherAccount;
+  final String? profileUserId;
+  final ProfileTabsRepository repository;
+  final ValueChanged<_WishlistItem> onEditWish;
 
-  const _WishesGrid({required this.isViewingOtherAccount});
+  const _WishesGrid({
+    required this.isViewingOtherAccount,
+    required this.profileUserId,
+    required this.repository,
+    required this.onEditWish,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 20.0;
-        final maxWidth = constraints.maxWidth;
-        final columns = maxWidth >= 1560
-            ? 4
-            : maxWidth >= 1160
-            ? 3
-            : maxWidth >= 760
-            ? 2
-            : 1;
-        final cardWidth = (maxWidth - (spacing * (columns - 1))) / columns;
+    final userId = profileUserId?.trim();
+    if (userId == null || userId.isEmpty) {
+      return const _EmptyProfileTab(
+        title: 'Wishlist',
+        message: 'Sign in to load wishlist items.',
+      );
+    }
 
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final item in _wishlistItems)
-              SizedBox(
-                width: cardWidth,
-                child: _WishCard(
-                  item: item,
-                  isViewingOtherAccount: isViewingOtherAccount,
-                ),
-              ),
-          ],
+    return StreamBuilder<List<ProfileWishlistItem>>(
+      stream: repository.watchWishlist(userId),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const _EmptyProfileTab(
+            title: 'Wishlist',
+            message: 'Could not load wishlist data right now.',
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const _ProfileTabLoading();
+        }
+
+        final items = (snapshot.data ?? const <ProfileWishlistItem>[])
+            .map(_WishlistItem.fromProfileWishlistItem)
+            .toList();
+
+        if (items.isEmpty) {
+          return const _EmptyProfileTab(
+            title: 'Wishlist',
+            message: 'No wishes posted yet.',
+          );
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 20.0;
+            final maxWidth = constraints.maxWidth;
+            final columns = maxWidth >= 1560
+                ? 4
+                : maxWidth >= 1160
+                ? 3
+                : maxWidth >= 760
+                ? 2
+                : 1;
+            final cardWidth = (maxWidth - (spacing * (columns - 1))) / columns;
+
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (final item in items)
+                  SizedBox(
+                    width: cardWidth,
+                    child: _WishCard(
+                      item: item,
+                      isViewingOtherAccount: isViewingOtherAccount,
+                      onEdit: isViewingOtherAccount
+                          ? null
+                          : () => onEditWish(item),
+                    ),
+                  ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1116,20 +1274,63 @@ class _GifterAvatar extends StatelessWidget {
   }
 }
 
-Future<void> _showAddWishDialog(BuildContext context) {
-  return showDialog<void>(
+Future<_WishDraft?> _showAddWishDialog(BuildContext context) {
+  return showDialog<_WishDraft>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.62),
     builder: (context) => const _AddWishDialog(),
   );
 }
 
-Future<void> _showEditWishDialog(BuildContext context, _WishlistItem item) {
-  return showDialog<void>(
+Future<_WishDraft?> _showEditWishDialog(
+  BuildContext context,
+  _WishlistItem item,
+) {
+  return showDialog<_WishDraft>(
     context: context,
     barrierColor: Colors.black.withValues(alpha: 0.62),
     builder: (context) => _EditWishDialog(item: item),
   );
+}
+
+void _showProfileDataUnavailable(BuildContext context) {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        'Profile is not ready for editing yet.',
+        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+      ),
+      backgroundColor: const Color(0xFFAD2E2E),
+    ),
+  );
+}
+
+void _showProfileActionError(BuildContext context, String message) {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        message,
+        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+      ),
+      backgroundColor: const Color(0xFFAD2E2E),
+    ),
+  );
+}
+
+class _WishDraft {
+  final String title;
+  final String subtitle;
+  final int price;
+  final bool highlighted;
+
+  const _WishDraft({
+    required this.title,
+    required this.subtitle,
+    required this.price,
+    required this.highlighted,
+  });
 }
 
 Future<void> _showSubscribeDialog(BuildContext context) {
@@ -1801,6 +2002,31 @@ class _AddWishDialogState extends State<_AddWishDialog> {
   final _descriptionController = TextEditingController();
   bool _highlight = false;
 
+  _WishDraft? _buildDraft() {
+    final title = _wishNameController.text.trim();
+    final subtitle = _descriptionController.text.trim();
+    final normalizedPrice = _priceController.text.replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
+    final parsedPrice = int.tryParse(normalizedPrice);
+
+    if (title.isEmpty || parsedPrice == null || parsedPrice <= 0) {
+      _showProfileActionError(
+        context,
+        'Enter a title and a valid price to save this wish.',
+      );
+      return null;
+    }
+
+    return _WishDraft(
+      title: title,
+      subtitle: subtitle,
+      price: parsedPrice,
+      highlighted: _highlight,
+    );
+  }
+
   @override
   void dispose() {
     _wishNameController.dispose();
@@ -1957,7 +2183,13 @@ class _AddWishDialogState extends State<_AddWishDialog> {
                   SizedBox(
                     height: 44,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () {
+                        final draft = _buildDraft();
+                        if (draft == null) {
+                          return;
+                        }
+                        Navigator.of(context).pop(draft);
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2F81EE),
                         foregroundColor: Colors.white,
@@ -2023,6 +2255,7 @@ class _EditWishDialogState extends State<_EditWishDialog> {
     _wishNameController = TextEditingController(text: widget.item.title);
     _priceController = TextEditingController(text: '${widget.item.price}');
     _descriptionController = TextEditingController(text: widget.item.subtitle);
+    _highlight = widget.item.highlighted;
   }
 
   @override
@@ -2031,6 +2264,31 @@ class _EditWishDialogState extends State<_EditWishDialog> {
     _priceController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  _WishDraft? _buildDraft() {
+    final title = _wishNameController.text.trim();
+    final subtitle = _descriptionController.text.trim();
+    final normalizedPrice = _priceController.text.replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
+    final parsedPrice = int.tryParse(normalizedPrice);
+
+    if (title.isEmpty || parsedPrice == null || parsedPrice <= 0) {
+      _showProfileActionError(
+        context,
+        'Enter a title and a valid price to save this wish.',
+      );
+      return null;
+    }
+
+    return _WishDraft(
+      title: title,
+      subtitle: subtitle,
+      price: parsedPrice,
+      highlighted: _highlight,
+    );
   }
 
   InputDecoration _fieldDecoration({String? hintText}) {
@@ -2080,6 +2338,7 @@ class _EditWishDialogState extends State<_EditWishDialog> {
                         _DialogImageAsset(
                           compact: compact,
                           asset: widget.item.imageAsset,
+                          imageUrl: widget.item.imageUrl,
                         ),
                         const SizedBox(height: 14),
                         _DialogWishInputs(
@@ -2096,6 +2355,7 @@ class _EditWishDialogState extends State<_EditWishDialog> {
                         _DialogImageAsset(
                           compact: compact,
                           asset: widget.item.imageAsset,
+                          imageUrl: widget.item.imageUrl,
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -2187,7 +2447,13 @@ class _EditWishDialogState extends State<_EditWishDialog> {
                   SizedBox(
                     height: 44,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () {
+                        final draft = _buildDraft();
+                        if (draft == null) {
+                          return;
+                        }
+                        Navigator.of(context).pop(draft);
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2F81EE),
                         foregroundColor: Colors.white,
@@ -2259,8 +2525,13 @@ class _DialogImagePlaceholder extends StatelessWidget {
 class _DialogImageAsset extends StatelessWidget {
   final bool compact;
   final String asset;
+  final String? imageUrl;
 
-  const _DialogImageAsset({required this.compact, required this.asset});
+  const _DialogImageAsset({
+    required this.compact,
+    required this.asset,
+    this.imageUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2269,16 +2540,212 @@ class _DialogImageAsset extends StatelessWidget {
       height: compact ? 180 : 236,
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(2)),
       clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        asset,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => Container(
-          color: const Color(0xFF9E9E9E),
-          alignment: Alignment.center,
-          child: Icon(
-            Icons.image_not_supported_outlined,
-            color: Colors.white.withValues(alpha: 0.85),
-            size: compact ? 38 : 46,
+      child: imageUrl != null && imageUrl!.isNotEmpty
+          ? Image.network(
+              imageUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Container(
+                color: const Color(0xFF9E9E9E),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.image_not_supported_outlined,
+                  color: Colors.white.withValues(alpha: 0.85),
+                  size: compact ? 38 : 46,
+                ),
+              ),
+            )
+          : Image.asset(
+              asset,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Container(
+                color: const Color(0xFF9E9E9E),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.image_not_supported_outlined,
+                  color: Colors.white.withValues(alpha: 0.85),
+                  size: compact ? 38 : 46,
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+class _ProfileTabLoading extends StatelessWidget {
+  const _ProfileTabLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 140),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFF060E2A),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: const SizedBox(
+        width: 32,
+        height: 32,
+        child: CircularProgressIndicator(strokeWidth: 2.6),
+      ),
+    );
+  }
+}
+
+class _GalleryPostDraft {
+  final String? imageUrl;
+  final String? imageAsset;
+  final bool isPrivate;
+
+  const _GalleryPostDraft({
+    required this.imageUrl,
+    required this.imageAsset,
+    required this.isPrivate,
+  });
+}
+
+Future<_GalleryPostDraft?> _showAddGalleryPostDialog(BuildContext context) {
+  return showDialog<_GalleryPostDraft>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.62),
+    builder: (context) => const _AddGalleryPostDialog(),
+  );
+}
+
+class _AddGalleryPostDialog extends StatefulWidget {
+  const _AddGalleryPostDialog();
+
+  @override
+  State<_AddGalleryPostDialog> createState() => _AddGalleryPostDialogState();
+}
+
+class _AddGalleryPostDialogState extends State<_AddGalleryPostDialog> {
+  final TextEditingController _imageUrlController = TextEditingController();
+  final TextEditingController _imageAssetController = TextEditingController(
+    text: 'assets/pp6.png',
+  );
+  bool _isPrivate = false;
+
+  @override
+  void dispose() {
+    _imageUrlController.dispose();
+    _imageAssetController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF0A1435),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Add Gallery Post',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _imageUrlController,
+                decoration: InputDecoration(
+                  labelText: 'Image URL (optional)',
+                  labelStyle: GoogleFonts.poppins(color: Colors.white70),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _imageAssetController,
+                decoration: InputDecoration(
+                  labelText: 'Fallback asset path',
+                  labelStyle: GoogleFonts.poppins(color: Colors.white70),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                value: _isPrivate,
+                onChanged: (value) => setState(() => _isPrivate = value),
+                activeThumbColor: const Color(0xFF56D97A),
+                title: Text(
+                  'Private post (subscribers)',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final imageUrl = _imageUrlController.text.trim();
+                      final imageAsset = _imageAssetController.text.trim();
+                      if (imageUrl.isEmpty && imageAsset.isEmpty) {
+                        _showProfileActionError(
+                          context,
+                          'Add an image URL or fallback asset path.',
+                        );
+                        return;
+                      }
+                      Navigator.of(context).pop(
+                        _GalleryPostDraft(
+                          imageUrl: imageUrl.isEmpty ? null : imageUrl,
+                          imageAsset: imageAsset.isEmpty ? null : imageAsset,
+                          isPrivate: _isPrivate,
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF56D97A),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(
+                      'Save',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -2362,8 +2829,13 @@ class _DialogWishInputs extends StatelessWidget {
 class _WishCard extends StatelessWidget {
   final _WishlistItem item;
   final bool isViewingOtherAccount;
+  final VoidCallback? onEdit;
 
-  const _WishCard({required this.item, required this.isViewingOtherAccount});
+  const _WishCard({
+    required this.item,
+    required this.isViewingOtherAccount,
+    this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2381,20 +2853,51 @@ class _WishCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
               child: AspectRatio(
                 aspectRatio: 1.95,
-                child: Image.asset(
-                  item.imageAsset,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    color: const Color(0xFFD0D0D0),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.image_not_supported_outlined,
-                      color: Color(0xFF6A6A6A),
-                    ),
+                child: item.imageUrl != null && item.imageUrl!.isNotEmpty
+                    ? Image.network(
+                        item.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          color: const Color(0xFFD0D0D0),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Color(0xFF6A6A6A),
+                          ),
+                        ),
+                      )
+                    : Image.asset(
+                        item.imageAsset,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          color: const Color(0xFFD0D0D0),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Color(0xFF6A6A6A),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            if (item.highlighted) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E5BBB),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  'Highlighted',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
                   ),
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: 12),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2480,7 +2983,7 @@ class _WishCard extends StatelessWidget {
                   children: [
                     if (!isViewingOtherAccount) ...[
                       IconButton(
-                        onPressed: () => _showEditWishDialog(context, item),
+                        onPressed: onEdit,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(
                           minWidth: 24,
@@ -2531,8 +3034,66 @@ class _WishCard extends StatelessWidget {
 
 class _GalleryTabContent extends StatelessWidget {
   final bool isViewingOtherAccount;
+  final String? profileUserId;
+  final ProfileTabsRepository _repository = ProfileTabsRepository();
 
-  const _GalleryTabContent({required this.isViewingOtherAccount});
+  _GalleryTabContent({
+    required this.isViewingOtherAccount,
+    required this.profileUserId,
+  });
+
+  Future<void> _handleAddGalleryPost(BuildContext context) async {
+    final userId = profileUserId?.trim();
+    if (userId == null || userId.isEmpty) {
+      _showProfileDataUnavailable(context);
+      return;
+    }
+
+    final draft = await _showAddGalleryPostDialog(context);
+    if (!context.mounted) {
+      return;
+    }
+    if (draft == null) {
+      return;
+    }
+
+    try {
+      await _repository.createGalleryPost(
+        userId,
+        ProfileGalleryItem(
+          id: '',
+          imageAsset: draft.imageAsset ?? 'assets/pp6.png',
+          imageUrl: draft.imageUrl,
+          isPrivate: draft.isPrivate,
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      _showProfileActionError(context, 'Failed to add gallery post.');
+    }
+  }
+
+  Future<void> _handleDeleteGalleryPost(
+    BuildContext context,
+    String postId,
+  ) async {
+    final userId = profileUserId?.trim();
+    if (userId == null || userId.isEmpty) {
+      _showProfileDataUnavailable(context);
+      return;
+    }
+
+    try {
+      await _repository.deleteGalleryPost(userId, postId);
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      _showProfileActionError(context, 'Failed to remove gallery post.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2542,14 +3103,19 @@ class _GalleryTabContent extends StatelessWidget {
         if (isViewingOtherAccount) ...[
           const _GalleryLockedHeader(),
           const SizedBox(height: 26),
-          const _LockedGalleryGrid(),
+          _GalleryGrid(
+            showDeleteBadge: false,
+            includePrivate: false,
+            profileUserId: profileUserId,
+            repository: _repository,
+          ),
         ] else ...[
           Align(
             alignment: Alignment.centerRight,
             child: SizedBox(
               height: 30,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () => _handleAddGalleryPost(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF56D97A),
                   foregroundColor: Colors.white,
@@ -2571,7 +3137,13 @@ class _GalleryTabContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          _GalleryGrid(showDeleteBadge: true),
+          _GalleryGrid(
+            showDeleteBadge: true,
+            includePrivate: true,
+            profileUserId: profileUserId,
+            repository: _repository,
+            onDelete: (itemId) => _handleDeleteGalleryPost(context, itemId),
+          ),
         ],
       ],
     );
@@ -2635,121 +3207,87 @@ class _GalleryLockedHeader extends StatelessWidget {
   }
 }
 
-class _LockedGalleryGrid extends StatelessWidget {
-  const _LockedGalleryGrid();
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 22.0;
-        final maxWidth = constraints.maxWidth;
-        final columns = maxWidth >= 1240
-            ? 4
-            : maxWidth >= 940
-            ? 3
-            : maxWidth >= 620
-            ? 2
-            : 1;
-        final cardWidth = (maxWidth - (spacing * (columns - 1))) / columns;
-
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final card in _lockedGalleryCards)
-              SizedBox(
-                width: cardWidth,
-                child: _LockedGalleryCard(card: card),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _LockedGalleryCard extends StatelessWidget {
-  final _LockedGalleryCardStyle card;
-
-  const _LockedGalleryCard({required this.card});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: AspectRatio(
-          aspectRatio: 0.77,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: card.begin,
-                    end: card.end,
-                    colors: card.colors,
-                  ),
-                ),
-              ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.45),
-                ),
-              ),
-              Center(
-                child: Icon(
-                  Icons.lock_rounded,
-                  color: const Color(0xFF53D978),
-                  size: 34,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _GalleryGrid extends StatelessWidget {
   final bool showDeleteBadge;
+  final bool includePrivate;
+  final String? profileUserId;
+  final ProfileTabsRepository repository;
+  final ValueChanged<String>? onDelete;
 
-  const _GalleryGrid({required this.showDeleteBadge});
+  const _GalleryGrid({
+    required this.showDeleteBadge,
+    required this.includePrivate,
+    required this.profileUserId,
+    required this.repository,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 22.0;
-        final maxWidth = constraints.maxWidth;
-        final columns = maxWidth >= 1240
-            ? 4
-            : maxWidth >= 940
-            ? 3
-            : maxWidth >= 620
-            ? 2
-            : 1;
-        final cardWidth = (maxWidth - (spacing * (columns - 1))) / columns;
+    final userId = profileUserId?.trim();
+    if (userId == null || userId.isEmpty) {
+      return const _EmptyProfileTab(
+        title: 'Gallery',
+        message: 'Profile gallery is not available.',
+      );
+    }
 
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final item in _galleryItems)
-              SizedBox(
-                width: cardWidth,
-                child: _GalleryCard(
-                  item: item,
-                  showDeleteBadge: showDeleteBadge,
-                ),
-              ),
-          ],
+    return StreamBuilder<List<ProfileGalleryItem>>(
+      stream: repository.watchGallery(userId, includePrivate: includePrivate),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const _EmptyProfileTab(
+            title: 'Gallery',
+            message: 'Could not load gallery right now.',
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const _ProfileTabLoading();
+        }
+
+        final items = (snapshot.data ?? const <ProfileGalleryItem>[])
+            .map(_GalleryItem.fromProfileGalleryItem)
+            .toList();
+        if (items.isEmpty) {
+          return const _EmptyProfileTab(
+            title: 'Gallery',
+            message: 'No gallery posts yet.',
+          );
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 22.0;
+            final maxWidth = constraints.maxWidth;
+            final columns = maxWidth >= 1240
+                ? 4
+                : maxWidth >= 940
+                ? 3
+                : maxWidth >= 620
+                ? 2
+                : 1;
+            final cardWidth = (maxWidth - (spacing * (columns - 1))) / columns;
+
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (final item in items)
+                  SizedBox(
+                    width: cardWidth,
+                    child: _GalleryCard(
+                      item: item,
+                      showDeleteBadge: showDeleteBadge,
+                      onDelete: item.id == null
+                          ? null
+                          : () => onDelete?.call(item.id!),
+                    ),
+                  ),
+              ],
+            );
+          },
         );
       },
     );
@@ -2759,8 +3297,13 @@ class _GalleryGrid extends StatelessWidget {
 class _GalleryCard extends StatelessWidget {
   final _GalleryItem item;
   final bool showDeleteBadge;
+  final VoidCallback? onDelete;
 
-  const _GalleryCard({required this.item, required this.showDeleteBadge});
+  const _GalleryCard({
+    required this.item,
+    required this.showDeleteBadge,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2780,17 +3323,29 @@ class _GalleryCard extends StatelessWidget {
               const DecoratedBox(
                 decoration: BoxDecoration(color: Color(0xFF0A1536)),
               ),
-              Image.asset(
-                item.imageAsset,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Center(
-                  child: Icon(
-                    Icons.image_not_supported_outlined,
-                    color: Colors.white.withValues(alpha: 0.6),
-                    size: 34,
-                  ),
-                ),
-              ),
+              item.imageUrl != null && item.imageUrl!.isNotEmpty
+                  ? Image.network(
+                      item.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Center(
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          color: Colors.white.withValues(alpha: 0.6),
+                          size: 34,
+                        ),
+                      ),
+                    )
+                  : Image.asset(
+                      item.imageAsset,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Center(
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          color: Colors.white.withValues(alpha: 0.6),
+                          size: 34,
+                        ),
+                      ),
+                    ),
               if (item.overlayAsset != null) ...[
                 Positioned.fill(
                   child: IgnorePointer(
@@ -2827,24 +3382,31 @@ class _GalleryCard extends StatelessWidget {
                 Positioned(
                   right: 4,
                   bottom: 4,
-                  child: Container(
-                    width: 13,
-                    height: 13,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE01E2F),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onDelete,
                       borderRadius: BorderRadius.circular(2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          blurRadius: 3,
-                          offset: const Offset(0, 1),
+                      child: Container(
+                        width: 13,
+                        height: 13,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE01E2F),
+                          borderRadius: BorderRadius.circular(2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              blurRadius: 3,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.delete_outline_rounded,
-                      color: Colors.white,
-                      size: 9,
+                        child: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Colors.white,
+                          size: 9,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -2854,6 +3416,428 @@ class _GalleryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PostsTabContent extends StatelessWidget {
+  final bool isViewingOtherAccount;
+  final String? profileUserId;
+  final ProfileTabsRepository _repository = ProfileTabsRepository();
+
+  _PostsTabContent({
+    required this.isViewingOtherAccount,
+    required this.profileUserId,
+  });
+
+  Future<void> _handleCreatePost(BuildContext context) async {
+    final userId = profileUserId?.trim();
+    if (userId == null || userId.isEmpty) {
+      _showProfileDataUnavailable(context);
+      return;
+    }
+
+    final draft = await _showCreatePostDialog(context);
+    if (!context.mounted) {
+      return;
+    }
+    if (draft == null) {
+      return;
+    }
+
+    try {
+      await _repository.createPost(
+        userId,
+        ProfilePostEntry(
+          id: '',
+          text: draft.text,
+          imageUrl: draft.imageUrl,
+          imageAsset: draft.imageAsset,
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      _showProfileActionError(context, 'Failed to publish post.');
+    }
+  }
+
+  Future<void> _handleDeletePost(BuildContext context, String postId) async {
+    final userId = profileUserId?.trim();
+    if (userId == null || userId.isEmpty) {
+      _showProfileDataUnavailable(context);
+      return;
+    }
+
+    try {
+      await _repository.deletePost(userId, postId);
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      _showProfileActionError(context, 'Failed to remove post.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userId = profileUserId?.trim();
+    if (userId == null || userId.isEmpty) {
+      return const _EmptyProfileTab(
+        title: 'Posts',
+        message: 'Profile posts are not available.',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!isViewingOtherAccount)
+          Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              height: 36,
+              child: ElevatedButton(
+                onPressed: () => _handleCreatePost(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF56D97A),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+                child: Text(
+                  'Create Post',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (!isViewingOtherAccount) const SizedBox(height: 12),
+        StreamBuilder<List<ProfilePostEntry>>(
+          stream: _repository.watchPosts(userId),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const _EmptyProfileTab(
+                title: 'Posts',
+                message: 'Could not load posts right now.',
+              );
+            }
+
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const _ProfileTabLoading();
+            }
+
+            final posts = snapshot.data ?? const <ProfilePostEntry>[];
+            if (posts.isEmpty) {
+              return const _EmptyProfileTab(
+                title: 'Posts',
+                message: 'No posts yet.',
+              );
+            }
+
+            return Column(
+              children: [
+                for (final post in posts) ...[
+                  _PostCard(
+                    post: post,
+                    onDelete: isViewingOtherAccount
+                        ? null
+                        : () => _handleDeletePost(context, post.id),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _PostCard extends StatelessWidget {
+  final ProfilePostEntry post;
+  final VoidCallback? onDelete;
+
+  const _PostCard({required this.post, this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF060E2A),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _formatPostDate(post.createdAt),
+                  style: GoogleFonts.poppins(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              if (onDelete != null)
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFE05161),
+                  ),
+                  splashRadius: 20,
+                ),
+            ],
+          ),
+          if (post.text.trim().isNotEmpty)
+            Text(
+              post.text,
+              style: GoogleFonts.poppins(
+                color: Colors.white.withValues(alpha: 0.92),
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+          if (post.text.trim().isNotEmpty) const SizedBox(height: 10),
+          if ((post.imageUrl?.isNotEmpty ?? false) ||
+              (post.imageAsset?.isNotEmpty ?? false))
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: (post.imageUrl?.isNotEmpty ?? false)
+                    ? Image.network(
+                        post.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _postImageFallback(),
+                      )
+                    : Image.asset(
+                        post.imageAsset!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _postImageFallback(),
+                      ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _postImageFallback() {
+    return Container(
+      color: const Color(0xFF17254F),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.image_not_supported_outlined,
+        color: Colors.white54,
+      ),
+    );
+  }
+}
+
+class _CreatePostDraft {
+  final String text;
+  final String? imageUrl;
+  final String? imageAsset;
+
+  const _CreatePostDraft({required this.text, this.imageUrl, this.imageAsset});
+}
+
+Future<_CreatePostDraft?> _showCreatePostDialog(BuildContext context) {
+  return showDialog<_CreatePostDraft>(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.62),
+    builder: (context) => const _CreatePostDialog(),
+  );
+}
+
+class _CreatePostDialog extends StatefulWidget {
+  const _CreatePostDialog();
+
+  @override
+  State<_CreatePostDialog> createState() => _CreatePostDialogState();
+}
+
+class _CreatePostDialogState extends State<_CreatePostDialog> {
+  final TextEditingController _textController = TextEditingController();
+  final TextEditingController _imageUrlController = TextEditingController();
+  final TextEditingController _imageAssetController = TextEditingController();
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    _imageUrlController.dispose();
+    _imageAssetController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF0A1435),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 540),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Create Post',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _textController,
+                minLines: 2,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  labelText: 'Post text',
+                  labelStyle: GoogleFonts.poppins(color: Colors.white70),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _imageUrlController,
+                decoration: InputDecoration(
+                  labelText: 'Image URL (optional)',
+                  labelStyle: GoogleFonts.poppins(color: Colors.white70),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _imageAssetController,
+                decoration: InputDecoration(
+                  labelText: 'Fallback asset path (optional)',
+                  labelStyle: GoogleFonts.poppins(color: Colors.white70),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final text = _textController.text.trim();
+                      final imageUrl = _imageUrlController.text.trim();
+                      final imageAsset = _imageAssetController.text.trim();
+                      if (text.isEmpty &&
+                          imageUrl.isEmpty &&
+                          imageAsset.isEmpty) {
+                        _showProfileActionError(
+                          context,
+                          'Post text or image is required.',
+                        );
+                        return;
+                      }
+
+                      Navigator.of(context).pop(
+                        _CreatePostDraft(
+                          text: text,
+                          imageUrl: imageUrl.isEmpty ? null : imageUrl,
+                          imageAsset: imageAsset.isEmpty ? null : imageAsset,
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF56D97A),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(
+                      'Publish',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatPostDate(DateTime? value) {
+  if (value == null) {
+    return 'Just now';
+  }
+  final local = value.toLocal();
+  final month = _monthLabel(local.month);
+  return '$month ${local.day}, ${local.year}';
+}
+
+String _monthLabel(int month) {
+  const labels = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  if (month < 1 || month > 12) {
+    return 'Jan';
+  }
+  return labels[month - 1];
 }
 
 class _EmptyProfileTab extends StatelessWidget {
@@ -2898,10 +3882,54 @@ class _EmptyProfileTab extends StatelessWidget {
 }
 
 class _ServicesMenuPanel extends StatelessWidget {
-  const _ServicesMenuPanel();
+  final String? profileUserId;
+  final ProfileTabsRepository _repository = ProfileTabsRepository();
+
+  _ServicesMenuPanel({required this.profileUserId});
 
   @override
   Widget build(BuildContext context) {
+    final userId = profileUserId?.trim();
+
+    Widget servicesList(List<_ServiceItem> items) {
+      return Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF060E2B),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        ),
+        child: Column(
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              _ServiceTile(item: items[i]),
+              if (i < items.length - 1)
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Colors.white.withValues(alpha: 0.1),
+                ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    Widget content;
+    if (userId == null || userId.isEmpty) {
+      content = servicesList(_services);
+    } else {
+      content = StreamBuilder<List<ProfileServiceItem>>(
+        stream: _repository.watchServices(userId),
+        builder: (context, snapshot) {
+          final backendItems = (snapshot.data ?? const <ProfileServiceItem>[])
+              .map(_ServiceItem.fromProfileServiceItem)
+              .toList();
+          final resolved = backendItems.isEmpty ? _services : backendItems;
+          return servicesList(resolved);
+        },
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0x120A1A45),
@@ -2922,26 +3950,7 @@ class _ServicesMenuPanel extends StatelessWidget {
               ),
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF060E2B),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-            ),
-            child: Column(
-              children: [
-                for (var i = 0; i < _services.length; i++) ...[
-                  _ServiceTile(item: _services[i]),
-                  if (i < _services.length - 1)
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      color: Colors.white.withValues(alpha: 0.1),
-                    ),
-                ],
-              ],
-            ),
-          ),
+          content,
         ],
       ),
     );
@@ -3007,10 +4016,48 @@ class _ServiceTile extends StatelessWidget {
 }
 
 class _ServiceDetailsCard extends StatelessWidget {
-  const _ServiceDetailsCard();
+  final String? profileUserId;
+  final ProfileTabsRepository _repository = ProfileTabsRepository();
+
+  _ServiceDetailsCard({required this.profileUserId});
 
   @override
   Widget build(BuildContext context) {
+    final userId = profileUserId?.trim();
+    if (userId == null || userId.isEmpty) {
+      final defaultService = _services.firstWhere(
+        (item) => item.selected,
+        orElse: () => _services.first,
+      );
+      return _buildCard(defaultService, defaultService.options);
+    }
+
+    return StreamBuilder<List<ProfileServiceItem>>(
+      stream: _repository.watchServices(userId),
+      builder: (context, snapshot) {
+        final backendItems = (snapshot.data ?? const <ProfileServiceItem>[])
+            .map(_ServiceItem.fromProfileServiceItem)
+            .toList();
+        final resolvedItems = backendItems.isEmpty ? _services : backendItems;
+        final selectedService = resolvedItems.firstWhere(
+          (item) => item.selected,
+          orElse: () => resolvedItems.first,
+        );
+        return _buildCard(selectedService, selectedService.options);
+      },
+    );
+  }
+
+  Widget _buildCard(
+    _ServiceItem selectedService,
+    List<_ServiceOption> options,
+  ) {
+    final resolvedDescription = selectedService.description.trim().isEmpty
+        ? 'If you are looking for a chill and open-minded talking companion, '
+              'I am your girl. I am always ready to hear your stories and share mine too.'
+        : selectedService.description;
+    final resolvedOptions = options.isEmpty ? _options : options;
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF060E2A),
@@ -3030,7 +4077,7 @@ class _ServiceDetailsCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Echat',
+                        selectedService.title,
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
@@ -3040,7 +4087,8 @@ class _ServiceDetailsCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        '4 Served - 100% Rating',
+                        '${selectedService.servedCount} Served - '
+                        '${selectedService.ratingPercent}% Rating',
                         style: GoogleFonts.poppins(
                           color: Colors.white.withValues(alpha: 0.78),
                           fontWeight: FontWeight.w500,
@@ -3077,27 +4125,24 @@ class _ServiceDetailsCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: AspectRatio(
                 aspectRatio: 16 / 6,
-                child: Image.asset(
-                  'assets/login.png',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    color: const Color(0xFF1A274D),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.image_outlined,
-                      color: Colors.white54,
-                      size: 40,
-                    ),
-                  ),
-                ),
+                child: selectedService.bannerImageUrl != null
+                    ? Image.network(
+                        selectedService.bannerImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _serviceImageFallback(),
+                      )
+                    : Image.asset(
+                        selectedService.bannerImageAsset,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _serviceImageFallback(),
+                      ),
               ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Text(
-              'If you are looking for a chill and open-minded talking companion, '
-              'I am your girl. I am always ready to hear your stories and share mine too.',
+              resolvedDescription,
               style: GoogleFonts.poppins(
                 color: Colors.white.withValues(alpha: 0.9),
                 fontWeight: FontWeight.w500,
@@ -3110,15 +4155,23 @@ class _ServiceDetailsCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
             child: Column(
               children: [
-                for (var i = 0; i < _options.length; i++) ...[
-                  _OptionTile(item: _options[i]),
-                  if (i < _options.length - 1) const SizedBox(height: 8),
+                for (var i = 0; i < resolvedOptions.length; i++) ...[
+                  _OptionTile(item: resolvedOptions[i]),
+                  if (i < resolvedOptions.length - 1) const SizedBox(height: 8),
                 ],
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _serviceImageFallback() {
+    return Container(
+      color: const Color(0xFF1A274D),
+      alignment: Alignment.center,
+      child: const Icon(Icons.image_outlined, color: Colors.white54, size: 40),
     );
   }
 }
@@ -3180,10 +4233,39 @@ class _OptionTile extends StatelessWidget {
 }
 
 class _ReviewsCard extends StatelessWidget {
-  const _ReviewsCard();
+  final String? profileUserId;
+  final ProfileTabsRepository _repository = ProfileTabsRepository();
+
+  _ReviewsCard({required this.profileUserId});
 
   @override
   Widget build(BuildContext context) {
+    final userId = profileUserId?.trim();
+    if (userId == null || userId.isEmpty) {
+      return _buildCard(_reviews);
+    }
+
+    return StreamBuilder<List<ProfileReviewEntry>>(
+      stream: _repository.watchReviews(userId),
+      builder: (context, snapshot) {
+        final backendReviews = (snapshot.data ?? const <ProfileReviewEntry>[])
+            .map(_ReviewEntry.fromProfileReviewEntry)
+            .toList();
+        final resolved = backendReviews.isEmpty ? _reviews : backendReviews;
+        return _buildCard(resolved);
+      },
+    );
+  }
+
+  Widget _buildCard(List<_ReviewEntry> entries) {
+    final totalReviews = entries.length;
+    final averageRating = entries.isEmpty
+        ? 0
+        : entries
+                  .map((entry) => entry.rating)
+                  .reduce((value, element) => value + element) /
+              entries.length;
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF060E2A),
@@ -3199,7 +4281,7 @@ class _ReviewsCard extends StatelessWidget {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: 'Reviews 4',
+                    text: 'Reviews $totalReviews',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -3207,7 +4289,7 @@ class _ReviewsCard extends StatelessWidget {
                     ),
                   ),
                   TextSpan(
-                    text: '  -  5.0 Rating',
+                    text: '  -  ${averageRating.toStringAsFixed(1)} Rating',
                     style: GoogleFonts.poppins(
                       color: Colors.white.withValues(alpha: 0.88),
                       fontWeight: FontWeight.w600,
@@ -3218,9 +4300,9 @@ class _ReviewsCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            for (var i = 0; i < _reviews.length; i++) ...[
-              _ReviewTile(entry: _reviews[i]),
-              if (i < _reviews.length - 1) const SizedBox(height: 14),
+            for (var i = 0; i < entries.length; i++) ...[
+              _ReviewTile(entry: entries[i]),
+              if (i < entries.length - 1) const SizedBox(height: 14),
             ],
             const SizedBox(height: 10),
             Align(
@@ -3292,19 +4374,17 @@ class _ReviewTile extends StatelessWidget {
             border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
           ),
           child: ClipOval(
-            child: Image.asset(
-              entry.avatar,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Container(
-                color: const Color(0xFF1E2E5A),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: Colors.white70,
-                  size: 18,
-                ),
-              ),
-            ),
+            child: entry.avatarUrl != null && entry.avatarUrl!.isNotEmpty
+                ? Image.network(
+                    entry.avatarUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => _reviewAvatarFallback(),
+                  )
+                : Image.asset(
+                    entry.avatarAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => _reviewAvatarFallback(),
+                  ),
           ),
         ),
         const SizedBox(width: 10),
@@ -3322,7 +4402,7 @@ class _ReviewTile extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                '5.0  ${entry.title}',
+                '${entry.rating.toStringAsFixed(1)}  ${entry.title}',
                 style: GoogleFonts.poppins(
                   color: const Color(0xFF9BEA64),
                   fontWeight: FontWeight.w600,
@@ -3343,6 +4423,14 @@ class _ReviewTile extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _reviewAvatarFallback() {
+    return Container(
+      color: const Color(0xFF1E2E5A),
+      alignment: Alignment.center,
+      child: const Icon(Icons.person_rounded, color: Colors.white70, size: 18),
     );
   }
 }
@@ -3488,9 +4576,9 @@ class _RightRail extends StatelessWidget {
   }
 }
 
-bool _isViewingOtherAccount(String? routeUserId) {
-  final targetId = _resolveTargetUserId(routeUserId);
-  if (targetId == null) {
+bool _isViewingOtherAccount(String? targetUserId) {
+  final normalizedTarget = targetUserId?.trim();
+  if (normalizedTarget == null || normalizedTarget.isEmpty) {
     return false;
   }
 
@@ -3504,7 +4592,25 @@ bool _isViewingOtherAccount(String? routeUserId) {
     return true;
   }
 
-  return targetId != currentId;
+  return normalizedTarget != currentId;
+}
+
+String? _resolveProfileUserId(String? raw) {
+  final routeId = _resolveTargetUserId(raw);
+  if (routeId != null) {
+    return routeId;
+  }
+
+  if (!Get.isRegistered<AuthController>()) {
+    return null;
+  }
+
+  final auth = Get.find<AuthController>();
+  final currentId = auth.userId.trim();
+  if (currentId.isEmpty || currentId == 'U-00000') {
+    return null;
+  }
+  return currentId;
 }
 
 String? _resolveTargetUserId(String? raw) {
@@ -3528,10 +4634,9 @@ String _resolveUserName(String? raw) {
   }
 
   if (Get.isRegistered<AuthController>()) {
-    final auth = Get.find<AuthController>();
-    final preferred = auth.userName.trim();
-    if (preferred.isNotEmpty && preferred != 'User') {
-      return preferred;
+    final name = Get.find<AuthController>().userName.trim();
+    if (name.isNotEmpty && name != 'User') {
+      return name;
     }
   }
 
@@ -3546,6 +4651,12 @@ class _ServiceItem {
   final Color iconBackground;
   final Color iconColor;
   final bool selected;
+  final int servedCount;
+  final int ratingPercent;
+  final String description;
+  final String bannerImageAsset;
+  final String? bannerImageUrl;
+  final List<_ServiceOption> options;
 
   const _ServiceItem({
     required this.title,
@@ -3555,7 +4666,34 @@ class _ServiceItem {
     required this.iconBackground,
     required this.iconColor,
     this.selected = false,
+    this.servedCount = 0,
+    this.ratingPercent = 0,
+    this.description = '',
+    this.bannerImageAsset = 'assets/login.png',
+    this.bannerImageUrl,
+    this.options = const <_ServiceOption>[],
   });
+
+  factory _ServiceItem.fromProfileServiceItem(ProfileServiceItem item) {
+    final parsedOptions = item.options
+        .map(_ServiceOption.fromProfileServiceOption)
+        .toList();
+    return _ServiceItem(
+      title: item.title,
+      price: item.price,
+      unit: item.unit,
+      icon: _iconFromKey(item.iconKey),
+      iconBackground: Color(item.iconBackgroundColor),
+      iconColor: Color(item.iconColor),
+      selected: item.selected,
+      servedCount: item.servedCount,
+      ratingPercent: item.ratingPercent,
+      description: item.description,
+      bannerImageAsset: item.bannerImageAsset,
+      bannerImageUrl: item.bannerImageUrl,
+      options: parsedOptions.isEmpty ? _options : parsedOptions,
+    );
+  }
 }
 
 class _ServiceOption {
@@ -3568,6 +4706,40 @@ class _ServiceOption {
     required this.price,
     required this.unit,
   });
+
+  factory _ServiceOption.fromProfileServiceOption(ProfileServiceOption option) {
+    return _ServiceOption(
+      label: option.label,
+      price: option.price,
+      unit: option.unit,
+    );
+  }
+}
+
+IconData _iconFromKey(String key) {
+  switch (key.trim().toLowerCase()) {
+    case 'chat':
+    case 'chat_rounded':
+      return Icons.chat_rounded;
+    case 'shield':
+    case 'shield_moon':
+      return Icons.shield_moon_rounded;
+    case 'gift':
+    case 'redeem':
+      return Icons.redeem_rounded;
+    case 'triangle':
+    case 'change_history':
+      return Icons.change_history_rounded;
+    case 'game':
+    case 'sports_esports':
+      return Icons.sports_esports_rounded;
+    case 'magic':
+    case 'sparkles':
+    case 'tarot':
+      return Icons.auto_awesome_rounded;
+    default:
+      return Icons.miscellaneous_services_rounded;
+  }
 }
 
 class _ReviewEntry {
@@ -3575,55 +4747,95 @@ class _ReviewEntry {
   final String date;
   final String title;
   final String text;
-  final String avatar;
+  final double rating;
+  final String avatarAsset;
+  final String? avatarUrl;
 
   const _ReviewEntry({
     required this.name,
     required this.date,
     required this.title,
     required this.text,
-    required this.avatar,
+    this.rating = 5,
+    this.avatarAsset = 'assets/pp6.png',
+    this.avatarUrl,
   });
+
+  factory _ReviewEntry.fromProfileReviewEntry(ProfileReviewEntry entry) {
+    return _ReviewEntry(
+      name: entry.name,
+      date: _formatPostDate(entry.createdAt),
+      title: entry.title,
+      text: entry.text,
+      rating: entry.rating,
+      avatarAsset: entry.avatarAsset,
+      avatarUrl: entry.avatarUrl,
+    );
+  }
 }
 
 class _WishlistItem {
+  final String? id;
   final String title;
   final String subtitle;
   final int price;
   final double progress;
   final String imageAsset;
+  final String? imageUrl;
+  final bool highlighted;
 
   const _WishlistItem({
+    this.id,
     required this.title,
     required this.subtitle,
     required this.price,
     required this.progress,
     required this.imageAsset,
+    this.imageUrl,
+    this.highlighted = false,
   });
+
+  factory _WishlistItem.fromProfileWishlistItem(ProfileWishlistItem item) {
+    return _WishlistItem(
+      id: item.id,
+      title: item.title,
+      subtitle: item.subtitle,
+      price: item.price,
+      progress: item.progress,
+      imageAsset: item.imageAsset,
+      imageUrl: item.imageUrl,
+      highlighted: item.highlighted,
+    );
+  }
 }
 
 class _GalleryItem {
+  final String? id;
   final String imageAsset;
+  final String? imageUrl;
   final String? overlayAsset;
   final double overlayWidthFactor;
+  final bool isPrivate;
 
   const _GalleryItem({
+    this.id,
     required this.imageAsset,
+    this.imageUrl,
     this.overlayAsset,
     this.overlayWidthFactor = 0.42,
+    this.isPrivate = false,
   });
-}
 
-class _LockedGalleryCardStyle {
-  final List<Color> colors;
-  final Alignment begin;
-  final Alignment end;
-
-  const _LockedGalleryCardStyle({
-    required this.colors,
-    this.begin = Alignment.topLeft,
-    this.end = Alignment.bottomRight,
-  });
+  factory _GalleryItem.fromProfileGalleryItem(ProfileGalleryItem item) {
+    return _GalleryItem(
+      id: item.id,
+      imageAsset: item.imageAsset,
+      imageUrl: item.imageUrl,
+      overlayAsset: item.overlayAsset,
+      overlayWidthFactor: item.overlayWidthFactor,
+      isPrivate: item.isPrivate,
+    );
+  }
 }
 
 class _SubscriptionPlan {
@@ -3664,74 +4876,6 @@ class _GifterEntry {
     this.avatarIconColor = Colors.white,
   });
 }
-
-const _wishlistItems = <_WishlistItem>[
-  _WishlistItem(
-    title: 'New Pc',
-    subtitle: 'Need a new setup asap!! help me :3',
-    price: 4000,
-    progress: 0.0,
-    imageAsset: 'assets/login.png',
-  ),
-  _WishlistItem(
-    title: 'Logitech G502 X Plus',
-    subtitle: 'Lightspeed wireless RGB gaming mouse.',
-    price: 130,
-    progress: 0.9,
-    imageAsset: 'assets/weekly_mvp.png',
-  ),
-  _WishlistItem(
-    title: 'Clothing',
-    subtitle: 'Get me goth clothing!!',
-    price: 50,
-    progress: 0.0,
-    imageAsset: 'assets/influencer_program.png',
-  ),
-  _WishlistItem(
-    title: 'New Keyboard <3',
-    subtitle: 'Logitech G Pro',
-    price: 150,
-    progress: 1.0,
-    imageAsset: 'assets/leaderboard_wallpaper.png',
-  ),
-  _WishlistItem(
-    title: 'My fav perfume',
-    subtitle: 'Smells amazing and lasts all day.',
-    price: 70,
-    progress: 0.4,
-    imageAsset: 'assets/struggling_to_get_clients.png',
-  ),
-];
-
-const _galleryItems = <_GalleryItem>[
-  _GalleryItem(imageAsset: 'assets/pp6.png'),
-  _GalleryItem(imageAsset: 'assets/all_services/cs_go.png'),
-  _GalleryItem(
-    imageAsset: 'assets/weekly_mvp.png',
-    overlayAsset: 'assets/bunny1.png',
-    overlayWidthFactor: 0.44,
-  ),
-  _GalleryItem(imageAsset: 'assets/pp6.png'),
-];
-
-const _lockedGalleryCards = <_LockedGalleryCardStyle>[
-  _LockedGalleryCardStyle(
-    colors: [Color(0xFFA68E80), Color(0xFF8D6D62), Color(0xFF70534D)],
-  ),
-  _LockedGalleryCardStyle(
-    colors: [Color(0xFF242A3A), Color(0xFF4D545F), Color(0xFF9A9DA6)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomLeft,
-  ),
-  _LockedGalleryCardStyle(
-    colors: [Color(0xFF6B3A3E), Color(0xFF6D5A73), Color(0xFFA1872B)],
-  ),
-  _LockedGalleryCardStyle(
-    colors: [Color(0xFFA29486), Color(0xFF7E685E), Color(0xFF9E8D83)],
-    begin: Alignment.topRight,
-    end: Alignment.bottomLeft,
-  ),
-];
 
 const _subscriptionPlans = <_SubscriptionPlan>[
   _SubscriptionPlan(
@@ -3802,6 +4946,13 @@ const _services = <_ServiceItem>[
     iconBackground: Color(0xFF5A90F8),
     iconColor: Color(0xFF06163A),
     selected: true,
+    servedCount: 4,
+    ratingPercent: 100,
+    description:
+        'If you are looking for a chill and open-minded talking companion, '
+        'I am your girl. I am always ready to hear your stories and share mine too.',
+    bannerImageAsset: 'assets/login.png',
+    options: _options,
   ),
   _ServiceItem(
     title: 'League Of Legends',
@@ -3858,7 +5009,7 @@ const _reviews = <_ReviewEntry>[
     title: 'Great Service',
     text:
         'Very friendly and calm. Conversation flowed naturally and felt easy.',
-    avatar: 'assets/pp7.png',
+    avatarAsset: 'assets/pp7.png',
   ),
   _ReviewEntry(
     name: 'kr****ny',
@@ -3866,7 +5017,7 @@ const _reviews = <_ReviewEntry>[
     title: 'Amazing order',
     text:
         'She had a very nice conversation and definitely made my time worth it.',
-    avatar: 'assets/pp1.png',
+    avatarAsset: 'assets/pp1.png',
   ),
   _ReviewEntry(
     name: 'kr****ny',
@@ -3874,13 +5025,13 @@ const _reviews = <_ReviewEntry>[
     title: 'Fun session',
     text:
         'I was new to buddy chats, but this session was fun and very welcoming.',
-    avatar: 'assets/pp2.png',
+    avatarAsset: 'assets/pp2.png',
   ),
   _ReviewEntry(
     name: 'So*****s',
     date: 'Jan 23rd, 2024',
     title: 'Was good',
     text: 'Solid experience overall and quick response time.',
-    avatar: 'assets/pp5.png',
+    avatarAsset: 'assets/pp5.png',
   ),
 ];

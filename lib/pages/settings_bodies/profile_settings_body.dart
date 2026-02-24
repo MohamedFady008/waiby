@@ -1,7 +1,13 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/models/user_profile.dart';
+import '../../data/repositories/user_profile_repository.dart';
 import '../../services/frame_store_service.dart';
 import '../../widgets/user_avatar_with_frame.dart';
 import '../../widgets/settings_sidebar.dart';
@@ -16,6 +22,23 @@ const List<String> _tabs = <String>[
   'IM Settings',
 ];
 
+const Map<String, bool> _defaultNotificationSettings = <String, bool>{
+  'push_enabled': false,
+  'email_enabled': false,
+  'buddy_recommendations': false,
+  'sound_new_message': true,
+  'sound_order': true,
+  'sound_incoming_call': false,
+};
+
+const Map<String, bool> _defaultPrivacySettings = <String, bool>{
+  'incognito_browsing': false,
+  'hide_activity_interactions': false,
+  'hide_leaderboard_identity': true,
+  'disable_profile_suggestions': true,
+  'direct_message_restricted': false,
+};
+
 class ProfileSettingsBody extends StatefulWidget {
   final SettingsSidebarMenuEntry entry;
 
@@ -26,72 +49,510 @@ class ProfileSettingsBody extends StatefulWidget {
 }
 
 class _ProfileSettingsBodyState extends State<ProfileSettingsBody> {
-  int _selected = 0;
-  String _selectedLanguage = 'English';
+  final UserProfileRepository _userProfileRepository = UserProfileRepository();
 
-  Widget _currentView() {
+  int _selected = 0;
+  String? _languageOverride;
+  String? _lastUserId;
+
+  final Map<String, bool> _notificationOverrides = <String, bool>{};
+  final Map<String, bool> _privacyOverrides = <String, bool>{};
+
+  bool _isSavingProfile = false;
+  bool _isSendingPasswordReset = false;
+  bool _isDeletingAccount = false;
+
+  Widget _currentView({
+    required User user,
+    required UserProfile? profile,
+    required _ProfileSettingsData settings,
+  }) {
+    final notifications = Map<String, bool>.from(settings.notifications)
+      ..addAll(_notificationOverrides);
+    final privacy = Map<String, bool>.from(settings.privacy)
+      ..addAll(_privacyOverrides);
+    final selectedLanguage = _languageOverride ?? settings.preferredLanguage;
+
     switch (_selected) {
       case 0:
-        return const _MyProfileTab();
+        return _MyProfileTab(
+          settings: settings,
+          sendingResetPassword: _isSendingPasswordReset,
+          deletingAccount: _isDeletingAccount,
+          onEditProfile: () => setState(() => _selected = 1),
+          onResetPassword: () => unawaited(_sendPasswordResetEmail(user)),
+          onDeleteAccount: () => unawaited(_deleteAccount(user)),
+        );
       case 1:
-        return const _EditProfileTab();
+        return _EditProfileTab(
+          settings: settings,
+          saving: _isSavingProfile,
+          onSave: (update) =>
+              _saveProfileEdits(user: user, profile: profile, update: update),
+        );
       case 2:
-        return const _NotificationsTab();
+        return _NotificationsTab(
+          values: notifications,
+          onToggle: (key, value) => unawaited(
+            _updateNotificationSetting(
+              user: user,
+              profile: profile,
+              key: key,
+              value: value,
+            ),
+          ),
+        );
       case 3:
-        return const _PrivacyTab();
+        return _PrivacyTab(
+          values: privacy,
+          onToggle: (key, value) => unawaited(
+            _updatePrivacySetting(
+              user: user,
+              profile: profile,
+              key: key,
+              value: value,
+            ),
+          ),
+        );
       case 4:
         return _LanguageTab(
-          selectedLanguage: _selectedLanguage,
-          onSelectLanguage: (language) =>
-              setState(() => _selectedLanguage = language),
+          selectedLanguage: selectedLanguage,
+          onSelectLanguage: (language) {
+            final previousLanguage = selectedLanguage;
+            setState(() => _languageOverride = language);
+            unawaited(
+              _updatePreferredLanguage(
+                user: user,
+                profile: profile,
+                language: language,
+                previousLanguage: previousLanguage,
+              ),
+            );
+          },
         );
       case 5:
-        return const _ReferralsTab();
+        return _ReferralsTab(
+          referralLink: settings.referralLink,
+          onCopyReferralLink: () => _copyReferralLink(settings.referralLink),
+        );
       default:
         return _PlaceholderTab(title: _tabs[_selected]);
     }
   }
 
+  Future<void> _saveProfileEdits({
+    required User user,
+    required UserProfile? profile,
+    required _EditProfileUpdate update,
+  }) async {
+    if (_isSavingProfile) {
+      return;
+    }
+    if (update.displayName.trim().isEmpty) {
+      _showProfileSettingsSnackBar(context, 'Display name is required.');
+      return;
+    }
+
+    setState(() => _isSavingProfile = true);
+    try {
+      final metadata = _buildMergedMetadata(
+        profile,
+        profileUrlSlug: update.profileUrlSlug,
+        gender: update.gender,
+        languages: update.languages,
+        preferredLanguage: update.preferredLanguage,
+      );
+
+      await _userProfileRepository.updateFields(user.uid, <String, dynamic>{
+        'full_name': update.displayName.trim(),
+        'metadata': metadata,
+      });
+
+      if (!mounted) {
+        return;
+      }
+      _showProfileSettingsSnackBar(
+        context,
+        'Profile settings saved.',
+        isError: false,
+      );
+      setState(() {
+        _languageOverride = update.preferredLanguage;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showProfileSettingsSnackBar(
+        context,
+        'Could not save profile settings right now.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingProfile = false);
+      }
+    }
+  }
+
+  Future<void> _updateNotificationSetting({
+    required User user,
+    required UserProfile? profile,
+    required String key,
+    required bool value,
+  }) async {
+    final previous = _notificationOverrides[key];
+    setState(() => _notificationOverrides[key] = value);
+
+    try {
+      final settings = _ProfileSettingsData.fromSources(
+        user: user,
+        profile: profile,
+      );
+      final merged = Map<String, bool>.from(settings.notifications)
+        ..addAll(_notificationOverrides)
+        ..[key] = value;
+      final metadata = _buildMergedMetadata(profile, notifications: merged);
+      await _userProfileRepository.updateFields(user.uid, <String, dynamic>{
+        'metadata': metadata,
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        if (previous == null) {
+          _notificationOverrides.remove(key);
+        } else {
+          _notificationOverrides[key] = previous;
+        }
+      });
+      _showProfileSettingsSnackBar(
+        context,
+        'Could not update notification setting.',
+      );
+    }
+  }
+
+  Future<void> _updatePrivacySetting({
+    required User user,
+    required UserProfile? profile,
+    required String key,
+    required bool value,
+  }) async {
+    final previous = _privacyOverrides[key];
+    setState(() => _privacyOverrides[key] = value);
+
+    try {
+      final settings = _ProfileSettingsData.fromSources(
+        user: user,
+        profile: profile,
+      );
+      final merged = Map<String, bool>.from(settings.privacy)
+        ..addAll(_privacyOverrides)
+        ..[key] = value;
+      final metadata = _buildMergedMetadata(profile, privacy: merged);
+      await _userProfileRepository.updateFields(user.uid, <String, dynamic>{
+        'metadata': metadata,
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        if (previous == null) {
+          _privacyOverrides.remove(key);
+        } else {
+          _privacyOverrides[key] = previous;
+        }
+      });
+      _showProfileSettingsSnackBar(
+        context,
+        'Could not update privacy setting.',
+      );
+    }
+  }
+
+  Future<void> _updatePreferredLanguage({
+    required User user,
+    required UserProfile? profile,
+    required String language,
+    required String previousLanguage,
+  }) async {
+    try {
+      final metadata = _buildMergedMetadata(
+        profile,
+        preferredLanguage: language,
+      );
+      await _userProfileRepository.updateFields(user.uid, <String, dynamic>{
+        'metadata': metadata,
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _languageOverride = previousLanguage);
+      _showProfileSettingsSnackBar(context, 'Could not update language.');
+    }
+  }
+
+  Future<void> _copyReferralLink(String link) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: link));
+      if (!mounted) {
+        return;
+      }
+      _showProfileSettingsSnackBar(
+        context,
+        'Referral link copied.',
+        isError: false,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showProfileSettingsSnackBar(context, 'Could not copy referral link.');
+    }
+  }
+
+  Future<void> _sendPasswordResetEmail(User user) async {
+    if (_isSendingPasswordReset) {
+      return;
+    }
+    final email = user.email?.trim();
+    if (email == null || email.isEmpty) {
+      _showProfileSettingsSnackBar(
+        context,
+        'No email is linked to this account.',
+      );
+      return;
+    }
+
+    setState(() => _isSendingPasswordReset = true);
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (!mounted) {
+        return;
+      }
+      _showProfileSettingsSnackBar(
+        context,
+        'Password reset email sent to $email.',
+        isError: false,
+      );
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showProfileSettingsSnackBar(
+        context,
+        error.message ?? 'Could not send password reset email.',
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showProfileSettingsSnackBar(
+        context,
+        'Could not send password reset email right now.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingPasswordReset = false);
+      }
+    }
+  }
+
+  Future<void> _deleteAccount(User user) async {
+    if (_isDeletingAccount) {
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF111827),
+        title: Text(
+          'Delete account?',
+          style: GoogleFonts.notoSans(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'This action is permanent and cannot be undone.',
+          style: GoogleFonts.notoSans(
+            color: Colors.white.withValues(alpha: 0.85),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.notoSans(color: Colors.white70),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.notoSans(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
+    setState(() => _isDeletingAccount = true);
+    try {
+      await _userProfileRepository.deleteById(user.uid);
+      await user.delete();
+
+      if (!mounted) {
+        return;
+      }
+      _showProfileSettingsSnackBar(context, 'Account deleted.', isError: false);
+      context.go('/signup');
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final message = error.code == 'requires-recent-login'
+          ? 'Re-authenticate, then try deleting your account again.'
+          : (error.message ?? 'Could not delete account right now.');
+      _showProfileSettingsSnackBar(context, message);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showProfileSettingsSnackBar(context, 'Could not delete account.');
+    } finally {
+      if (mounted) {
+        setState(() => _isDeletingAccount = false);
+      }
+    }
+  }
+
+  Map<String, dynamic> _buildMergedMetadata(
+    UserProfile? profile, {
+    String? profileUrlSlug,
+    String? gender,
+    List<String>? languages,
+    String? preferredLanguage,
+    Map<String, bool>? notifications,
+    Map<String, bool>? privacy,
+  }) {
+    final metadata = Map<String, dynamic>.from(
+      profile?.metadata ?? const <String, dynamic>{},
+    );
+
+    if (profileUrlSlug != null) {
+      metadata['profile_url_slug'] = _sanitizeProfileSlug(profileUrlSlug);
+    }
+    if (gender != null) {
+      metadata['gender'] = gender.trim();
+    }
+    if (languages != null) {
+      metadata['languages'] = languages;
+    }
+    if (preferredLanguage != null) {
+      metadata['preferred_language'] = preferredLanguage.trim();
+    }
+    if (notifications != null) {
+      metadata['notifications'] = notifications;
+    }
+    if (privacy != null) {
+      metadata['privacy'] = privacy;
+    }
+
+    return metadata;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1650),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final stacked = constraints.maxWidth < 1220;
-            final left = Column(
-              children: [
-                _SidebarCard(
-                  tabs: _tabs,
-                  selected: _selected,
-                  onTap: (i) => setState(() => _selected = i),
-                ),
-                if (_selected == 1) ...[
-                  const SizedBox(height: 26),
-                  const _PromoCard(),
-                ],
-              ],
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      initialData: FirebaseAuth.instance.currentUser,
+      builder: (context, authSnapshot) {
+        final user = authSnapshot.data;
+        if (user == null) {
+          _lastUserId = null;
+          _notificationOverrides.clear();
+          _privacyOverrides.clear();
+          _languageOverride = null;
+          return const _SignedOutProfileSettingsHint();
+        }
+
+        if (_lastUserId != user.uid) {
+          _lastUserId = user.uid;
+          _notificationOverrides.clear();
+          _privacyOverrides.clear();
+          _languageOverride = null;
+        }
+
+        return StreamBuilder<UserProfile?>(
+          stream: _userProfileRepository.watchById(user.uid),
+          builder: (context, profileSnapshot) {
+            final profile = profileSnapshot.data;
+            final settings = _ProfileSettingsData.fromSources(
+              user: user,
+              profile: profile,
             );
 
-            if (stacked) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [left, const SizedBox(height: 20), _currentView()],
-              );
-            }
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1650),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stacked = constraints.maxWidth < 1220;
+                    final left = Column(
+                      children: [
+                        _SidebarCard(
+                          tabs: _tabs,
+                          selected: _selected,
+                          onTap: (i) => setState(() => _selected = i),
+                        ),
+                        if (_selected == 1) ...[
+                          const SizedBox(height: 26),
+                          const _PromoCard(),
+                        ],
+                      ],
+                    );
 
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(width: 420, child: left),
-                const SizedBox(width: 44),
-                Expanded(child: _currentView()),
-              ],
+                    final view = _currentView(
+                      user: user,
+                      profile: profile,
+                      settings: settings,
+                    );
+
+                    if (stacked) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [left, const SizedBox(height: 20), view],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(width: 420, child: left),
+                        const SizedBox(width: 44),
+                        Expanded(child: view),
+                      ],
+                    );
+                  },
+                ),
+              ),
             );
           },
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -273,7 +734,21 @@ class _HeroCard extends StatelessWidget {
 }
 
 class _MyProfileTab extends StatelessWidget {
-  const _MyProfileTab();
+  final _ProfileSettingsData settings;
+  final VoidCallback onEditProfile;
+  final VoidCallback onResetPassword;
+  final VoidCallback onDeleteAccount;
+  final bool sendingResetPassword;
+  final bool deletingAccount;
+
+  const _MyProfileTab({
+    required this.settings,
+    required this.onEditProfile,
+    required this.onResetPassword,
+    required this.onDeleteAccount,
+    required this.sendingResetPassword,
+    required this.deletingAccount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -291,33 +766,47 @@ class _MyProfileTab extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _HeroCard(
-            title: 'LaKimi',
-            trailing: _Btn.blue('Edit Profile'),
-            body: const Column(
+            title: settings.displayName,
+            trailing: _Btn.blue('Edit Profile', onPressed: onEditProfile),
+            body: Column(
               children: [
-                _Line('NAME', 'Lakimi'),
-                SizedBox(height: 14),
-                _Line('EMAIL', '************@gmail.com', reveal: true),
-                SizedBox(height: 14),
+                _Line('NAME', settings.displayName),
+                const SizedBox(height: 14),
+                _Line('EMAIL', settings.maskedEmail, reveal: true),
+                const SizedBox(height: 14),
                 _Line(
                   'PHONE NUMBER',
-                  '*********8182',
+                  settings.maskedPhoneNumber,
                   reveal: true,
-                  delete: true,
+                  delete: settings.phoneNumber.trim().isNotEmpty,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 26),
-          _section('Password and Authentication', 'Change Password'),
+          _section(
+            'Password and Authentication',
+            sendingResetPassword ? 'Sending...' : 'Change Password',
+            onPressed: sendingResetPassword ? null : onResetPassword,
+          ),
           const SizedBox(height: 18),
-          _section('Account Removal', 'Delete Account', red: true),
+          _section(
+            'Account Removal',
+            deletingAccount ? 'Deleting...' : 'Delete Account',
+            red: true,
+            onPressed: deletingAccount ? null : onDeleteAccount,
+          ),
         ],
       ),
     );
   }
 
-  Widget _section(String title, String action, {bool red = false}) {
+  Widget _section(
+    String title,
+    String action, {
+    bool red = false,
+    VoidCallback? onPressed,
+  }) {
     return Builder(
       builder: (context) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,7 +820,9 @@ class _MyProfileTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          red ? _Btn.red(action) : _Btn.blue(action),
+          red
+              ? _Btn.red(action, onPressed: onPressed)
+              : _Btn.blue(action, onPressed: onPressed),
         ],
       ),
     );
@@ -339,7 +830,15 @@ class _MyProfileTab extends StatelessWidget {
 }
 
 class _EditProfileTab extends StatefulWidget {
-  const _EditProfileTab();
+  final _ProfileSettingsData settings;
+  final bool saving;
+  final Future<void> Function(_EditProfileUpdate update) onSave;
+
+  const _EditProfileTab({
+    required this.settings,
+    required this.saving,
+    required this.onSave,
+  });
 
   @override
   State<_EditProfileTab> createState() => _EditProfileTabState();
@@ -347,7 +846,71 @@ class _EditProfileTab extends StatefulWidget {
 
 class _EditProfileTabState extends State<_EditProfileTab> {
   final FrameStoreService _frameStoreService = FrameStoreService();
+  late final TextEditingController _displayNameController;
+  late final TextEditingController _profileUrlController;
+  late final TextEditingController _genderController;
+  late final TextEditingController _languagesController;
+
   bool _removingFrame = false;
+  bool _didEdit = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayNameController = TextEditingController(
+      text: widget.settings.displayName,
+    );
+    _profileUrlController = TextEditingController(
+      text: widget.settings.profileUrlSlug,
+    );
+    _genderController = TextEditingController(text: widget.settings.gender);
+    _languagesController = TextEditingController(
+      text: widget.settings.languages.join(', '),
+    );
+    _displayNameController.addListener(_markEdited);
+    _profileUrlController.addListener(_markEdited);
+    _genderController.addListener(_markEdited);
+    _languagesController.addListener(_markEdited);
+  }
+
+  @override
+  void didUpdateWidget(covariant _EditProfileTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_didEdit) {
+      return;
+    }
+
+    if (oldWidget.settings.displayName != widget.settings.displayName) {
+      _displayNameController.text = widget.settings.displayName;
+    }
+    if (oldWidget.settings.profileUrlSlug != widget.settings.profileUrlSlug) {
+      _profileUrlController.text = widget.settings.profileUrlSlug;
+    }
+    if (oldWidget.settings.gender != widget.settings.gender) {
+      _genderController.text = widget.settings.gender;
+    }
+    final oldLanguages = oldWidget.settings.languages.join(', ');
+    final newLanguages = widget.settings.languages.join(', ');
+    if (oldLanguages != newLanguages) {
+      _languagesController.text = newLanguages;
+    }
+  }
+
+  @override
+  void dispose() {
+    _displayNameController.dispose();
+    _profileUrlController.dispose();
+    _genderController.dispose();
+    _languagesController.dispose();
+    super.dispose();
+  }
+
+  void _markEdited() {
+    if (_didEdit) {
+      return;
+    }
+    setState(() => _didEdit = true);
+  }
 
   Future<void> _removeFrame() async {
     if (_removingFrame) {
@@ -393,11 +956,101 @@ class _EditProfileTabState extends State<_EditProfileTab> {
     }
   }
 
+  Future<void> _handleSave() async {
+    final displayName = _displayNameController.text.trim();
+    final slug = _sanitizeProfileSlug(_profileUrlController.text);
+    final gender = _genderController.text.trim();
+    final languages = _languagesController.text
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+
+    if (displayName.isEmpty) {
+      _showProfileSettingsSnackBar(context, 'Display name is required.');
+      return;
+    }
+
+    await widget.onSave(
+      _EditProfileUpdate(
+        displayName: displayName,
+        profileUrlSlug: slug,
+        gender: gender,
+        languages: languages,
+        preferredLanguage: widget.settings.preferredLanguage,
+      ),
+    );
+    if (mounted) {
+      setState(() => _didEdit = false);
+    }
+  }
+
+  Widget _editableField({
+    required String label,
+    required TextEditingController controller,
+    String? hint,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 130,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              label,
+              style: GoogleFonts.notoSans(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        ),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            style: GoogleFonts.notoSans(
+              color: Colors.white.withValues(alpha: 0.86),
+              fontSize: 11,
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: GoogleFonts.notoSans(
+                color: Colors.white.withValues(alpha: 0.42),
+                fontSize: 10,
+              ),
+              isDense: true,
+              filled: true,
+              fillColor: Colors.black.withValues(alpha: 0.11),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.21),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.21),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: const BorderSide(color: Color(0xFF2F88FF)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return _Panel(
       child: _HeroCard(
-        title: 'LaKimi',
+        title: widget.settings.displayName,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -412,17 +1065,38 @@ class _EditProfileTabState extends State<_EditProfileTab> {
             ),
           ],
         ),
-        body: const Column(
+        body: Column(
           children: [
-            _EditRow('Display Name', 'LaKimi'),
-            SizedBox(height: 10),
-            _EditRow('Profile URL', 'Waiby.gg/LaKimi'),
-            SizedBox(height: 10),
-            _EditRow('Gender', 'Choose your gender'),
-            SizedBox(height: 10),
-            _EditRow('Languages', 'Choose your languages'),
-            SizedBox(height: 14),
-            Align(alignment: Alignment.centerRight, child: _Btn.blue('Save')),
+            _editableField(
+              label: 'Display Name',
+              controller: _displayNameController,
+            ),
+            const SizedBox(height: 10),
+            _editableField(
+              label: 'Profile URL',
+              controller: _profileUrlController,
+              hint: 'waiby.gg/your-handle',
+            ),
+            const SizedBox(height: 10),
+            _editableField(
+              label: 'Gender',
+              controller: _genderController,
+              hint: 'Choose your gender',
+            ),
+            const SizedBox(height: 10),
+            _editableField(
+              label: 'Languages',
+              controller: _languagesController,
+              hint: 'English, Spanish',
+            ),
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _Btn.blue(
+                widget.saving ? 'Saving...' : 'Save',
+                onPressed: widget.saving ? null : _handleSave,
+              ),
+            ),
           ],
         ),
       ),
@@ -431,43 +1105,64 @@ class _EditProfileTabState extends State<_EditProfileTab> {
 }
 
 class _NotificationsTab extends StatelessWidget {
-  const _NotificationsTab();
+  final Map<String, bool> values;
+  final void Function(String key, bool value) onToggle;
+
+  const _NotificationsTab({required this.values, required this.onToggle});
 
   @override
   Widget build(BuildContext context) {
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           _Banner(
             title: 'Enable push notifications',
             subtitle: 'Never miss an update with real-time alerts',
             action: 'Enable',
+            onAction: () => onToggle('push_enabled', true),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           _RowItem(
             title: 'Enable email notifications',
             subtitle:
                 'Get notified about orders, platform news, major updates, and special promotions.',
-            on: false,
+            on: values['email_enabled'] ?? false,
+            onChanged: (value) => onToggle('email_enabled', value),
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           _RowItem(
             title: 'Buddy Recommendations',
             subtitle:
                 'Receive creator recommendations selected by the platform.',
-            on: false,
+            on: values['buddy_recommendations'] ?? false,
+            onChanged: (value) => onToggle('buddy_recommendations', value),
           ),
-          SizedBox(height: 18),
-          _Divider(),
-          SizedBox(height: 18),
-          _RowItem(title: 'Sounds', subtitle: '', header: true),
-          SizedBox(height: 10),
-          _RowItem(title: 'New Message', subtitle: '', on: true),
-          SizedBox(height: 10),
-          _RowItem(title: 'Order', subtitle: '', on: true),
-          SizedBox(height: 10),
-          _RowItem(title: 'Incoming Call ring', subtitle: '', on: false),
+          const SizedBox(height: 18),
+          const _Divider(),
+          const SizedBox(height: 18),
+          const _RowItem(title: 'Sounds', subtitle: '', header: true),
+          const SizedBox(height: 10),
+          _RowItem(
+            title: 'New Message',
+            subtitle: '',
+            on: values['sound_new_message'] ?? true,
+            onChanged: (value) => onToggle('sound_new_message', value),
+          ),
+          const SizedBox(height: 10),
+          _RowItem(
+            title: 'Order',
+            subtitle: '',
+            on: values['sound_order'] ?? true,
+            onChanged: (value) => onToggle('sound_order', value),
+          ),
+          const SizedBox(height: 10),
+          _RowItem(
+            title: 'Incoming Call ring',
+            subtitle: '',
+            on: values['sound_incoming_call'] ?? false,
+            onChanged: (value) => onToggle('sound_incoming_call', value),
+          ),
         ],
       ),
     );
@@ -475,55 +1170,68 @@ class _NotificationsTab extends StatelessWidget {
 }
 
 class _PrivacyTab extends StatelessWidget {
-  const _PrivacyTab();
+  final Map<String, bool> values;
+  final void Function(String key, bool value) onToggle;
+
+  const _PrivacyTab({required this.values, required this.onToggle});
 
   @override
   Widget build(BuildContext context) {
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
+        children: [
           _RowItem(
             title: 'Incognito Browsing',
             subtitle: 'View profiles anonymously without notifying users',
-            on: false,
+            on: values['incognito_browsing'] ?? false,
             premium: true,
+            onChanged: (value) => onToggle('incognito_browsing', value),
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           _RowItem(
             title: 'Hide activity interactions',
             subtitle:
                 'Hide your Following, likes, and pet activity from other users.',
-            on: false,
+            on: values['hide_activity_interactions'] ?? false,
             premium: true,
+            onChanged: (value) => onToggle('hide_activity_interactions', value),
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           _RowItem(
             title: 'Hide identity on leaderboard',
             subtitle: 'Hide your avatar and nickname on leaderboards.',
-            on: true,
+            on: values['hide_leaderboard_identity'] ?? true,
+            onChanged: (value) => onToggle('hide_leaderboard_identity', value),
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           _RowItem(
             title: 'Disable profile suggestions',
             subtitle: 'Hide your profile from recommendations.',
-            on: true,
+            on: values['disable_profile_suggestions'] ?? true,
+            onChanged: (value) =>
+                onToggle('disable_profile_suggestions', value),
           ),
-          SizedBox(height: 18),
-          _Divider(),
-          SizedBox(height: 18),
-          _BlockedRow(),
-          SizedBox(height: 18),
-          _Divider(),
-          SizedBox(height: 18),
-          _RowItem(title: 'Social Permissions', subtitle: '', header: true),
-          SizedBox(height: 14),
+          const SizedBox(height: 18),
+          const _Divider(),
+          const SizedBox(height: 18),
+          const _BlockedRow(),
+          const SizedBox(height: 18),
+          const _Divider(),
+          const SizedBox(height: 18),
+          const _RowItem(
+            title: 'Social Permissions',
+            subtitle: '',
+            header: true,
+          ),
+          const SizedBox(height: 14),
           _RowItem(
             title: 'Direct Message',
             subtitle:
                 'Only allow messages after an order is placed or when you start the conversation',
-            on: false,
+            on: values['direct_message_restricted'] ?? false,
             premium: true,
+            onChanged: (value) => onToggle('direct_message_restricted', value),
           ),
         ],
       ),
@@ -741,7 +1449,13 @@ class _LanguageChip extends StatelessWidget {
 }
 
 class _ReferralsTab extends StatelessWidget {
-  const _ReferralsTab();
+  final String referralLink;
+  final VoidCallback onCopyReferralLink;
+
+  const _ReferralsTab({
+    required this.referralLink,
+    required this.onCopyReferralLink,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -830,20 +1544,23 @@ class _ReferralsTab extends StatelessWidget {
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 500;
               if (compact) {
-                return const Column(
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _ReferralLinkField(),
-                    SizedBox(height: 10),
-                    _CopyLinkButton(),
+                    _ReferralLinkField(link: referralLink),
+                    const SizedBox(height: 10),
+                    _CopyLinkButton(onPressed: onCopyReferralLink),
                   ],
                 );
               }
-              return const Row(
+              return Row(
                 children: [
-                  SizedBox(width: 360, child: _ReferralLinkField()),
-                  SizedBox(width: 10),
-                  _CopyLinkButton(),
+                  SizedBox(
+                    width: 360,
+                    child: _ReferralLinkField(link: referralLink),
+                  ),
+                  const SizedBox(width: 10),
+                  _CopyLinkButton(onPressed: onCopyReferralLink),
                 ],
               );
             },
@@ -1174,7 +1891,9 @@ class _SparkBars extends StatelessWidget {
 }
 
 class _ReferralLinkField extends StatelessWidget {
-  const _ReferralLinkField();
+  final String link;
+
+  const _ReferralLinkField({required this.link});
 
   @override
   Widget build(BuildContext context) {
@@ -1188,7 +1907,7 @@ class _ReferralLinkField extends StatelessWidget {
       ),
       alignment: Alignment.centerLeft,
       child: Text(
-        'https://Waiby.gg/?ref=lakimi',
+        link,
         style: GoogleFonts.notoSans(
           color: Colors.white.withValues(alpha: 0.9),
           fontWeight: FontWeight.w500,
@@ -1200,14 +1919,16 @@ class _ReferralLinkField extends StatelessWidget {
 }
 
 class _CopyLinkButton extends StatelessWidget {
-  const _CopyLinkButton();
+  final VoidCallback onPressed;
+
+  const _CopyLinkButton({required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 36,
       child: ElevatedButton.icon(
-        onPressed: () {},
+        onPressed: onPressed,
         icon: const Icon(Icons.copy_rounded, size: 14),
         label: Text(
           'Copy link',
@@ -1250,11 +1971,13 @@ class _Banner extends StatelessWidget {
   final String title;
   final String subtitle;
   final String action;
+  final VoidCallback? onAction;
 
   const _Banner({
     required this.title,
     required this.subtitle,
     required this.action,
+    this.onAction,
   });
 
   @override
@@ -1292,7 +2015,7 @@ class _Banner extends StatelessWidget {
               ],
             ),
           ),
-          _Btn.blue(action),
+          _Btn.blue(action, onPressed: onAction),
         ],
       ),
     );
@@ -1305,6 +2028,7 @@ class _RowItem extends StatelessWidget {
   final bool header;
   final bool premium;
   final bool? on;
+  final ValueChanged<bool>? onChanged;
 
   const _RowItem({
     required this.title,
@@ -1312,6 +2036,7 @@ class _RowItem extends StatelessWidget {
     this.header = false,
     this.premium = false,
     this.on,
+    this.onChanged,
   });
 
   @override
@@ -1365,7 +2090,7 @@ class _RowItem extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        _Toggle(on: on!),
+        _Toggle(on: on!, onChanged: onChanged),
       ],
     );
   }
@@ -1462,77 +2187,44 @@ class _Line extends StatelessWidget {
   }
 }
 
-class _EditRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _EditRow(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 130,
-          child: Text(
-            label,
-            style: GoogleFonts.notoSans(color: Colors.white, fontSize: 12),
-          ),
-        ),
-        Expanded(
-          child: Container(
-            height: 30,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            alignment: Alignment.centerLeft,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.11),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.21)),
-            ),
-            child: Text(
-              value,
-              style: GoogleFonts.notoSans(
-                color: Colors.white.withValues(alpha: 0.72),
-                fontSize: 10,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _Toggle extends StatelessWidget {
   final bool on;
+  final ValueChanged<bool>? onChanged;
 
-  const _Toggle({required this.on});
+  const _Toggle({required this.on, this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 33,
-      height: 13,
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        color: on ? const Color(0xFF51D76E) : const Color(0xFF303030),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onChanged == null ? null : () => onChanged!.call(!on),
         borderRadius: BorderRadius.circular(212),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.4),
-          width: 0.5,
-        ),
-      ),
-      child: Align(
-        alignment: on ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
-          width: 9,
-          height: 9,
+          width: 33,
+          height: 13,
+          padding: const EdgeInsets.symmetric(horizontal: 2),
           decoration: BoxDecoration(
-            color: const Color(0xFFECECEC),
-            shape: BoxShape.circle,
+            color: on ? const Color(0xFF51D76E) : const Color(0xFF303030),
+            borderRadius: BorderRadius.circular(212),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.4),
               width: 0.5,
+            ),
+          ),
+          child: Align(
+            alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: const Color(0xFFECECEC),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  width: 0.5,
+                ),
+              ),
             ),
           ),
         ),
@@ -1688,16 +2380,292 @@ class _PromoCard extends StatelessWidget {
                 child: Image.asset('assets/bunny1.png'),
               ),
             ),
-            const Positioned(
+            Positioned(
               right: 10,
               bottom: 8,
-              child: _Btn.blue('Open shop'),
+              child: _Btn.blue(
+                'Open shop',
+                onPressed: () => context.go('/settings?tab=store'),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+@immutable
+class _EditProfileUpdate {
+  final String displayName;
+  final String profileUrlSlug;
+  final String gender;
+  final List<String> languages;
+  final String preferredLanguage;
+
+  const _EditProfileUpdate({
+    required this.displayName,
+    required this.profileUrlSlug,
+    required this.gender,
+    required this.languages,
+    required this.preferredLanguage,
+  });
+}
+
+@immutable
+class _ProfileSettingsData {
+  final String displayName;
+  final String email;
+  final String phoneNumber;
+  final String profileUrlSlug;
+  final String gender;
+  final List<String> languages;
+  final String preferredLanguage;
+  final Map<String, bool> notifications;
+  final Map<String, bool> privacy;
+  final String referralCode;
+  final String referralLink;
+
+  const _ProfileSettingsData({
+    required this.displayName,
+    required this.email,
+    required this.phoneNumber,
+    required this.profileUrlSlug,
+    required this.gender,
+    required this.languages,
+    required this.preferredLanguage,
+    required this.notifications,
+    required this.privacy,
+    required this.referralCode,
+    required this.referralLink,
+  });
+
+  factory _ProfileSettingsData.fromSources({
+    required User user,
+    required UserProfile? profile,
+  }) {
+    final metadata = Map<String, dynamic>.from(
+      profile?.metadata ?? const <String, dynamic>{},
+    );
+
+    final displayName = _firstNonEmpty(<String?>[
+      profile?.fullName,
+      user.displayName,
+      user.email?.split('@').first,
+    ], fallback: 'User');
+    final email = _firstNonEmpty(<String?>[profile?.email, user.email]);
+    final phoneNumber = _firstNonEmpty(<String?>[
+      metadata['phone_number']?.toString(),
+      metadata['phone']?.toString(),
+      user.phoneNumber,
+    ]);
+    final profileSlug = _sanitizeProfileSlug(
+      _firstNonEmpty(<String?>[
+        metadata['profile_url_slug']?.toString(),
+        metadata['profile_slug']?.toString(),
+        displayName,
+      ], fallback: user.uid),
+    );
+    final gender = _firstNonEmpty(<String?>[
+      metadata['gender']?.toString(),
+    ], fallback: 'Choose your gender');
+
+    final rawLanguages = metadata['languages'];
+    final parsedLanguages = rawLanguages is Iterable
+        ? rawLanguages
+              .map((item) => item.toString().trim())
+              .where((item) => item.isNotEmpty)
+              .toList(growable: false)
+        : const <String>[];
+    final languages = parsedLanguages.isEmpty
+        ? const <String>['English']
+        : parsedLanguages;
+
+    final preferredLanguage = _firstNonEmpty(<String?>[
+      metadata['preferred_language']?.toString(),
+      if (languages.isNotEmpty) languages.first,
+    ], fallback: 'English');
+
+    final notifications = _extractBoolMap(
+      metadata['notifications'],
+      _defaultNotificationSettings,
+    );
+    final privacy = _extractBoolMap(
+      metadata['privacy'],
+      _defaultPrivacySettings,
+    );
+    final referralCode = _firstNonEmpty(
+      <String?>[metadata['referral_code']?.toString()],
+      fallback: user.uid.length > 8
+          ? user.uid.substring(0, 8).toLowerCase()
+          : user.uid.toLowerCase(),
+    );
+    final referralLink = 'https://waiby.gg/?ref=$referralCode';
+
+    return _ProfileSettingsData(
+      displayName: displayName,
+      email: email,
+      phoneNumber: phoneNumber,
+      profileUrlSlug: profileSlug,
+      gender: gender,
+      languages: languages,
+      preferredLanguage: preferredLanguage,
+      notifications: notifications,
+      privacy: privacy,
+      referralCode: referralCode,
+      referralLink: referralLink,
+    );
+  }
+
+  String get maskedEmail => _maskEmail(email);
+
+  String get maskedPhoneNumber =>
+      phoneNumber.trim().isEmpty ? 'Not added' : _maskPhone(phoneNumber);
+}
+
+class _SignedOutProfileSettingsHint extends StatelessWidget {
+  const _SignedOutProfileSettingsHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0x1AFFFFFF),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sign in to manage your profile settings',
+              style: GoogleFonts.notoSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Profile, privacy, language and notification preferences are account-based and synced from backend.',
+              style: GoogleFonts.notoSans(
+                color: Colors.white.withValues(alpha: 0.75),
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _Btn.blue('Go to login', onPressed: () => context.go('/login')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Map<String, bool> _extractBoolMap(dynamic raw, Map<String, bool> defaults) {
+  final result = Map<String, bool>.from(defaults);
+  if (raw is! Map) {
+    return result;
+  }
+
+  for (final entry in raw.entries) {
+    final key = entry.key.toString();
+    if (!result.containsKey(key)) {
+      continue;
+    }
+    result[key] = _toBool(entry.value, fallback: result[key] ?? false);
+  }
+  return result;
+}
+
+bool _toBool(dynamic value, {required bool fallback}) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  if (value is String) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+      return false;
+    }
+  }
+  return fallback;
+}
+
+String _firstNonEmpty(Iterable<String?> values, {String fallback = ''}) {
+  for (final candidate in values) {
+    final normalized = candidate?.trim();
+    if (normalized != null && normalized.isNotEmpty) {
+      return normalized;
+    }
+  }
+  return fallback;
+}
+
+String _sanitizeProfileSlug(String input) {
+  final trimmed = input.trim().toLowerCase();
+  final withoutProtocol = trimmed
+      .replaceFirst('https://', '')
+      .replaceFirst('http://', '')
+      .replaceFirst('waiby.gg/', '');
+  final afterSlash = withoutProtocol.contains('/')
+      ? withoutProtocol.split('/').last
+      : withoutProtocol;
+  final cleaned = afterSlash
+      .replaceAll(RegExp(r'[^a-z0-9\-_ ]'), '')
+      .replaceAll(RegExp(r'[\s_]+'), '-')
+      .replaceAll(RegExp(r'-{2,}'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  if (cleaned.isEmpty) {
+    return 'user';
+  }
+  return cleaned;
+}
+
+String _maskEmail(String email) {
+  final normalized = email.trim();
+  final atIndex = normalized.indexOf('@');
+  if (atIndex <= 0) {
+    return normalized.isEmpty ? 'Not added' : normalized;
+  }
+
+  final local = normalized.substring(0, atIndex);
+  final domain = normalized.substring(atIndex);
+  final visible = local.length <= 2 ? 1 : 2;
+  final hiddenCount = (local.length - visible).clamp(1, 20);
+  return '${local.substring(0, visible)}${'*' * hiddenCount}$domain';
+}
+
+String _maskPhone(String phone) {
+  final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.length < 4) {
+    return phone;
+  }
+  return '${'*' * (digits.length - 4)}${digits.substring(digits.length - 4)}';
+}
+
+void _showProfileSettingsSnackBar(
+  BuildContext context,
+  String message, {
+  bool isError = true,
+}) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: isError
+          ? const Color(0xFFB43A3A)
+          : const Color(0xFF2E7D32),
+    ),
+  );
 }
 
 class _PlaceholderTab extends StatelessWidget {
