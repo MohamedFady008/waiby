@@ -17,6 +17,18 @@ class AppConfig {
     'GOOGLE_SERVER_CLIENT_ID',
   );
   static const String facebookAppId = String.fromEnvironment('FACEBOOK_APP_ID');
+  static const String stripePublishableKey = String.fromEnvironment(
+    'STRIPE_PUBLISHABLE_KEY',
+    defaultValue: '',
+  );
+  static const String paymentsApiBaseUrl = String.fromEnvironment(
+    'PAYMENTS_API_BASE_URL',
+    defaultValue: '',
+  );
+  static const String paymentsRegion = String.fromEnvironment(
+    'PAYMENTS_REGION',
+    defaultValue: 'us-central1',
+  );
 
   /// Continue URL used by Firebase reset-password emails (web/mobile deep link).
   static const String resetPasswordContinueUrl = String.fromEnvironment(

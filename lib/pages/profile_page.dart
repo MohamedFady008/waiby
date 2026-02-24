@@ -1,4 +1,4 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../controllers/auth_controller.dart';
+import '../widgets/user_avatar_with_frame.dart';
 import '../widgets/chat_sidebar.dart';
 import '../widgets/common/responsive_layout.dart';
 
@@ -25,6 +26,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final profileUserId =
+        _resolveTargetUserId(widget.userId) ?? _currentUserId();
     final userName = _resolveUserName(widget.userId);
     final isViewingOtherAccount = _isViewingOtherAccount(widget.userId);
 
@@ -67,6 +70,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     constraints: BoxConstraints(maxWidth: contentWidth),
                     child: _ProfileBody(
                       userName: userName,
+                      profileUserId: profileUserId,
                       width: width,
                       isViewingOtherAccount: isViewingOtherAccount,
                       selectedTab: _selectedTab,
@@ -88,10 +92,22 @@ class _ProfilePageState extends State<ProfilePage> {
       },
     );
   }
+
+  String? _currentUserId() {
+    if (!Get.isRegistered<AuthController>()) {
+      return null;
+    }
+    final userId = Get.find<AuthController>().userId.trim();
+    if (userId.isEmpty || userId == 'U-00000') {
+      return null;
+    }
+    return userId;
+  }
 }
 
 class _ProfileBody extends StatelessWidget {
   final String userName;
+  final String? profileUserId;
   final double width;
   final bool isViewingOtherAccount;
   final _ProfileTab selectedTab;
@@ -99,6 +115,7 @@ class _ProfileBody extends StatelessWidget {
 
   const _ProfileBody({
     required this.userName,
+    required this.profileUserId,
     required this.width,
     required this.isViewingOtherAccount,
     required this.selectedTab,
@@ -194,7 +211,11 @@ class _ProfileBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Hero(userName: userName, isViewingOtherAccount: isViewingOtherAccount),
+        _Hero(
+          userName: userName,
+          profileUserId: profileUserId,
+          isViewingOtherAccount: isViewingOtherAccount,
+        ),
         const SizedBox(height: 22),
         _Tabs(selectedTab: selectedTab, onSelect: onSelectTab),
         const SizedBox(height: 16),
@@ -244,9 +265,14 @@ class _BackdropGlow extends StatelessWidget {
 
 class _Hero extends StatelessWidget {
   final String userName;
+  final String? profileUserId;
   final bool isViewingOtherAccount;
 
-  const _Hero({required this.userName, required this.isViewingOtherAccount});
+  const _Hero({
+    required this.userName,
+    required this.profileUserId,
+    required this.isViewingOtherAccount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -332,7 +358,10 @@ class _Hero extends StatelessWidget {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _ProfileAvatar(size: avatarSize),
+                                _ProfileAvatar(
+                                  size: avatarSize,
+                                  userId: profileUserId,
+                                ),
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: _ProfileIdentity(
@@ -353,7 +382,10 @@ class _Hero extends StatelessWidget {
                       : Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            _ProfileAvatar(size: avatarSize),
+                            _ProfileAvatar(
+                              size: avatarSize,
+                              userId: profileUserId,
+                            ),
                             const SizedBox(width: 18),
                             Expanded(
                               child: _ProfileIdentity(
@@ -388,45 +420,19 @@ class _Hero extends StatelessWidget {
 
 class _ProfileAvatar extends StatelessWidget {
   final double size;
+  final String? userId;
 
-  const _ProfileAvatar({required this.size});
+  const _ProfileAvatar({required this.size, this.userId});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFFFA2D0), width: 3),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ClipOval(
-            child: Image.asset(
-              'assets/pp6.png',
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Container(
-                color: const Color(0xFF213258),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.person_rounded,
-                  color: Colors.white.withValues(alpha: 0.75),
-                  size: size * 0.48,
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: Image.asset(
-              'assets/medals/lolita_pearl.png',
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-          ),
-        ],
-      ),
+    return UserAvatarWithFrame(
+      userId: userId,
+      size: size,
+      frameScale: 1.30,
+      borderColor: const Color(0xFFFFA2D0),
+      borderWidth: 3,
+      fallbackAsset: 'assets/pp6.png',
     );
   }
 }
@@ -3517,11 +3523,19 @@ String? _resolveTargetUserId(String? raw) {
 
 String _resolveUserName(String? raw) {
   final normalized = _resolveTargetUserId(raw);
-  if (normalized == null) {
-    return 'LaKimi';
+  if (normalized != null) {
+    return normalized;
   }
 
-  return normalized;
+  if (Get.isRegistered<AuthController>()) {
+    final auth = Get.find<AuthController>();
+    final preferred = auth.userName.trim();
+    if (preferred.isNotEmpty && preferred != 'User') {
+      return preferred;
+    }
+  }
+
+  return 'LaKimi';
 }
 
 class _ServiceItem {
