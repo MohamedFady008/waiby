@@ -3,14 +3,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'app_router.dart';
 import 'controllers/auth_controller.dart';
+import 'controllers/creator_form_controller.dart';
 import 'core/web/firebase_web_loader.dart';
+import 'core/web/url_strategy_config.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  configureWebUrlStrategy();
 
   await ensureFirebaseWebModulesLoaded();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -29,6 +31,7 @@ void main() async {
   }
 
   Get.put(AuthController(), permanent: true);
+  Get.lazyPut(() => CreatorFormController(), fenix: true);
   runApp(const MyApp());
 }
 

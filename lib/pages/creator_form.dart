@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:waiby/controllers/creator_form_controller.dart';
 import 'package:waiby/widgets/waiby_footer.dart';
 
 import '../widgets/common/waiby_common.dart';
@@ -12,6 +15,9 @@ class CreatorFormPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure the controller exists.
+    final controller = Get.find<CreatorFormController>();
+
     return Stack(
       children: [
         Positioned.fill(
@@ -40,6 +46,45 @@ class CreatorFormPage extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // ── Existing request banner ──
+                                Obx(() {
+                                  if (!controller.hasExistingRequest.value) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Container(
+                                    width: double.infinity,
+                                    margin: const EdgeInsets.only(bottom: 20),
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1A2F1A),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: const Color(0xFF4CAF50),
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.info_outline_rounded,
+                                          color: Color(0xFF4CAF50),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            'You have already submitted a creator application. You cannot submit another one.',
+                                            style: GoogleFonts.notoSans(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: const Color(0xFF81C784),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+
                                 Text(
                                   "Become a Waiby Creator",
                                   style: GoogleFonts.notoSans(
@@ -129,7 +174,7 @@ class CreatorFormPage extends StatelessWidget {
                               ],
                             ),
                           ),
-                          SizedBox(height: 100),
+                          const SizedBox(height: 100),
                           const WaibyFooter(),
                         ],
                       );
@@ -150,11 +195,17 @@ class CreatorFormPage extends StatelessWidget {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  BASIC INFORMATION FORM
+// ═══════════════════════════════════════════════════════════════════════
+
 class _BasicInformationForm extends StatelessWidget {
   const _BasicInformationForm();
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.find<CreatorFormController>();
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
@@ -167,9 +218,11 @@ class _BasicInformationForm extends StatelessWidget {
           required Widget leftField,
           String? leftHint,
           String? leftSubText,
+          String? leftErrorKey,
           required String rightLabel,
           required Widget rightField,
           String? rightHint,
+          String? rightErrorKey,
         }) {
           if (twoCols) {
             return Row(
@@ -181,6 +234,7 @@ class _BasicInformationForm extends StatelessWidget {
                     label: leftLabel,
                     hint: leftHint,
                     subText: leftSubText,
+                    errorKey: leftErrorKey,
                     child: leftField,
                   ),
                 ),
@@ -190,6 +244,7 @@ class _BasicInformationForm extends StatelessWidget {
                   child: _LabeledField(
                     label: rightLabel,
                     hint: rightHint,
+                    errorKey: rightErrorKey,
                     child: rightField,
                   ),
                 ),
@@ -202,12 +257,14 @@ class _BasicInformationForm extends StatelessWidget {
                 label: leftLabel,
                 hint: leftHint,
                 subText: leftSubText,
+                errorKey: leftErrorKey,
                 child: leftField,
               ),
               const SizedBox(height: 18),
               _LabeledField(
                 label: rightLabel,
                 hint: rightHint,
+                errorKey: rightErrorKey,
                 child: rightField,
               ),
             ],
@@ -219,29 +276,41 @@ class _BasicInformationForm extends StatelessWidget {
           children: [
             _LabeledField(
               label: "Full legal name",
-              child: const _InputField(height: 52),
+              errorKey: 'fullLegalName',
+              child: _InputField(
+                height: 52,
+                textController: controller.fullLegalNameController,
+              ),
             ),
             const SizedBox(height: 16),
             pairField(
               leftLabel: "Date of birth",
               leftSubText: "You must be 18 years or older to apply",
-              leftField: const _InputField(
-                height: 52,
-                trailing: Icon(
-                  Icons.calendar_month_rounded,
-                  size: 24,
-                  color: Color(0x45FFFFFF),
-                ),
+              leftErrorKey: 'dateOfBirth',
+              leftField: _DatePickerField(
+                onDateSelected: controller.setDateOfBirth,
               ),
               rightLabel: "Country of residence",
-              rightField: const _InputField(height: 52),
+              rightErrorKey: 'country',
+              rightField: _InputField(
+                height: 52,
+                textController: controller.countryController,
+              ),
             ),
             const SizedBox(height: 16),
             pairField(
               leftLabel: "Discord username",
-              leftField: const _InputField(height: 52),
+              leftErrorKey: 'discordUsername',
+              leftField: _InputField(
+                height: 52,
+                textController: controller.discordUsernameController,
+              ),
               rightLabel: "Primary language/s",
-              rightField: const _InputField(height: 52),
+              rightErrorKey: 'primaryLanguages',
+              rightField: _InputField(
+                height: 52,
+                textController: controller.primaryLanguagesController,
+              ),
             ),
           ],
         );
@@ -250,11 +319,16 @@ class _BasicInformationForm extends StatelessWidget {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  CREATOR INTRODUCTION
+// ═══════════════════════════════════════════════════════════════════════
+
 class _CreatorIntroductionSection extends StatelessWidget {
   const _CreatorIntroductionSection();
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.find<CreatorFormController>();
     final width = MediaQuery.sizeOf(context).width;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,28 +343,44 @@ class _CreatorIntroductionSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        const _LabeledField(
+        _LabeledField(
           label: "Tell us about yourself",
-          child: _CountedTextArea(maxLength: 500, height: 220),
+          errorKey: 'aboutYourself',
+          child: _CountedTextArea(
+            maxLength: 500,
+            height: 220,
+            textController: controller.aboutYourselfController,
+          ),
         ),
         const SizedBox(height: 18),
-        const _LabeledField(
+        _LabeledField(
           label: "Why do you want to become a Waiby Creator?",
-          child: _CountedTextArea(maxLength: 500, height: 220),
+          errorKey: 'whyCreator',
+          child: _CountedTextArea(
+            maxLength: 500,
+            height: 220,
+            textController: controller.whyCreatorController,
+          ),
         ),
       ],
     );
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  LEGAL ACKNOWLEDGEMENT + SUBMIT
+// ═══════════════════════════════════════════════════════════════════════
+
 class _LegalAcknowledgementSection extends StatelessWidget {
   const _LegalAcknowledgementSection();
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.find<CreatorFormController>();
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 760;
     final medium = width < 1200;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -349,22 +439,141 @@ class _LegalAcknowledgementSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        WaibyGradientButton(
-          width: compact ? double.infinity : (medium ? 250 : 270),
-          height: 56,
-          label: 'Submit application',
-          onTap: () => _showCreatorGuidelinesDialog(context),
-          textStyle: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-            height: 30 / 20,
-          ),
-        ),
+        Obx(() {
+          final loading =
+              controller.isSubmitting.value || controller.isUploading.value;
+          final disabled = controller.hasExistingRequest.value;
+
+          return WaibyGradientButton(
+            width: compact ? double.infinity : (medium ? 250 : 270),
+            height: 56,
+            label: loading
+                ? 'Processing...'
+                : disabled
+                ? 'Already Submitted'
+                : 'Submit application',
+            onTap: (loading || disabled)
+                ? null
+                : () => _handleSubmitTap(context, controller),
+            textStyle: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: (loading || disabled) ? Colors.white54 : Colors.black,
+              height: 30 / 20,
+            ),
+          );
+        }),
       ],
     );
   }
+
+  void _handleSubmitTap(
+    BuildContext context,
+    CreatorFormController controller,
+  ) {
+    // Validate the form first.
+    if (!controller.validateForm()) {
+      // Show the first error.
+      final firstError = controller.fieldErrors.values
+          .where((e) => e != null)
+          .firstOrNull;
+      if (firstError != null) {
+        _showFormSnackbar(
+          context,
+          title: 'Validation Error',
+          message: firstError,
+          backgroundColor: Colors.orange.shade700.withValues(alpha: 0.9),
+          icon: Icons.warning_amber_rounded,
+        );
+      }
+      return;
+    }
+
+    // Verify identity document is uploaded.
+    if (!controller.identityUploaded.value) {
+      _showFormSnackbar(
+        context,
+        title: 'Identity Required',
+        message: 'Please upload your identity document before submitting.',
+        backgroundColor: Colors.orange.shade700.withValues(alpha: 0.9),
+        icon: Icons.upload_file_rounded,
+      );
+      return;
+    }
+
+    // Show the Creator Guidelines dialog.
+    _showCreatorGuidelinesDialog(context);
+  }
 }
+
+void _showFormSnackbar(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required Color backgroundColor,
+  IconData? icon,
+}) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger != null) {
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: backgroundColor,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, color: Colors.white),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(message, style: const TextStyle(color: Colors.white)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return;
+  }
+
+  final overlayContext = Get.overlayContext;
+  if (overlayContext == null) {
+    return;
+  }
+
+  Get.snackbar(
+    title,
+    message,
+    snackPosition: SnackPosition.BOTTOM,
+    backgroundColor: backgroundColor,
+    colorText: Colors.white,
+    duration: const Duration(seconds: 3),
+    margin: const EdgeInsets.all(16),
+    borderRadius: 12,
+    icon: icon == null ? null : Icon(icon, color: Colors.white),
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CREATOR GUIDELINES DIALOG
+// ═══════════════════════════════════════════════════════════════════════
 
 Future<void> _showCreatorGuidelinesDialog(BuildContext context) async {
   final accepted = await showDialog<bool>(
@@ -374,6 +583,8 @@ Future<void> _showCreatorGuidelinesDialog(BuildContext context) async {
   );
 
   if (!context.mounted || accepted != true) return;
+  // Set guidelines accepted on the controller.
+  Get.find<CreatorFormController>().setGuidelinesAccepted(true);
   context.go('/become-creator/creator-guidelines');
 }
 
@@ -853,16 +1064,21 @@ const List<_DialogStepData> _dialogSteps = [
         'If you fail, your application will be paused and can be retried after 3 days.',
   ),
   _DialogStepData(
-    title: '15. Platform Changes',
+    title: '16. Governing Law',
     body: 'The Creator Agreement is governed by the laws of Estonia.',
   ),
 ];
+
+// ═══════════════════════════════════════════════════════════════════════
+//  IDENTITY VERIFICATION CARD (with file picker + upload)
+// ═══════════════════════════════════════════════════════════════════════
 
 class _IdentityVerificationCard extends StatelessWidget {
   const _IdentityVerificationCard();
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.find<CreatorFormController>();
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 760;
 
@@ -909,58 +1125,185 @@ class _IdentityVerificationCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            constraints: const BoxConstraints(minHeight: 180),
-            decoration: BoxDecoration(
-              color: const Color(0xFF080912),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.cloud_upload_rounded,
-                    size: 66,
-                    color: Color(0xFF636363),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "Drag & Drop files here",
-                    style: GoogleFonts.notoSans(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.white,
-                      height: 19 / 14,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 28,
-                    constraints: const BoxConstraints(minWidth: 125),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF636363),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Text(
-                        "Browse files",
-                        style: GoogleFonts.notoSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.white,
-                          height: 19 / 14,
+
+          // ── File drop zone ─────────────────────────────────────────
+          Obx(() {
+            final hasFile = controller.identityFileName.value.isNotEmpty;
+            final uploaded = controller.identityUploaded.value;
+            final uploading = controller.isUploading.value;
+            final canBrowse = !uploading && (!hasFile || uploaded);
+
+            return GestureDetector(
+              onTap: canBrowse ? () => _pickFile(context, controller) : null,
+              child: Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(minHeight: 180),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF080912),
+                  borderRadius: BorderRadius.circular(20),
+                  border: uploaded
+                      ? Border.all(color: const Color(0xFF4CAF50), width: 1.5)
+                      : null,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Center(
+                  child: uploading
+                      ? const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(color: Color(0xFFCCF308)),
+                            SizedBox(height: 12),
+                            Text(
+                              'Uploading...',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        )
+                      : uploaded
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              size: 48,
+                              color: Color(0xFF4CAF50),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              controller.identityFileName.value,
+                              style: GoogleFonts.notoSans(
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Uploaded successfully',
+                              style: GoogleFonts.notoSans(
+                                fontSize: 12,
+                                color: const Color(0xFF81C784),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () {
+                                controller.clearIdentityFile();
+                              },
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text('Replace'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.white54,
+                              ),
+                            ),
+                          ],
+                        )
+                      : hasFile
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.insert_drive_file_rounded,
+                              size: 48,
+                              color: Color(0xFFCCF308),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              controller.identityFileName.value,
+                              style: GoogleFonts.notoSans(
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _SmallActionButton(
+                                  label: 'Upload',
+                                  icon: Icons.cloud_upload_rounded,
+                                  color: const Color(0xFFCCF308),
+                                  onTap: () =>
+                                      controller.uploadIdentityDocument(),
+                                ),
+                                const SizedBox(width: 8),
+                                _SmallActionButton(
+                                  label: 'Remove',
+                                  icon: Icons.close_rounded,
+                                  color: Colors.redAccent,
+                                  onTap: controller.clearIdentityFile,
+                                ),
+                              ],
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.cloud_upload_rounded,
+                              size: 66,
+                              color: Color(0xFF636363),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              "Click to browse files",
+                              style: GoogleFonts.notoSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.white,
+                                height: 19 / 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "JPG, PNG, WebP, or PDF • Max 10 MB",
+                              style: GoogleFonts.notoSans(
+                                fontSize: 11,
+                                color: Colors.white38,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              height: 28,
+                              constraints: const BoxConstraints(minWidth: 125),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF636363),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "Browse files",
+                                  style: GoogleFonts.notoSans(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w400,
+                                    color: Colors.white,
+                                    height: 19 / 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          }),
           const SizedBox(height: 12),
           const Divider(color: Color(0xFF1B234B), thickness: 0.5, height: 0.5),
           const SizedBox(height: 12),
@@ -999,7 +1342,204 @@ class _IdentityVerificationCard extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _pickFile(
+    BuildContext context,
+    CreatorFormController controller,
+  ) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf', 'webp'],
+        withData: true,
+      );
+
+      if (!context.mounted) return;
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _showFormSnackbar(
+          context,
+          title: 'Error',
+          message: 'Could not read the selected file.',
+          backgroundColor: Colors.red.shade600.withValues(alpha: 0.9),
+        );
+        return;
+      }
+
+      // Derive a robust extension/mime pair across browsers and file systems.
+      final rawExt = file.extension?.trim().toLowerCase();
+      final extFromName = file.name.contains('.')
+          ? file.name.split('.').last.trim().toLowerCase()
+          : '';
+      final ext = (rawExt != null && rawExt.isNotEmpty) ? rawExt : extFromName;
+
+      String? mimeType;
+      switch (ext) {
+        case 'jpg':
+        case 'jpeg':
+          mimeType = 'image/jpeg';
+          break;
+        case 'png':
+          mimeType = 'image/png';
+          break;
+        case 'webp':
+          mimeType = 'image/webp';
+          break;
+        case 'pdf':
+          mimeType = 'application/pdf';
+          break;
+      }
+
+      var normalizedFileName = file.name.trim();
+      if (normalizedFileName.isEmpty) {
+        normalizedFileName = 'identity_document';
+      }
+      if (!normalizedFileName.contains('.') && ext.isNotEmpty) {
+        normalizedFileName = '$normalizedFileName.$ext';
+      }
+
+      controller.setIdentityFile(
+        fileName: normalizedFileName,
+        bytes: bytes,
+        mimeType: mimeType,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      _showFormSnackbar(
+        context,
+        title: 'Error',
+        message: 'Failed to pick file: $e',
+        backgroundColor: Colors.red.shade600.withValues(alpha: 0.9),
+      );
+    }
+  }
 }
+
+class _SmallActionButton extends StatelessWidget {
+  const _SmallActionButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: GoogleFonts.notoSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  DATE PICKER FIELD
+// ═══════════════════════════════════════════════════════════════════════
+
+class _DatePickerField extends StatefulWidget {
+  const _DatePickerField({required this.onDateSelected});
+
+  final ValueChanged<DateTime> onDateSelected;
+
+  @override
+  State<_DatePickerField> createState() => _DatePickerFieldState();
+}
+
+class _DatePickerFieldState extends State<_DatePickerField> {
+  DateTime? _selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final now = DateTime.now();
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: _selected ?? DateTime(now.year - 18, now.month, now.day),
+          firstDate: DateTime(1900),
+          lastDate: now,
+          builder: (context, child) {
+            return Theme(
+              data: ThemeData.dark().copyWith(
+                colorScheme: const ColorScheme.dark(
+                  primary: Color(0xFFCCF308),
+                  onPrimary: Colors.black,
+                  surface: Color(0xFF14151C),
+                  onSurface: Colors.white,
+                ),
+              ),
+              child: child!,
+            );
+          },
+        );
+        if (picked != null) {
+          setState(() => _selected = picked);
+          widget.onDateSelected(picked);
+        }
+      },
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: const Color(0xFF222329),
+          borderRadius: BorderRadius.circular(3),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _selected != null
+                    ? '${_selected!.day.toString().padLeft(2, '0')}/${_selected!.month.toString().padLeft(2, '0')}/${_selected!.year}'
+                    : '',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            const Icon(
+              Icons.calendar_month_rounded,
+              size: 24,
+              color: Color(0x45FFFFFF),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SHARED FORM WIDGETS
+// ═══════════════════════════════════════════════════════════════════════
 
 class _LabeledField extends StatelessWidget {
   const _LabeledField({
@@ -1007,12 +1547,14 @@ class _LabeledField extends StatelessWidget {
     required this.child,
     this.hint,
     this.subText,
+    this.errorKey,
   });
 
   final String label;
   final Widget child;
   final String? hint;
   final String? subText;
+  final String? errorKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1043,16 +1585,34 @@ class _LabeledField extends StatelessWidget {
             ),
           ),
         ],
+        if (errorKey != null)
+          Obx(() {
+            final controller = Get.find<CreatorFormController>();
+            final error = controller.fieldErrors[errorKey];
+            if (error == null) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                error,
+                style: GoogleFonts.notoSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.redAccent,
+                ),
+              ),
+            );
+          }),
       ],
     );
   }
 }
 
 class _InputField extends StatelessWidget {
-  const _InputField({required this.height, this.trailing});
+  const _InputField({required this.height, this.textController});
 
   final double height;
-  final Widget? trailing;
+
+  final TextEditingController? textController;
 
   @override
   Widget build(BuildContext context) {
@@ -1065,16 +1625,16 @@ class _InputField extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: TextField(
-              style: TextStyle(color: Colors.white),
-              decoration: InputDecoration(
+              controller: textController,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
                 border: InputBorder.none,
                 isCollapsed: true,
               ),
             ),
           ),
-          ...[trailing].nonNulls,
         ],
       ),
     );
@@ -1082,10 +1642,15 @@ class _InputField extends StatelessWidget {
 }
 
 class _CountedTextArea extends StatefulWidget {
-  const _CountedTextArea({required this.maxLength, required this.height});
+  const _CountedTextArea({
+    required this.maxLength,
+    required this.height,
+    this.textController,
+  });
 
   final int maxLength;
   final double height;
+  final TextEditingController? textController;
 
   @override
   State<_CountedTextArea> createState() => _CountedTextAreaState();
@@ -1093,16 +1658,23 @@ class _CountedTextArea extends StatefulWidget {
 
 class _CountedTextAreaState extends State<_CountedTextArea> {
   late final TextEditingController _controller;
+  late final bool _ownsController;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController();
+    if (widget.textController != null) {
+      _controller = widget.textController!;
+      _ownsController = false;
+    } else {
+      _controller = TextEditingController();
+      _ownsController = true;
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_ownsController) _controller.dispose();
     super.dispose();
   }
 
@@ -1136,7 +1708,7 @@ class _CountedTextAreaState extends State<_CountedTextArea> {
             right: 0,
             bottom: 0,
             child: Text(
-              "Max ${widget.maxLength}",
+              "${_controller.text.length}/${widget.maxLength}",
               style: GoogleFonts.poppins(
                 fontSize: 10,
                 fontWeight: FontWeight.w300,

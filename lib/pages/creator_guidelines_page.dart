@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:waiby/controllers/creator_form_controller.dart';
 import 'package:waiby/widgets/waiby_footer.dart';
 
 import '../widgets/common/waiby_common.dart';
@@ -15,6 +18,7 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
   static const int _requiredCorrectAnswers = 15;
 
   bool _rulesAccepted = false;
+  bool _isSubmitting = false;
   late final List<int?> _answers = List<int?>.filled(
     _knowledgeQuestions.length,
     null,
@@ -36,7 +40,7 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
     return ((_correctAnswers / _knowledgeQuestions.length) * 100).round();
   }
 
-  void _onSubmit() {
+  Future<void> _onSubmit() async {
     if (!_rulesAccepted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -57,30 +61,122 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
       return;
     }
 
+    setState(() => _isSubmitting = true);
+
+    final controller = Get.find<CreatorFormController>();
     final passed = _correctAnswers >= _requiredCorrectAnswers;
-    showDialog<void>(
+
+    // Record the test result and handle submission.
+    final success = await controller.handleTestCompletion(
+      score: _correctAnswers,
+      totalQuestions: _knowledgeQuestions.length,
+      requiredScore: _requiredCorrectAnswers,
+    );
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    // Show the result dialog.
+    await showDialog<void>(
       context: context,
-      builder: (context) {
+      barrierDismissible: false,
+      builder: (dialogContext) {
         return AlertDialog(
           backgroundColor: const Color(0xFF14151C),
-          title: Text(
-            passed ? 'Test Passed' : 'Test Not Passed',
-            style: GoogleFonts.notoSans(
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
-          content: Text(
-            'You answered $_correctAnswers/${_knowledgeQuestions.length} correctly ($_scorePercentage%). ${passed ? "You passed the required score." : "Required score is $_requiredCorrectAnswers/${_knowledgeQuestions.length}. Please review the rules and try again."}',
-            style: GoogleFonts.notoSans(
-              color: Colors.white.withValues(alpha: 0.9),
-              height: 1.45,
-            ),
+          title: Row(
+            children: [
+              Icon(
+                passed ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                color: passed ? const Color(0xFF4CAF50) : Colors.redAccent,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  passed ? 'Test Passed! 🎉' : 'Test Not Passed',
+                  style: GoogleFonts.notoSans(
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'You answered $_correctAnswers/${_knowledgeQuestions.length} correctly ($_scorePercentage%).',
+                style: GoogleFonts.notoSans(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (passed) ...[
+                if (success)
+                  Text(
+                    'Your creator application has been submitted successfully! '
+                    'You will receive an update within 48 hours.',
+                    style: GoogleFonts.notoSans(
+                      color: const Color(0xFF81C784),
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  )
+                else
+                  Text(
+                    'You passed the test but there was an issue submitting '
+                    'your application. Please try again.',
+                    style: GoogleFonts.notoSans(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
+                    ),
+                  ),
+              ] else ...[
+                Text(
+                  'Required score: $_requiredCorrectAnswers/${_knowledgeQuestions.length}.',
+                  style: GoogleFonts.notoSans(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your temporary data has been cleared. '
+                  'Please review the guidelines and try again after 3 days.',
+                  style: GoogleFonts.notoSans(
+                    color: Colors.redAccent.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ],
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                if (passed && success) {
+                  // Navigate back to home or profile.
+                  context.go('/');
+                } else if (!passed) {
+                  // Navigate back to become-creator page.
+                  context.go('/become-creator');
+                }
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: passed
+                    ? const Color(0xFFCCF308)
+                    : Colors.white70,
+              ),
+              child: Text(passed && success ? 'Go to Home' : 'Close'),
             ),
           ],
         );
@@ -117,6 +213,7 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
                               rulesAccepted: _rulesAccepted,
                               answeredCount: _answeredCount,
                               answers: _answers,
+                              isSubmitting: _isSubmitting,
                               onRulesAcceptedChanged: (value) {
                                 setState(() => _rulesAccepted = value);
                               },
@@ -155,6 +252,7 @@ class _KnowledgeTestContent extends StatelessWidget {
     required this.rulesAccepted,
     required this.answeredCount,
     required this.answers,
+    required this.isSubmitting,
     required this.onRulesAcceptedChanged,
     required this.onAnswerSelected,
     required this.onSubmit,
@@ -163,6 +261,7 @@ class _KnowledgeTestContent extends StatelessWidget {
   final bool rulesAccepted;
   final int answeredCount;
   final List<int?> answers;
+  final bool isSubmitting;
   final ValueChanged<bool> onRulesAcceptedChanged;
   final void Function(int questionIndex, int optionIndex) onAnswerSelected;
   final VoidCallback onSubmit;
@@ -305,22 +404,33 @@ class _KnowledgeTestContent extends StatelessWidget {
         Align(
           alignment: Alignment.centerRight,
           child: SizedBox(
-            height: 38,
+            height: 44,
             child: ElevatedButton(
-              onPressed: onSubmit,
+              onPressed: isSubmitting ? null : onSubmit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF51D76E),
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: const Color(0xFF3A6B42),
+                disabledForegroundColor: Colors.white54,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(4),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 textStyle: GoogleFonts.notoSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              child: const Text('Submit Test'),
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('Submit Test'),
             ),
           ),
         ),
