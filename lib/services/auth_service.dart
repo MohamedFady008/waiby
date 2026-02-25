@@ -547,6 +547,11 @@ class AuthService {
       emailVerified: user.emailVerified,
       providers: _providerIds(user),
       isOnline: existing?.isOnline ?? true,
+      isCreator: existing?.isCreator ?? false,
+      isProGamer: existing?.isProGamer ?? false,
+      lastTestPassed: existing?.lastTestPassed ?? false,
+      lastTestAttempt: existing?.lastTestAttempt,
+      creatorActivatedAt: existing?.creatorActivatedAt,
       metadata: metadata,
       createdAt: existing?.createdAt,
     );

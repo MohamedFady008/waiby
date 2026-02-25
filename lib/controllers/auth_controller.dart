@@ -5,15 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../core/validators/auth_validators.dart';
+import '../data/models/user_profile.dart';
+import '../data/repositories/user_profile_repository.dart';
 import '../services/auth_service.dart';
 
 enum AuthStatus { initial, loading, authenticated, unauthenticated, error }
 
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
+  final UserProfileRepository _userProfileRepository = UserProfileRepository();
 
   final Rx<AuthStatus> status = AuthStatus.initial.obs;
   final Rxn<User> currentUser = Rxn<User>();
+  final Rxn<UserProfile> profile = Rxn<UserProfile>();
   final RxString errorMessage = ''.obs;
   final RxString successMessage = ''.obs;
   final RxBool isLoading = false.obs;
@@ -21,18 +25,36 @@ class AuthController extends GetxController {
   final RxBool online = true.obs;
 
   final RxBool _isCreator = false.obs;
+  final RxBool _isProGamer = false.obs;
 
   bool get isLoggedIn => currentUser.value != null;
   bool get loggedIn => isLoggedIn;
   bool get isCreator => _isCreator.value;
-  String get userName => _authService.getUserDisplayName() ?? 'User';
+  bool get isProGamer => _isProGamer.value;
+  bool get canShowBecomeCreatorButton => isLoggedIn && !isCreator;
+  String get userName {
+    final profileName = profile.value?.fullName?.trim();
+    if (profileName != null && profileName.isNotEmpty) {
+      return profileName;
+    }
+    return _authService.getUserDisplayName() ?? 'User';
+  }
+
   String get name => userName;
   String? get userEmail => currentUser.value?.email;
-  String? get userPhotoUrl => _authService.getUserAvatarUrl();
+  String? get userPhotoUrl {
+    final profilePhoto = profile.value?.avatarUrl?.trim();
+    if (profilePhoto != null && profilePhoto.isNotEmpty) {
+      return profilePhoto;
+    }
+    return _authService.getUserAvatarUrl();
+  }
+
   String? get photoUrl => userPhotoUrl;
   String get userId => currentUser.value?.uid ?? 'U-00000';
 
   StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<UserProfile?>? _profileSubscription;
 
   @override
   void onInit() {
@@ -42,19 +64,13 @@ class AuthController extends GetxController {
 
   @override
   void onClose() {
-    _authSubscription?.cancel();
+    unawaited(_authSubscription?.cancel());
+    unawaited(_profileSubscription?.cancel());
     super.onClose();
   }
 
   Future<void> _initAuthListener() async {
-    final initialUser = _authService.currentUser;
-    if (initialUser != null) {
-      await _authService.preloadCurrentUserProfile();
-      currentUser.value = initialUser;
-      status.value = AuthStatus.authenticated;
-    } else {
-      status.value = AuthStatus.unauthenticated;
-    }
+    await _applyAuthState(_authService.currentUser);
 
     _authSubscription = _authService.authStateChanges.listen(
       (user) => unawaited(_applyAuthState(user)),
@@ -69,10 +85,35 @@ class AuthController extends GetxController {
     currentUser.value = user;
     if (user != null) {
       await _authService.preloadCurrentUserProfile();
+      await _startProfileWatcher(user.uid);
       status.value = AuthStatus.authenticated;
     } else {
+      await _profileSubscription?.cancel();
+      _profileSubscription = null;
+      profile.value = null;
+      _isCreator.value = false;
+      _isProGamer.value = false;
       status.value = AuthStatus.unauthenticated;
     }
+  }
+
+  Future<void> _startProfileWatcher(String userId) async {
+    await _profileSubscription?.cancel();
+    _profileSubscription = _userProfileRepository
+        .watchById(userId)
+        .listen(
+          (nextProfile) {
+            profile.value = nextProfile;
+            _isCreator.value = nextProfile?.isCreator ?? false;
+            _isProGamer.value = nextProfile?.isProGamer ?? false;
+            if (nextProfile != null) {
+              online.value = nextProfile.isOnline;
+            }
+          },
+          onError: (_) {
+            // Profile stream errors should not terminate the auth session.
+          },
+        );
   }
 
   void clearMessages() {
@@ -273,6 +314,9 @@ class AuthController extends GetxController {
       final result = await _authService.signOut();
       if (result.success) {
         currentUser.value = null;
+        profile.value = null;
+        _isCreator.value = false;
+        _isProGamer.value = false;
         status.value = AuthStatus.unauthenticated;
         _showSuccess('Signed out successfully');
       } else {

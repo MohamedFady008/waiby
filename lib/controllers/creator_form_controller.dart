@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -7,9 +9,9 @@ import '../controllers/auth_controller.dart';
 import '../core/validators/creator_validators.dart';
 import '../data/models/creator_request.dart';
 import '../data/repositories/creator_request_repository.dart';
+import '../data/repositories/user_profile_repository.dart';
 import '../services/creator_storage_service.dart';
 
-/// Managed workflow states for the Become a Creator flow.
 enum CreatorFlowStep {
   formEntry,
   identityUpload,
@@ -18,20 +20,12 @@ enum CreatorFlowStep {
   submitted,
 }
 
-/// GetX controller that manages the full Become a Creator workflow.
-///
-/// Responsibilities:
-/// - Collects and validates creator form data locally.
-/// - Manages identity document upload to Firebase Storage.
-/// - Tracks Creator Knowledge Test results.
-/// - Submits data to Firestore only if the test is passed.
-/// - Stores approved creator data locally for fast access.
-/// - Prevents duplicate submissions.
 class CreatorFormController extends GetxController {
-  final CreatorRequestRepository _repository = CreatorRequestRepository();
-  final CreatorStorageService _storageService = CreatorStorageService();
+  static const Duration _testRetakeWindow = Duration(hours: 72);
 
-  // ── Observable state ───────────────────────────────────────────────
+  final CreatorRequestRepository _repository = CreatorRequestRepository();
+  final UserProfileRepository _userProfileRepository = UserProfileRepository();
+  final CreatorStorageService _storageService = CreatorStorageService();
 
   final Rx<CreatorFlowStep> currentStep = CreatorFlowStep.formEntry.obs;
   final RxBool isLoading = false.obs;
@@ -40,13 +34,12 @@ class CreatorFormController extends GetxController {
   final RxString errorMessage = ''.obs;
   final RxString successMessage = ''.obs;
 
-  /// Tracks whether the user already has a submitted request.
   final RxBool hasExistingRequest = false.obs;
-
-  /// Cached approved creator data for performance (local only).
   final Rxn<CreatorRequest> approvedLocalData = Rxn<CreatorRequest>();
 
-  // ── Form field controllers ─────────────────────────────────────────
+  final RxBool isRetakeBlocked = false.obs;
+  final Rxn<DateTime> nextRetakeAllowedAt = Rxn<DateTime>();
+  final Rxn<Duration> retakeRemaining = Rxn<Duration>();
 
   final fullLegalNameController = TextEditingController();
   final countryController = TextEditingController();
@@ -55,44 +48,33 @@ class CreatorFormController extends GetxController {
   final aboutYourselfController = TextEditingController();
   final whyCreatorController = TextEditingController();
 
-  /// Selected date of birth.
   final Rxn<DateTime> dateOfBirth = Rxn<DateTime>();
-
-  // ── Identity document state ────────────────────────────────────────
 
   final RxString identityFileName = ''.obs;
   final Rxn<Uint8List> identityFileBytes = Rxn<Uint8List>();
   final RxString identityFileMimeType = ''.obs;
-
-  /// After upload: Firebase Storage path reference.
   final RxString identityDocumentRef = ''.obs;
-
-  /// After upload: public download URL.
   final RxString identityDocumentUrl = ''.obs;
-
   final RxBool identityUploaded = false.obs;
 
-  // ── Guidelines acceptance ──────────────────────────────────────────
-
   final RxBool guidelinesAccepted = false.obs;
-
-  // ── Knowledge test results ─────────────────────────────────────────
 
   final RxBool testCompleted = false.obs;
   final RxBool testPassed = false.obs;
   final RxInt testScore = 0.obs;
   final RxInt testTotalQuestions = 20.obs;
 
-  // ── Validation error per field ─────────────────────────────────────
-
   final RxMap<String, String?> fieldErrors = <String, String?>{}.obs;
-
-  // ── Lifecycle ──────────────────────────────────────────────────────
+  Worker? _authStateWorker;
 
   @override
   void onInit() {
     super.onInit();
-    _checkExistingRequest();
+    final auth = Get.find<AuthController>();
+    _authStateWorker = ever(auth.currentUser, (_) {
+      unawaited(_initializeFlowState());
+    });
+    unawaited(_initializeFlowState());
   }
 
   @override
@@ -103,50 +85,130 @@ class CreatorFormController extends GetxController {
     primaryLanguagesController.dispose();
     aboutYourselfController.dispose();
     whyCreatorController.dispose();
+    _authStateWorker?.dispose();
     super.onClose();
   }
 
-  // ── Public API ─────────────────────────────────────────────────────
+  Future<void> _initializeFlowState() async {
+    await _checkExistingRequest();
+    await refreshRetakePolicy();
+  }
 
-  /// Checks if the current user already has a submitted creator request.
+  Future<void> refreshSubmissionState() async {
+    await _checkExistingRequest();
+  }
+
   Future<void> _checkExistingRequest() async {
     try {
       final auth = Get.find<AuthController>();
-      if (!auth.isLoggedIn) return;
+      if (!auth.isLoggedIn) {
+        hasExistingRequest.value = false;
+        approvedLocalData.value = null;
+        return;
+      }
 
       final exists = await _repository.hasExistingRequest(auth.userId);
       hasExistingRequest.value = exists;
 
-      if (exists) {
-        final request = await _repository.fetchByUserId(auth.userId);
-        if (request != null &&
-            request.status == CreatorRequestStatus.approved) {
-          approvedLocalData.value = request;
-        }
+      if (!exists) {
+        return;
+      }
+
+      final request = await _repository.fetchByUserId(auth.userId);
+      if (request != null && request.status == CreatorRequestStatus.approved) {
+        await _userProfileRepository.promoteUserToCreator(userId: auth.userId);
+        auth.setCreatorStatus(true);
+        approvedLocalData.value = request;
+      } else {
+        approvedLocalData.value = null;
       }
     } catch (_) {
-      // Silently fail – non-blocking check.
+      // Non-blocking preload.
     }
   }
 
-  /// Sets the selected date of birth.
+  Future<void> refreshRetakePolicy() async {
+    try {
+      final auth = Get.find<AuthController>();
+      if (!auth.isLoggedIn) {
+        isRetakeBlocked.value = false;
+        nextRetakeAllowedAt.value = null;
+        retakeRemaining.value = null;
+        return;
+      }
+
+      final profile = await _userProfileRepository.fetchById(
+        auth.userId,
+        options: const GetOptions(source: Source.server),
+      );
+      final lastAttempt = profile?.lastTestAttempt;
+      final lastPassed = profile?.lastTestPassed ?? false;
+
+      if (lastAttempt == null || lastPassed) {
+        isRetakeBlocked.value = false;
+        nextRetakeAllowedAt.value = null;
+        retakeRemaining.value = null;
+        return;
+      }
+
+      final serverNow = await _userProfileRepository.fetchCurrentServerTime(
+        auth.userId,
+      );
+      if (serverNow == null) {
+        isRetakeBlocked.value = false;
+        nextRetakeAllowedAt.value = null;
+        retakeRemaining.value = null;
+        return;
+      }
+
+      final unlockAt = lastAttempt.add(_testRetakeWindow);
+      final blocked = serverNow.isBefore(unlockAt);
+      isRetakeBlocked.value = blocked;
+      nextRetakeAllowedAt.value = unlockAt;
+      retakeRemaining.value = blocked ? unlockAt.difference(serverNow) : null;
+    } catch (_) {
+      // Non-blocking state check.
+    }
+  }
+
+  Future<bool> canAccessKnowledgeTest({bool showFeedback = true}) async {
+    await refreshRetakePolicy();
+    if (!isRetakeBlocked.value) {
+      return true;
+    }
+
+    if (!showFeedback) {
+      return false;
+    }
+
+    final remaining = retakeRemaining.value ?? const Duration(hours: 72);
+    final unlockAt = nextRetakeAllowedAt.value;
+    final unlockText = unlockAt == null
+        ? ''
+        : ' Next access: ${unlockAt.toUtc().toIso8601String()}.';
+    _showError(
+      'You can retake the Creator Knowledge Test in '
+      '${_formatDuration(remaining)}.$unlockText',
+    );
+    return false;
+  }
+
   void setDateOfBirth(DateTime date) {
     dateOfBirth.value = date;
     fieldErrors['dateOfBirth'] = CreatorValidators.validateDateOfBirth(date);
   }
 
-  /// Sets the picked identity document file (in memory, not uploaded yet).
   void setIdentityFile({
     required String fileName,
     required Uint8List bytes,
     required String? mimeType,
   }) {
-    // Validate before accepting.
     final extError = CreatorValidators.validateFileExtension(fileName);
     if (extError != null) {
       _showError(extError);
       return;
     }
+
     final sizeError = CreatorValidators.validateFileSize(bytes.length);
     if (sizeError != null) {
       _showError(sizeError);
@@ -161,7 +223,6 @@ class CreatorFormController extends GetxController {
     identityDocumentUrl.value = '';
   }
 
-  /// Clears the selected identity document.
   void clearIdentityFile() {
     identityFileName.value = '';
     identityFileBytes.value = null;
@@ -171,7 +232,6 @@ class CreatorFormController extends GetxController {
     identityDocumentUrl.value = '';
   }
 
-  /// Uploads the selected identity document to Firebase Storage.
   Future<bool> uploadIdentityDocument() async {
     final auth = Get.find<AuthController>();
     if (!auth.isLoggedIn) {
@@ -216,7 +276,6 @@ class CreatorFormController extends GetxController {
     }
   }
 
-  /// Validates all form fields. Returns true if all fields are valid.
   bool validateForm() {
     fieldErrors.clear();
 
@@ -243,18 +302,14 @@ class CreatorFormController extends GetxController {
       whyCreatorController.text,
     );
 
-    // Remove null entries so we can easily check if any errors exist.
-    fieldErrors.removeWhere((_, v) => v == null);
-
+    fieldErrors.removeWhere((_, value) => value == null);
     return fieldErrors.isEmpty;
   }
 
-  /// Sets the acceptance state of the creator guidelines.
   void setGuidelinesAccepted(bool accepted) {
     guidelinesAccepted.value = accepted;
   }
 
-  /// Records the result of the Creator Knowledge Test.
   void recordTestResult({
     required int score,
     required int totalQuestions,
@@ -266,39 +321,42 @@ class CreatorFormController extends GetxController {
     testPassed.value = score >= requiredScore;
   }
 
-  /// The main submission method. Called after the Knowledge Test completes.
-  ///
-  /// - If the user **passed** the test: submits all data to Firestore.
-  /// - If the user **failed** the test: clears temporary data.
   Future<bool> handleTestCompletion({
     required int score,
     required int totalQuestions,
     required int requiredScore,
   }) async {
+    final auth = Get.find<AuthController>();
+    if (!auth.isLoggedIn) {
+      _showError('You must be logged in to complete the test');
+      return false;
+    }
+
+    if (!await canAccessKnowledgeTest(showFeedback: true)) {
+      return false;
+    }
+
     recordTestResult(
       score: score,
       totalQuestions: totalQuestions,
       requiredScore: requiredScore,
     );
 
+    await _recordTestAttempt(passed: testPassed.value);
+    await refreshRetakePolicy();
+
     if (!testPassed.value) {
-      // ❌ User failed – clear temporary local data.
       _resetLocalData();
       _showError(
         'You scored $score/$totalQuestions. '
-        'Required: $requiredScore/$totalQuestions. '
-        'Your temporary data has been cleared.',
+        'Required: $requiredScore/$totalQuestions.',
       );
       return false;
     }
 
-    // ✅ User passed – submit to Firestore.
     return submitToFirestore();
   }
 
-  /// Submits the creator request to Cloud Firestore.
-  ///
-  /// Only called when the test is passed. Prevents duplicate submissions.
   Future<bool> submitToFirestore() async {
     final auth = Get.find<AuthController>();
     if (!auth.isLoggedIn) {
@@ -306,25 +364,21 @@ class CreatorFormController extends GetxController {
       return false;
     }
 
-    // Prevent duplicate submissions.
+    await _checkExistingRequest();
     if (hasExistingRequest.value) {
-      _showError('You have already submitted a creator application');
-      return false;
+      return _handleExistingRequest(auth);
     }
 
-    // Validate form fields one final time.
     if (!validateForm()) {
       _showError('Please correct the form errors before submitting');
       return false;
     }
 
-    // Identity document must be uploaded.
     if (!identityUploaded.value) {
       _showError('Please upload your identity document before submitting');
       return false;
     }
 
-    // Guidelines must be accepted.
     if (!guidelinesAccepted.value) {
       _showError('You must accept the Creator Guidelines before submitting');
       return false;
@@ -349,26 +403,37 @@ class CreatorFormController extends GetxController {
         testPassed: testPassed.value,
         testScore: testScore.value,
         testTotalQuestions: testTotalQuestions.value,
-        status: CreatorRequestStatus.pending,
+        status: CreatorRequestStatus.approved,
         guidelinesAccepted: guidelinesAccepted.value,
       );
 
       await _repository.submitRequest(request);
+      await _userProfileRepository.promoteUserToCreator(userId: auth.userId);
 
       hasExistingRequest.value = true;
       currentStep.value = CreatorFlowStep.submitted;
-
-      // Store locally for performance.
       _storeApprovedDataLocally(request);
-
-      // Update creator status on the auth controller.
-      auth.setCreatorStatus(false); // Still pending, not yet approved.
+      auth.setCreatorStatus(true);
 
       _showSuccess(
-        'Your creator application has been submitted successfully! '
-        'You will receive an update within 48 hours.',
+        'Creator status activated successfully. '
+        'Your profile is now eligible for New Buddies.',
       );
       return true;
+    } on FirebaseException catch (e) {
+      if (e.code == 'already-exists') {
+        hasExistingRequest.value = true;
+        return _handleExistingRequest(auth);
+      }
+      if (e.code == 'permission-denied') {
+        _showError(
+          'Submission failed due to Firestore access rules. '
+          'Please contact support with code: permission-denied.',
+        );
+        return false;
+      }
+      _showError('Submission failed: ${e.message ?? e.code}');
+      return false;
     } catch (e) {
       _showError('Submission failed: $e');
       return false;
@@ -377,8 +442,6 @@ class CreatorFormController extends GetxController {
     }
   }
 
-  /// Builds a [CreatorRequest] from the current local state.
-  /// Useful for previewing what would be submitted.
   CreatorRequest buildLocalRequest() {
     final auth = Get.find<AuthController>();
     return CreatorRequest(
@@ -401,9 +464,17 @@ class CreatorFormController extends GetxController {
     );
   }
 
-  // ── Private helpers ────────────────────────────────────────────────
+  Future<void> _recordTestAttempt({required bool passed}) async {
+    final auth = Get.find<AuthController>();
+    if (!auth.isLoggedIn) {
+      return;
+    }
+    await _userProfileRepository.recordCreatorTestAttempt(
+      userId: auth.userId,
+      passed: passed,
+    );
+  }
 
-  /// Clears all temporary local data (called when the test is failed).
   void _resetLocalData() {
     fullLegalNameController.clear();
     countryController.clear();
@@ -421,97 +492,90 @@ class CreatorFormController extends GetxController {
     currentStep.value = CreatorFlowStep.formEntry;
   }
 
-  /// Stores the submitted request locally for quick access.
   void _storeApprovedDataLocally(CreatorRequest request) {
     approvedLocalData.value = request;
   }
 
+  Future<bool> _handleExistingRequest(AuthController auth) async {
+    final existing = await _repository.fetchByUserId(auth.userId);
+    if (existing == null) {
+      _showError('You have already submitted a creator application');
+      return false;
+    }
+
+    switch (existing.status) {
+      case CreatorRequestStatus.approved:
+        await _userProfileRepository.promoteUserToCreator(userId: auth.userId);
+        auth.setCreatorStatus(true);
+        _storeApprovedDataLocally(existing);
+        _showSuccess(
+          'Your creator application is already approved. '
+          'Your creator account is active.',
+        );
+        return true;
+      case CreatorRequestStatus.pending:
+        _showError(
+          'Your creator application is already submitted and under review.',
+        );
+        return false;
+      case CreatorRequestStatus.rejected:
+        _showError(
+          'Your previous creator application was rejected. '
+          'Please contact support before reapplying.',
+        );
+        return false;
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    final totalMinutes = duration.inMinutes;
+    if (totalMinutes <= 0) {
+      return '0m';
+    }
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    if (hours == 0) {
+      return '${minutes}m';
+    }
+    if (minutes == 0) {
+      return '${hours}h';
+    }
+    return '${hours}h ${minutes}m';
+  }
+
   void _showError(String message) {
     errorMessage.value = message;
-    _showFeedbackSnackbar(
-      title: 'Error',
-      message: message,
+    if (Get.context == null) {
+      return;
+    }
+    Get.snackbar(
+      'Error',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
       backgroundColor: Colors.red.shade600.withValues(alpha: 0.9),
-      icon: Icons.error_outline,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 4),
+      margin: const EdgeInsets.all(16),
+      borderRadius: 12,
+      icon: const Icon(Icons.error_outline, color: Colors.white),
     );
   }
 
   void _showSuccess(String message) {
     successMessage.value = message;
-    _showFeedbackSnackbar(
-      title: 'Success',
-      message: message,
-      backgroundColor: Colors.green.shade600.withValues(alpha: 0.9),
-      icon: Icons.check_circle_outline,
-    );
-  }
-
-  void _showFeedbackSnackbar({
-    required String title,
-    required String message,
-    required Color backgroundColor,
-    required IconData icon,
-  }) {
-    final context = Get.context;
-    if (context != null) {
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      if (messenger != null) {
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: backgroundColor,
-            duration: const Duration(seconds: 4),
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            content: Row(
-              children: [
-                Icon(icon, color: Colors.white),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        message,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-        return;
-      }
-    }
-
-    if (Get.overlayContext == null) {
+    if (Get.context == null) {
       return;
     }
-
     Get.snackbar(
-      title,
+      'Success',
       message,
       snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: backgroundColor,
+      backgroundColor: Colors.green.shade600.withValues(alpha: 0.9),
       colorText: Colors.white,
       duration: const Duration(seconds: 4),
       margin: const EdgeInsets.all(16),
       borderRadius: 12,
-      icon: Icon(icon, color: Colors.white),
+      icon: const Icon(Icons.check_circle_outline, color: Colors.white),
     );
   }
 }

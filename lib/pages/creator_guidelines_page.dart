@@ -40,7 +40,74 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
     return ((_correctAnswers / _knowledgeQuestions.length) * 100).round();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _guardTestAccess();
+    });
+  }
+
+  Future<void> _guardTestAccess() async {
+    final controller = Get.find<CreatorFormController>();
+    await controller.refreshSubmissionState();
+    if (!mounted) {
+      return;
+    }
+    if (controller.hasExistingRequest.value) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your creator application already exists. '
+            'You cannot retake the test now.',
+          ),
+        ),
+      );
+      context.go('/become-creator');
+      return;
+    }
+
+    final canAccess = await controller.canAccessKnowledgeTest(
+      showFeedback: true,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (canAccess) {
+      return;
+    }
+    context.go('/become-creator');
+  }
+
   Future<void> _onSubmit() async {
+    final controller = Get.find<CreatorFormController>();
+    await controller.refreshSubmissionState();
+    if (!mounted) {
+      return;
+    }
+    if (controller.hasExistingRequest.value) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your creator application is already submitted and under review.',
+          ),
+        ),
+      );
+      context.go('/become-creator');
+      return;
+    }
+
+    final canAccess = await controller.canAccessKnowledgeTest(
+      showFeedback: true,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (!canAccess) {
+      context.go('/become-creator');
+      return;
+    }
+
     if (!_rulesAccepted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -62,8 +129,9 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
     }
 
     setState(() => _isSubmitting = true);
+    controller.errorMessage.value = '';
+    controller.successMessage.value = '';
 
-    final controller = Get.find<CreatorFormController>();
     final passed = _correctAnswers >= _requiredCorrectAnswers;
 
     // Record the test result and handle submission.
@@ -75,6 +143,9 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
+    final nextRetakeAt = controller.nextRetakeAllowedAt.value;
+    final successDetails = controller.successMessage.value.trim();
+    final failureDetails = controller.errorMessage.value.trim();
 
     // Show the result dialog.
     await showDialog<void>(
@@ -120,8 +191,10 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
               if (passed) ...[
                 if (success)
                   Text(
-                    'Your creator application has been submitted successfully! '
-                    'You will receive an update within 48 hours.',
+                    successDetails.isNotEmpty
+                        ? successDetails
+                        : 'Creator status activated successfully. '
+                              'Your profile is now eligible for New Buddies.',
                     style: GoogleFonts.notoSans(
                       color: const Color(0xFF81C784),
                       fontWeight: FontWeight.w600,
@@ -130,8 +203,10 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
                   )
                 else
                   Text(
-                    'You passed the test but there was an issue submitting '
-                    'your application. Please try again.',
+                    failureDetails.isNotEmpty
+                        ? failureDetails
+                        : 'You passed the test but there was an issue '
+                              'submitting your application. Please try again.',
                     style: GoogleFonts.notoSans(
                       color: Colors.orange,
                       fontWeight: FontWeight.w500,
@@ -149,13 +224,24 @@ class _CreatorGuidelinesPageState extends State<CreatorGuidelinesPage> {
                 const SizedBox(height: 8),
                 Text(
                   'Your temporary data has been cleared. '
-                  'Please review the guidelines and try again after 3 days.',
+                  'Please review the guidelines and try again after 72 hours.',
                   style: GoogleFonts.notoSans(
                     color: Colors.redAccent.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w500,
                     height: 1.4,
                   ),
                 ),
+                if (nextRetakeAt != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Next access: ${nextRetakeAt.toUtc().toIso8601String()}',
+                    style: GoogleFonts.notoSans(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ],
             ],
           ),
@@ -527,10 +613,9 @@ class _KnowledgeQuestion {
 }
 
 const List<String> _testRules = [
-  'You have 3 attempts to complete this test.',
   'You must score at least 15/20 to pass.',
   'You can review the rules before submitting your answers.',
-  'If you fail, your application may be paused and can be retried after 3 days.',
+  'If you fail, you can retake the test after 72 hours.',
   'Reading the full guideline page is strongly recommended.',
 ];
 
