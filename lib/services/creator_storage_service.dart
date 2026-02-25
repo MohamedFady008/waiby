@@ -87,10 +87,14 @@ class CreatorStorageService {
         downloadUrl: downloadUrl,
       );
     } on FirebaseException catch (e) {
-      return IdentityUploadResult.error(
-        'Upload failed: ${e.message ?? e.code}',
-      );
+      return IdentityUploadResult.error(_formatStorageError(e));
     } catch (e) {
+      final message = e.toString();
+      if (message.contains('Service storage is not available')) {
+        return const IdentityUploadResult.error(
+          'Upload failed [storage-unavailable]. Firebase Storage web SDK is missing in the deployed bundle. Rebuild/deploy the latest web build and clear browser cache.',
+        );
+      }
       return IdentityUploadResult.error('Unexpected upload error: $e');
     }
   }
@@ -101,6 +105,25 @@ class CreatorStorageService {
       await _storage.ref(storagePath).delete();
     } on FirebaseException {
       // Silently ignore if the file doesn't exist.
+    }
+  }
+
+  String _formatStorageError(FirebaseException e) {
+    final code = e.code.trim().isEmpty ? 'unknown' : e.code.trim();
+    switch (code) {
+      case 'unauthorized':
+        return 'Upload failed [unauthorized]. Check Storage rules and sign-in state.';
+      case 'no-default-bucket':
+      case 'bucket-not-found':
+        return 'Upload failed [$code]. Firebase Storage bucket is not configured.';
+      case 'canceled':
+        return 'Upload was canceled.';
+      default:
+        final message = e.message?.trim();
+        if (message != null && message.isNotEmpty) {
+          return 'Upload failed [$code]: $message';
+        }
+        return 'Upload failed [$code].';
     }
   }
 }
