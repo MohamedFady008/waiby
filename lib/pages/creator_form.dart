@@ -1131,9 +1131,10 @@ class _IdentityVerificationCard extends StatelessWidget {
             final hasFile = controller.identityFileName.value.isNotEmpty;
             final uploaded = controller.identityUploaded.value;
             final uploading = controller.isUploading.value;
+            final canBrowse = !uploading && (!hasFile || uploaded);
 
             return GestureDetector(
-              onTap: uploading ? null : () => _pickFile(context, controller),
+              onTap: canBrowse ? () => _pickFile(context, controller) : null,
               child: Container(
                 width: double.infinity,
                 constraints: const BoxConstraints(minHeight: 180),
@@ -1368,8 +1369,13 @@ class _IdentityVerificationCard extends StatelessWidget {
         return;
       }
 
-      // Determine MIME type from extension.
-      final ext = file.extension?.toLowerCase() ?? '';
+      // Derive a robust extension/mime pair across browsers and file systems.
+      final rawExt = file.extension?.trim().toLowerCase();
+      final extFromName = file.name.contains('.')
+          ? file.name.split('.').last.trim().toLowerCase()
+          : '';
+      final ext = (rawExt != null && rawExt.isNotEmpty) ? rawExt : extFromName;
+
       String? mimeType;
       switch (ext) {
         case 'jpg':
@@ -1387,8 +1393,16 @@ class _IdentityVerificationCard extends StatelessWidget {
           break;
       }
 
+      var normalizedFileName = file.name.trim();
+      if (normalizedFileName.isEmpty) {
+        normalizedFileName = 'identity_document';
+      }
+      if (!normalizedFileName.contains('.') && ext.isNotEmpty) {
+        normalizedFileName = '$normalizedFileName.$ext';
+      }
+
       controller.setIdentityFile(
-        fileName: file.name,
+        fileName: normalizedFileName,
         bytes: bytes,
         mimeType: mimeType,
       );
