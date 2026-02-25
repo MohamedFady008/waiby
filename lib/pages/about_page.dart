@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../widgets/chat_sidebar.dart';
 import '../widgets/common/responsive_layout.dart';
 import '../widgets/waiby_footer.dart';
 
@@ -52,7 +51,6 @@ class _AboutPageState extends State<AboutPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final pageWidth = constraints.maxWidth;
-        final showSidebar = pageWidth >= 1200;
         final compact = pageWidth < WaibyBreakpoints.mobile;
 
         return Container(
@@ -72,22 +70,11 @@ class _AboutPageState extends State<AboutPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     WaibyConstrainedContent(
-                      maxWidth: showSidebar ? 1380 : 1200,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: _FaqMainContent(
-                              compact: compact,
-                              expandedEntryIds: _expandedEntryIds,
-                              onToggleEntry: _toggleEntry,
-                            ),
-                          ),
-                          if (showSidebar) ...[
-                            const SizedBox(width: WaibySpacing.s16),
-                            const _FaqRail(),
-                          ],
-                        ],
+                      maxWidth: 1200,
+                      child: _FaqMainContent(
+                        compact: compact,
+                        expandedEntryIds: _expandedEntryIds,
+                        onToggleEntry: _toggleEntry,
                       ),
                     ),
                     SizedBox(height: compact ? 72 : 96),
@@ -443,35 +430,6 @@ class _HelpCenterCallout extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _FaqRail extends StatelessWidget {
-  const _FaqRail();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 84,
-      child: Container(
-        height: 793,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: const ChatSidebar(
-          width: 84,
-          padding: EdgeInsets.symmetric(vertical: 10),
-          backgroundColor: Colors.transparent,
-          avatarSize: 48,
-          frameSize: 62,
-          itemSpacing: 14,
-          unreadBadgeSize: 20,
-          unreadBadgeFontSize: 11,
-        ),
-      ),
     );
   }
 }

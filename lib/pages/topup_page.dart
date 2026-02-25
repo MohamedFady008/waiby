@@ -10,7 +10,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/topup_checkout_service.dart';
-import '../widgets/chat_sidebar.dart';
 import '../widgets/common/responsive_layout.dart';
 import '../widgets/waiby_footer.dart';
 
@@ -309,12 +308,6 @@ class _TopupPageState extends State<TopupPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = constraints.maxWidth;
-        final showChatSidebar = screenWidth >= 1100;
-        const sidebarWidth = 84.0;
-        const sidebarGap = 12.0;
-        final reservedSidebarSpace = showChatSidebar
-            ? sidebarWidth + sidebarGap
-            : 0.0;
         final horizontalPadding = waibyHorizontalPaddingForWidth(screenWidth);
 
         return Container(
@@ -336,7 +329,7 @@ class _TopupPageState extends State<TopupPage> {
                       padding: EdgeInsets.fromLTRB(
                         horizontalPadding,
                         56,
-                        horizontalPadding + reservedSidebarSpace,
+                        horizontalPadding,
                         72,
                       ),
                       child: _buildRechargeBody(),
@@ -345,26 +338,6 @@ class _TopupPageState extends State<TopupPage> {
                   ],
                 ),
               ),
-              if (showChatSidebar)
-                Positioned.fill(
-                  child: Align(
-                    alignment: Alignment.topRight,
-                    child: SizedBox(
-                      width: sidebarWidth,
-                      height: math.max(360, constraints.maxHeight - 16),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: ChatSidebar(width: sidebarWidth),
-                      ),
-                    ),
-                  ),
-                ),
-              if (showChatSidebar)
-                Positioned(
-                  right: sidebarWidth + 24,
-                  top: constraints.maxHeight * 0.53,
-                  child: const _FloatingChatButton(),
-                ),
             ],
           ),
         );
@@ -942,23 +915,6 @@ class _DashedRectPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DashedRectPainter oldDelegate) {
     return oldDelegate.radius != radius;
-  }
-}
-
-class _FloatingChatButton extends StatelessWidget {
-  const _FloatingChatButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 54,
-      height: 54,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: Color(0xFF51D76E),
-      ),
-      child: const Icon(Icons.chat_bubble_rounded, color: Colors.white),
-    );
   }
 }
 

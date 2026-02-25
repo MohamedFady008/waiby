@@ -11,24 +11,14 @@ class ExplorePage extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, c) {
         final w = c.maxWidth;
-        final showRail = w >= 1680;
         final threeCol = w >= 1380;
         final twoCol = w >= 1080 && !threeCol;
-        const railRightInset = 8.0;
-        const railWidth = 76.0;
-        const railGap = 8.0;
         final pad = w >= 1200
             ? 28.0
             : w >= 900
             ? 20.0
             : 12.0;
-        final railReserve = showRail
-            ? railWidth + railRightInset + railGap
-            : 0.0;
-        final contentW = math.min(
-          1680.0,
-          math.max(0.0, w - (pad * 2) - (railReserve * 2)),
-        );
+        final contentW = math.min(1680.0, math.max(0.0, w - (pad * 2)));
         final sideW = w >= 1540 ? 300.0 : 272.0;
         final feedW = threeCol
             ? math.min(803.0, contentW - (sideW * 2) - 48.0)
@@ -48,12 +38,7 @@ class ExplorePage extends StatelessWidget {
             children: [
               const Positioned.fill(child: _BgGlow()),
               SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  pad + railReserve,
-                  22,
-                  pad + railReserve,
-                  220,
-                ),
+                padding: EdgeInsets.fromLTRB(pad, 22, pad, 220),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: contentW),
@@ -139,13 +124,6 @@ class ExplorePage extends StatelessWidget {
                   ),
                 ),
               ),
-              if (showRail)
-                Positioned(
-                  right: railRightInset,
-                  top: 10,
-                  bottom: 10,
-                  child: const _RightRail(),
-                ),
             ],
           ),
         );
@@ -935,92 +913,6 @@ class _LivePanel extends StatelessWidget {
           const SizedBox(height: 9),
           row("Mr.Big", "noodles night", "assets/pp7.png"),
         ],
-      ),
-    );
-  }
-}
-
-class _RightRail extends StatelessWidget {
-  const _RightRail();
-
-  @override
-  Widget build(BuildContext context) {
-    const entries = [
-      ("assets/pp1.png", true, 1),
-      ("assets/pp2.png", false, null),
-      ("assets/pp3.png", true, 1),
-      ("assets/pp4.png", true, 1),
-      ("assets/pp5.png", true, 1),
-      ("assets/pp6.png", false, null),
-      ("assets/pp7.png", false, null),
-      ("assets/pp1.png", false, null),
-      ("assets/pp2.png", false, null),
-    ];
-
-    return SizedBox(
-      width: 76,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            for (final e in entries) ...[
-              SizedBox(
-                width: 64,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    if (e.$2)
-                      Positioned(
-                        left: 0,
-                        top: 20,
-                        child: Container(
-                          width: 4,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                      ),
-                    Center(child: _Avatar(asset: e.$1, size: 48)),
-                    if (e.$3 != null)
-                      Positioned(
-                        right: 0,
-                        bottom: -2,
-                        child: Container(
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFED4245),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: const Color(0xFF202225),
-                              width: 1.5,
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            "${e.$3}",
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-          ],
-        ),
       ),
     );
   }

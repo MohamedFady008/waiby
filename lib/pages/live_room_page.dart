@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../widgets/chat_sidebar.dart';
-
 class LiveRoomPage extends StatelessWidget {
   final bool isHost;
 
@@ -30,21 +28,12 @@ class LiveRoomPage extends StatelessWidget {
         builder: (context, c) {
           final w = c.maxWidth;
           final h = c.maxHeight;
-          final showRail = w >= 1320;
-          const railWidth = 84.0;
-          const railGap = 12.0;
           final pad = w >= 1500
               ? 20.0
               : w >= 1100
               ? 14.0
               : 8.0;
-          final contentW = math.min(
-            1720.0,
-            math.max(
-              300.0,
-              w - (pad * 2) - (showRail ? railWidth + railGap : 0),
-            ),
-          );
+          final contentW = math.min(1720.0, math.max(300.0, w - (pad * 2)));
 
           return Container(
             decoration: const BoxDecoration(
@@ -54,26 +43,19 @@ class LiveRoomPage extends StatelessWidget {
                 colors: [Color(0xFF0C122D), Color(0xFF050816)],
               ),
             ),
-            child: Row(
+            child: Stack(
               children: [
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: SizedBox(
-                      width: contentW,
-                      height: h,
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(pad, 22, pad, 16),
-                        child: _LiveShell(isHost: isHost),
-                      ),
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: contentW,
+                    height: h,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(pad, 22, pad, 16),
+                      child: _LiveShell(isHost: isHost),
                     ),
                   ),
                 ),
-                if (showRail)
-                  Padding(
-                    padding: EdgeInsets.only(right: pad),
-                    child: const _LiveRail(),
-                  ),
               ],
             ),
           );
@@ -1478,36 +1460,6 @@ Future<bool> _showLeaveLiveDialog(
     },
   );
   return confirmLeave ?? false;
-}
-
-class _LiveRail extends StatelessWidget {
-  const _LiveRail();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 84,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          border: Border(
-            left: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            right: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
-          ),
-        ),
-        child: const ChatSidebar(
-          width: 84,
-          backgroundColor: Colors.transparent,
-          padding: EdgeInsets.only(top: 8, bottom: 12),
-          avatarSize: 48,
-          frameSize: 62,
-          itemSpacing: 12,
-          unreadBadgeSize: 20,
-          unreadBadgeFontSize: 11,
-        ),
-      ),
-    );
-  }
 }
 
 class _Avatar extends StatelessWidget {

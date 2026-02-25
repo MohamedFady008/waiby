@@ -8,7 +8,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
 import '../data/models/user_profile.dart';
 import '../data/repositories/user_profile_repository.dart';
-import '../widgets/chat_sidebar.dart';
 import '../widgets/common/responsive_layout.dart';
 import '../data/models/profile_tab_models.dart';
 import '../data/repositories/profile_tabs_repository.dart';
@@ -33,21 +32,15 @@ class _ProfilePageState extends State<ProfilePage> {
     final profileUserId = _resolveProfileUserId(widget.userId);
     final fallbackUserName = _resolveUserName(widget.userId);
     final isViewingOtherAccount = _isViewingOtherAccount(profileUserId);
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final showRail = width >= 1500;
-        const railWidth = 76.0;
-        const railInset = 8.0;
-        const railGap = 12.0;
         final pagePadding = width >= 1200
             ? 28.0
             : waibyHorizontalPaddingForWidth(width);
-        final railReserve = showRail ? railWidth + railInset + railGap : 0.0;
         final contentWidth = math.min(
           1380.0,
-          math.max(0.0, width - (pagePadding * 2) - (railReserve * 2)),
+          math.max(0.0, width - (pagePadding * 2)),
         );
 
         return Container(
@@ -62,12 +55,7 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               const Positioned.fill(child: _BackdropGlow()),
               SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  pagePadding + railReserve,
-                  18,
-                  pagePadding + railReserve,
-                  36,
-                ),
+                padding: EdgeInsets.fromLTRB(pagePadding, 18, pagePadding, 36),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: contentWidth),
@@ -108,13 +96,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
               ),
-              if (showRail)
-                const Positioned(
-                  right: railInset,
-                  top: 10,
-                  bottom: 10,
-                  child: _RightRail(),
-                ),
             ],
           ),
         );
@@ -4544,34 +4525,6 @@ class _ActionPanel extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-class _RightRail extends StatelessWidget {
-  const _RightRail();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 76,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-        ),
-        child: const ChatSidebar(
-          width: 76,
-          backgroundColor: Colors.transparent,
-          padding: EdgeInsets.symmetric(vertical: 8),
-          avatarSize: 48,
-          frameSize: 66,
-          itemSpacing: 12,
-          unreadBadgeSize: 20,
-          unreadBadgeFontSize: 11,
-        ),
-      ),
     );
   }
 }

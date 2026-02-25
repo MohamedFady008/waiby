@@ -444,6 +444,26 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     });
   }
 
+  double _scaleByWidth(
+    double width, {
+    required double min,
+    required double max,
+    double minWidth = 560,
+    double maxWidth = 1040,
+  }) {
+    if (max <= min) {
+      return min;
+    }
+    if (width <= minWidth) {
+      return min;
+    }
+    if (width >= maxWidth) {
+      return max;
+    }
+    final t = (width - minWidth) / (maxWidth - minWidth);
+    return min + ((max - min) * t);
+  }
+
   @override
   Widget build(BuildContext context) {
     final selected = _selectedThread;
@@ -457,13 +477,17 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
             : widget.height;
         final compact = panelWidth < 860;
         final tiny = panelWidth < 620;
+        final cornerRadius = _scaleByWidth(panelWidth, min: 8, max: 12);
         final threadListWidth = math
-            .min(340.0, panelWidth * 0.34)
-            .clamp(230.0, 340.0)
+            .min(320.0, panelWidth * 0.33)
+            .clamp(210.0, 320.0)
             .toDouble();
-        final outerPadding = tiny ? 12.0 : 16.0;
-        final threadListHeight = (panelHeight * 0.35)
-            .clamp(180.0, 260.0)
+        final outerPadding = tiny
+            ? 10.0
+            : _scaleByWidth(panelWidth, min: 11, max: 16);
+        final sectionGap = _scaleByWidth(panelWidth, min: 8, max: 12);
+        final threadListHeight = (panelHeight * 0.33)
+            .clamp(170.0, 240.0)
             .toDouble();
 
         return Container(
@@ -471,18 +495,22 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
           constraints: BoxConstraints(minHeight: 420, maxHeight: panelHeight),
           decoration: BoxDecoration(
             color: Colors.black,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(cornerRadius),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(cornerRadius),
             child: Column(
               children: [
-                _buildTopBar(compact: compact),
+                _buildTopBar(
+                  compact: compact,
+                  panelWidth: panelWidth,
+                  cornerRadius: cornerRadius,
+                ),
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       outerPadding,
-                      outerPadding - 1,
+                      0,
                       outerPadding,
                       outerPadding,
                     ),
@@ -494,13 +522,18 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                                   minHeight: 180,
                                   maxHeight: threadListHeight,
                                 ),
-                                child: _buildThreadList(compact: true),
+                                child: _buildThreadList(
+                                  compact: true,
+                                  cornerRadius: cornerRadius,
+                                ),
                               ),
-                              const SizedBox(height: 12),
+                              SizedBox(height: sectionGap),
                               Expanded(
                                 child: _buildMessagesPanel(
                                   selected,
                                   compact: true,
+                                  cornerRadius: cornerRadius,
+                                  panelWidth: panelWidth,
                                 ),
                               ),
                             ],
@@ -509,13 +542,18 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                             children: [
                               SizedBox(
                                 width: threadListWidth,
-                                child: _buildThreadList(compact: false),
+                                child: _buildThreadList(
+                                  compact: false,
+                                  cornerRadius: cornerRadius,
+                                ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: sectionGap),
                               Expanded(
                                 child: _buildMessagesPanel(
                                   selected,
                                   compact: false,
+                                  cornerRadius: cornerRadius,
+                                  panelWidth: panelWidth,
                                 ),
                               ),
                             ],
@@ -530,121 +568,145 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     );
   }
 
-  Widget _buildTopBar({required bool compact}) {
+  Widget _buildTopBar({
+    required bool compact,
+    required double panelWidth,
+    required double cornerRadius,
+  }) {
+    final iconSize = _scaleByWidth(panelWidth, min: 14, max: 16);
+    final titleSize = _scaleByWidth(panelWidth, min: 12, max: 13);
     return Container(
-      constraints: BoxConstraints(minHeight: compact ? 54 : 58),
+      width: double.infinity,
+      constraints: BoxConstraints(minHeight: compact ? 40 : 44),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.21),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(cornerRadius)),
       ),
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 12 : 16,
-        vertical: compact ? 8 : 10,
+      padding: EdgeInsets.fromLTRB(
+        compact ? 8 : 10,
+        compact ? 4 : 5,
+        compact ? 8 : 10,
+        compact ? 4 : 5,
       ),
-      child: Container(
-        constraints: BoxConstraints(minHeight: compact ? 36 : 40),
-        padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 14),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.21),
-          border: Border.all(color: Colors.black),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.inbox_rounded,
-              color: Colors.white,
-              size: compact ? 19 : 21,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'All',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: compact ? 16 : 18,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          constraints: BoxConstraints(minHeight: compact ? 26 : 28),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 8 : 10,
+            vertical: compact ? 2 : 3,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.21),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.7)),
+            borderRadius: BorderRadius.circular(cornerRadius - 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.inbox_rounded, color: Colors.white, size: iconSize),
+              const SizedBox(width: 4),
+              Text(
+                'All',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: titleSize,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildThreadList({required bool compact}) {
+  Widget _buildThreadList({
+    required bool compact,
+    required double cornerRadius,
+  }) {
     final results = _filteredThreads;
+    final headerHeight = compact ? 44.0 : 48.0;
+    final headerTitleSize = compact ? 13.0 : 14.0;
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1D1C3E),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(cornerRadius),
       ),
       child: Column(
         children: [
           Container(
-            constraints: BoxConstraints(minHeight: compact ? 56 : 60),
+            constraints: BoxConstraints(minHeight: headerHeight),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.38),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(10),
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(cornerRadius),
               ),
             ),
-            padding: EdgeInsets.symmetric(vertical: compact ? 10 : 12),
+            padding: EdgeInsets.symmetric(vertical: compact ? 6 : 7),
             alignment: Alignment.center,
             child: Text(
-              'Blocked users',
+              'Conversations',
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
-                fontSize: compact ? 16 : 18,
+                fontSize: headerTitleSize,
               ),
             ),
           ),
           Padding(
             padding: EdgeInsets.fromLTRB(
-              compact ? 14 : 18,
-              compact ? 12 : 16,
-              compact ? 14 : 18,
-              12,
+              compact ? 10 : 12,
+              compact ? 8 : 10,
+              compact ? 10 : 12,
+              compact ? 8 : 10,
             ),
             child: SizedBox(
-              height: compact ? 46 : 50,
+              height: compact ? 34 : 36,
               child: TextField(
                 controller: _searchController,
                 style: GoogleFonts.inter(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: compact ? 14 : 15,
+                  fontSize: compact ? 12 : 13,
                 ),
                 decoration: InputDecoration(
+                  isDense: true,
                   filled: true,
                   fillColor: Colors.black.withValues(alpha: 0.09),
                   hintText: 'Search for people',
                   hintStyle: GoogleFonts.inter(
                     color: Colors.white.withValues(alpha: 0.7),
                     fontWeight: FontWeight.w600,
-                    fontSize: compact ? 13 : 14,
+                    fontSize: compact ? 11 : 12,
+                  ),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 30,
+                    maxWidth: 34,
                   ),
                   prefixIcon: Icon(
                     Icons.search_rounded,
                     color: Colors.white.withValues(alpha: 0.3),
-                    size: compact ? 22 : 24,
+                    size: compact ? 15 : 16,
                   ),
-                  contentPadding: EdgeInsets.only(top: compact ? 9 : 10),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: compact ? 6 : 7,
+                  ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(cornerRadius - 1),
                     borderSide: BorderSide(
                       color: Colors.white.withValues(alpha: 0.1),
                     ),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(cornerRadius - 1),
                     borderSide: BorderSide(
                       color: Colors.white.withValues(alpha: 0.1),
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(cornerRadius - 1),
                     borderSide: BorderSide(
                       color: Colors.white.withValues(alpha: 0.26),
                     ),
@@ -661,6 +723,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                 final selected = thread.id == _selectedThreadId;
                 return _ThreadTile(
                   thread: thread,
+                  compact: compact,
                   selected: selected,
                   onTap: () => _selectThread(thread.id),
                 );
@@ -672,7 +735,12 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     );
   }
 
-  Widget _buildMessagesPanel(_ThreadRuntime thread, {required bool compact}) {
+  Widget _buildMessagesPanel(
+    _ThreadRuntime thread, {
+    required bool compact,
+    required double cornerRadius,
+    required double panelWidth,
+  }) {
     final dayLabel = _formatDateStamp(
       thread.messages.isNotEmpty
           ? thread.messages.first.sentAt
@@ -682,36 +750,41 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final settingsPanelWidth = (constraints.maxWidth * 0.72)
-            .clamp(240.0, 360.0)
+            .clamp(220.0, 340.0)
             .toDouble();
         final giftPanelWidth = (constraints.maxWidth - 16)
-            .clamp(280.0, 460.0)
+            .clamp(260.0, 430.0)
             .toDouble();
         final giftPanelHeight =
-            (constraints.maxHeight * (compact ? 0.72 : 0.62))
-                .clamp(260.0, 420.0)
+            (constraints.maxHeight * (compact ? 0.68 : 0.58))
+                .clamp(240.0, 400.0)
                 .toDouble();
         final showFloatingOverlay = _showSettingsPanel || _showGiftPanel;
+        final headerHeight = compact ? 44.0 : 48.0;
+        final headerTitleSize = compact ? 13.0 : 14.0;
+        final headerAvatarSize = compact ? 28.0 : 30.0;
+        final headerFrameSize = compact ? 34.0 : 36.0;
+        final headerIconSize = _scaleByWidth(panelWidth, min: 15, max: 16);
 
         return Container(
           decoration: BoxDecoration(
             color: const Color(0xFF1D1C3E),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(cornerRadius),
           ),
           child: Stack(
             children: [
               Column(
                 children: [
                   Container(
-                    constraints: BoxConstraints(minHeight: compact ? 58 : 62),
+                    constraints: BoxConstraints(minHeight: headerHeight),
                     padding: EdgeInsets.symmetric(
-                      horizontal: compact ? 12 : 16,
-                      vertical: compact ? 8 : 10,
+                      horizontal: compact ? 8 : 10,
+                      vertical: compact ? 6 : 7,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.38),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(10),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(cornerRadius),
                       ),
                     ),
                     child: Row(
@@ -719,17 +792,17 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                         _FramedAvatar(
                           avatarAsset: thread.avatarAsset,
                           frameAsset: thread.frameAsset,
-                          avatarSize: compact ? 40 : 44,
-                          frameSize: compact ? 48 : 54,
+                          avatarSize: headerAvatarSize,
+                          frameSize: headerFrameSize,
                           showOnlineDot: thread.isOnline,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 6),
                         Text(
                           thread.displayName,
                           style: GoogleFonts.inter(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
-                            fontSize: compact ? 14 : 15,
+                            fontSize: headerTitleSize,
                             height: 1.3,
                           ),
                         ),
@@ -737,18 +810,21 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                         _HeaderIcon(
                           tooltip: 'Voice call',
                           icon: Icons.add_ic_call_rounded,
+                          iconSize: headerIconSize,
                           onTap: () {},
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 6),
                         _HeaderIcon(
                           tooltip: 'Settings',
                           icon: Icons.settings_rounded,
+                          iconSize: headerIconSize,
                           onTap: _toggleSettingsPanel,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 6),
                         _HeaderIcon(
                           tooltip: 'Close',
                           icon: Icons.logout_rounded,
+                          iconSize: headerIconSize,
                           onTap: () {
                             final onClose = widget.onClose;
                             if (onClose != null) {
@@ -764,10 +840,10 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                   Expanded(
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
-                        compact ? 14 : 18,
-                        compact ? 12 : 16,
-                        compact ? 14 : 18,
-                        12,
+                        compact ? 12 : 14,
+                        compact ? 10 : 12,
+                        compact ? 12 : 14,
+                        compact ? 10 : 12,
                       ),
                       child: Column(
                         children: [
@@ -784,18 +860,22 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                                         alpha: 0.5,
                                       ),
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 11,
+                                      fontSize: compact ? 10 : 11,
                                     ),
                                   ),
                                 ),
-                                SizedBox(height: compact ? 10 : 14),
+                                SizedBox(height: compact ? 8 : 12),
                                 for (final message in thread.messages)
                                   _MessageBubble(message: message),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          _buildComposer(thread.displayName, compact: compact),
+                          SizedBox(height: compact ? 8 : 10),
+                          _buildComposer(
+                            thread.displayName,
+                            compact: compact,
+                            cornerRadius: cornerRadius,
+                          ),
                         ],
                       ),
                     ),
@@ -893,47 +973,52 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     );
   }
 
-  Widget _buildComposer(String displayName, {required bool compact}) {
+  Widget _buildComposer(
+    String displayName, {
+    required bool compact,
+    required double cornerRadius,
+  }) {
     return SizedBox(
-      height: compact ? 44 : 46,
+      height: compact ? 40 : 44,
       child: TextField(
         controller: _messageController,
         onSubmitted: (_) => _sendMessage(),
         style: GoogleFonts.inter(
           color: Colors.white,
           fontWeight: FontWeight.w600,
-          fontSize: compact ? 12 : 13,
+          fontSize: compact ? 11 : 12,
         ),
         decoration: InputDecoration(
+          isDense: true,
           filled: true,
           fillColor: Colors.black.withValues(alpha: 0.09),
           hintText: 'Message $displayName',
           hintStyle: GoogleFonts.inter(
             color: Colors.white.withValues(alpha: 0.7),
             fontWeight: FontWeight.w600,
-            fontSize: compact ? 11 : 12,
+            fontSize: compact ? 10 : 11,
           ),
-          contentPadding: EdgeInsets.symmetric(vertical: compact ? 10 : 11),
+          contentPadding: EdgeInsets.symmetric(vertical: compact ? 9 : 10),
           prefixIcon: Icon(
             Icons.attach_file_rounded,
             color: Colors.white.withValues(alpha: 0.74),
-            size: compact ? 18 : 20,
+            size: compact ? 16 : 18,
           ),
           suffixIconConstraints: BoxConstraints(
-            minWidth: compact ? 88 : 100,
-            maxWidth: compact ? 96 : 108,
+            minWidth: compact ? 78 : 90,
+            maxWidth: compact ? 88 : 98,
           ),
           suffixIcon: SizedBox(
-            width: compact ? 96 : 108,
+            width: compact ? 88 : 98,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Icon(
                   Icons.emoji_emotions_outlined,
                   color: Colors.white.withValues(alpha: 0.54),
-                  size: compact ? 20 : 22,
+                  size: compact ? 18 : 20,
                 ),
-                SizedBox(width: compact ? 8 : 10),
+                SizedBox(width: compact ? 6 : 8),
                 InkWell(
                   borderRadius: BorderRadius.circular(14),
                   onTap: _toggleGiftPanel,
@@ -946,37 +1031,37 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                                   ? const Color(0xFF51D76E)
                                   : Colors.white)
                               .withValues(alpha: _showGiftPanel ? 1 : 0.54),
-                      size: compact ? 18 : 19,
+                      size: compact ? 16 : 18,
                     ),
                   ),
                 ),
-                SizedBox(width: compact ? 8 : 10),
+                SizedBox(width: compact ? 6 : 8),
                 InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: _sendMessage,
                   child: Padding(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(3),
                     child: Icon(
                       Icons.send_rounded,
                       color: const Color(0xFF2F88FF),
-                      size: compact ? 18 : 20,
+                      size: compact ? 16 : 18,
                     ),
                   ),
                 ),
-                SizedBox(width: compact ? 6 : 10),
+                SizedBox(width: compact ? 6 : 8),
               ],
             ),
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(cornerRadius - 1),
             borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(cornerRadius - 1),
             borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(cornerRadius - 1),
             borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.24)),
           ),
         ),
@@ -1203,97 +1288,96 @@ class _ThreadRuntime {
 
 class _ThreadTile extends StatelessWidget {
   final _ThreadRuntime thread;
+  final bool compact;
   final bool selected;
   final VoidCallback onTap;
 
   const _ThreadTile({
     required this.thread,
+    required this.compact,
     required this.selected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final showUnreadRail = selected || thread.showUnreadIndicator;
     return InkWell(
       onTap: onTap,
       child: Container(
-        constraints: const BoxConstraints(minHeight: 68),
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        constraints: BoxConstraints(minHeight: compact ? 60 : 66),
+        padding: EdgeInsets.symmetric(vertical: compact ? 6 : 8),
         color: selected
             ? Colors.white.withValues(alpha: 0.12)
             : Colors.transparent,
-        child: Stack(
-          children: [
-            if (selected || thread.showUnreadIndicator)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (showUnreadRail) ...[
+                Container(
                   width: 4,
-                  height: selected ? 14 : 8,
+                  height: selected ? (compact ? 12 : 14) : (compact ? 6 : 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
+                SizedBox(width: compact ? 6 : 8),
+              ],
+              _FramedAvatar(
+                avatarAsset: thread.avatarAsset,
+                frameAsset: thread.frameAsset,
+                avatarSize: compact ? 36 : 42,
+                frameSize: compact ? 44 : 50,
+                unreadCount: thread.unreadCount,
               ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  _FramedAvatar(
-                    avatarAsset: thread.avatarAsset,
-                    frameAsset: thread.frameAsset,
-                    avatarSize: 44,
-                    frameSize: 54,
-                    unreadCount: thread.unreadCount,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          thread.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            height: 1.25,
-                          ),
-                        ),
-                        Text(
-                          thread.previewText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                            height: 1.25,
-                            fontStyle: thread.previewItalic
-                                ? FontStyle.italic
-                                : FontStyle.normal,
-                          ),
-                        ),
-                      ],
+              SizedBox(width: compact ? 8 : 10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      thread.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: compact ? 13 : 14,
+                        height: 1.25,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    thread.lastActivityLabel,
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11,
+                    Text(
+                      thread.previewText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.w600,
+                        fontSize: compact ? 11 : 12,
+                        height: 1.25,
+                        fontStyle: thread.previewItalic
+                            ? FontStyle.italic
+                            : FontStyle.normal,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              SizedBox(width: compact ? 8 : 10),
+              Text(
+                thread.lastActivityLabel,
+                style: GoogleFonts.inter(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontWeight: FontWeight.w600,
+                  fontSize: compact ? 10 : 11,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1319,6 +1403,11 @@ class _FramedAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final fallbackIconSize = math.max(16.0, avatarSize * 0.5);
+    final badgeSize = math.max(16.0, avatarSize * 0.5);
+    final badgeFontSize = math.max(9.0, avatarSize * 0.24);
+    final onlineDotSize = math.max(12.0, avatarSize * 0.34);
+
     return SizedBox(
       width: frameSize,
       height: frameSize,
@@ -1337,10 +1426,10 @@ class _FramedAvatar extends StatelessWidget {
                   errorBuilder: (_, _, _) => Container(
                     color: const Color(0xFF1B274E),
                     alignment: Alignment.center,
-                    child: const Icon(
+                    child: Icon(
                       Icons.person_rounded,
-                      color: Color(0xFF8E98B5),
-                      size: 22,
+                      color: const Color(0xFF8E98B5),
+                      size: fallbackIconSize,
                     ),
                   ),
                 ),
@@ -1357,15 +1446,24 @@ class _FramedAvatar extends StatelessWidget {
             ),
           if (unreadCount > 0)
             Positioned(
-              right: -2,
-              bottom: -2,
+              right: -1,
+              bottom: -1,
               child: Container(
-                constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                constraints: BoxConstraints(
+                  minWidth: badgeSize,
+                  minHeight: badgeSize,
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: badgeSize * 0.22,
+                  vertical: badgeSize * 0.12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFED4245),
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF202225), width: 2),
+                  border: Border.all(
+                    color: const Color(0xFF202225),
+                    width: badgeSize <= 18 ? 1.4 : 1.8,
+                  ),
                 ),
                 child: Center(
                   child: Text(
@@ -1373,7 +1471,7 @@ class _FramedAvatar extends StatelessWidget {
                     style: GoogleFonts.poppins(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
-                      fontSize: 12,
+                      fontSize: badgeFontSize,
                       height: 1,
                     ),
                   ),
@@ -1385,12 +1483,15 @@ class _FramedAvatar extends StatelessWidget {
               right: 1,
               bottom: 2,
               child: Container(
-                width: 15,
-                height: 15,
+                width: onlineDotSize,
+                height: onlineDotSize,
                 decoration: BoxDecoration(
                   color: const Color(0xFF51D76E),
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF1D1C3E), width: 2),
+                  border: Border.all(
+                    color: const Color(0xFF1D1C3E),
+                    width: onlineDotSize <= 12 ? 1.4 : 1.8,
+                  ),
                 ),
               ),
             ),
@@ -1408,25 +1509,32 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final alignRight = message.fromCurrentUser;
+    final maxBubbleWidth = math.min(
+      340.0,
+      MediaQuery.sizeOf(context).width * 0.7,
+    );
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 7),
       child: Align(
         alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: alignRight
-                ? const Color(0xFF2F88FF)
-                : const Color(0xFFADADAD),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Text(
-              message.text,
-              style: GoogleFonts.inter(
-                color: alignRight ? Colors.white : Colors.black,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: alignRight
+                  ? const Color(0xFF2F88FF)
+                  : const Color(0xFFADADAD),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+              child: Text(
+                message.text,
+                style: GoogleFonts.inter(
+                  color: alignRight ? Colors.white : Colors.black,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
               ),
             ),
           ),
@@ -1439,11 +1547,13 @@ class _MessageBubble extends StatelessWidget {
 class _HeaderIcon extends StatelessWidget {
   final String tooltip;
   final IconData icon;
+  final double iconSize;
   final VoidCallback onTap;
 
   const _HeaderIcon({
     required this.tooltip,
     required this.icon,
+    this.iconSize = 20,
     required this.onTap,
   });
 
@@ -1455,8 +1565,8 @@ class _HeaderIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Icon(icon, color: Colors.white, size: 22),
+          padding: const EdgeInsets.all(3),
+          child: Icon(icon, color: Colors.white, size: iconSize),
         ),
       ),
     );

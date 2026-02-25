@@ -10,8 +10,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/home_controller.dart';
 import '../data/models/user_profile.dart';
-import '../widgets/chat_sidebar.dart';
-import '../widgets/chat_window.dart';
 import '../widgets/common/responsive_layout.dart';
 import '../widgets/waiby_footer.dart';
 
@@ -105,12 +103,6 @@ class _HomeBody extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final showChatSidebar = loggedIn && width >= 1000;
-        const chatSidebarWidth = 84.0;
-        const chatSidebarGap = 12.0;
-        final reservedSidebarSpace = showChatSidebar
-            ? chatSidebarWidth + chatSidebarGap
-            : 0.0;
         final pagePadding = waibyHorizontalPaddingForWidth(width);
         final compact = width < WaibyBreakpoints.mobile;
         final topPadding = compact ? WaibySpacing.s8 : WaibySpacing.s16;
@@ -145,7 +137,7 @@ class _HomeBody extends StatelessWidget {
                       padding: EdgeInsets.fromLTRB(
                         pagePadding,
                         0,
-                        pagePadding + reservedSidebarSpace,
+                        pagePadding,
                         0,
                       ),
                       child: Column(
@@ -215,146 +207,8 @@ class _HomeBody extends StatelessWidget {
                   ],
                 ),
               ),
-              if (showChatSidebar)
-                Positioned.fill(
-                  child: _HomeChatDock(
-                    sidebarWidth: chatSidebarWidth,
-                    sidebarGap: chatSidebarGap,
-                  ),
-                ),
             ],
           ),
-        );
-      },
-    );
-  }
-}
-
-class _HomeChatDock extends StatefulWidget {
-  final double sidebarWidth;
-  final double sidebarGap;
-
-  const _HomeChatDock({required this.sidebarWidth, required this.sidebarGap});
-
-  @override
-  State<_HomeChatDock> createState() => _HomeChatDockState();
-}
-
-class _HomeChatDockState extends State<_HomeChatDock> {
-  late final List<WaibyChatThread> _threads;
-  String? _activeThreadId;
-
-  @override
-  void initState() {
-    super.initState();
-    _threads = WaibyChatThread.demoThreads();
-  }
-
-  bool get _panelOpen => _activeThreadId != null;
-
-  void _openThread(String threadId) {
-    setState(() => _activeThreadId = threadId);
-  }
-
-  void _closePanel() {
-    setState(() => _activeThreadId = null);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final sidebarItems = _threads
-        .map(
-          (thread) => ChatSidebarItem(
-            avatarAsset: thread.avatarAsset,
-            frameAsset: thread.frameAsset,
-            unreadCount: thread.unreadCount,
-            showUnreadIndicator: thread.showUnreadIndicator,
-            onTap: () => _openThread(thread.id),
-          ),
-        )
-        .toList(growable: false);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final dockHeight = math.max(320.0, constraints.maxHeight - 20);
-        final rawPanelWidth =
-            constraints.maxWidth - widget.sidebarWidth - widget.sidebarGap - 24;
-        final maxPanelWidth = rawPanelWidth.clamp(520.0, 860.0).toDouble();
-        final visiblePanelWidth = _panelOpen ? maxPanelWidth : 0.0;
-
-        return Stack(
-          children: [
-            if (_panelOpen)
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _closePanel,
-                ),
-              ),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 340),
-                      curve: Curves.easeOutCubic,
-                      width: visiblePanelWidth,
-                      height: dockHeight,
-                      child: ClipRect(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: SizedBox(
-                            width: maxPanelWidth,
-                            height: dockHeight,
-                            child: IgnorePointer(
-                              ignoring: !_panelOpen,
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 180),
-                                curve: Curves.easeOut,
-                                opacity: _panelOpen ? 1 : 0,
-                                child: AnimatedSlide(
-                                  duration: const Duration(milliseconds: 340),
-                                  curve: Curves.easeOutCubic,
-                                  offset: _panelOpen
-                                      ? Offset.zero
-                                      : const Offset(0.08, 0),
-                                  child: WaibyChatWindow(
-                                    width: maxPanelWidth,
-                                    height: dockHeight,
-                                    threads: _threads,
-                                    initialThreadId: _activeThreadId,
-                                    onClose: _closePanel,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: widget.sidebarGap),
-                    AnimatedSlide(
-                      duration: const Duration(milliseconds: 340),
-                      curve: Curves.easeOutCubic,
-                      offset: _panelOpen ? const Offset(-0.02, 0) : Offset.zero,
-                      child: SizedBox(
-                        width: widget.sidebarWidth,
-                        height: dockHeight,
-                        child: ChatSidebar(
-                          width: widget.sidebarWidth,
-                          items: sidebarItems,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
         );
       },
     );
@@ -1132,6 +986,16 @@ class _SearchStripState extends State<_SearchStrip> {
     'fr-FR',
     'ar-SA',
   };
+  static const _panelLanguageLabels = <String, String>{
+    'en-US': 'English',
+    'es-ES': 'Espanol',
+    'tr-TR': 'Turkce',
+    'de-DE': 'Deutsch',
+    'pt-PT': 'Portugues',
+    'ru-RU': 'Russian',
+    'fr-FR': 'Francais',
+    'ar-SA': 'Arabic',
+  };
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -1165,10 +1029,9 @@ class _SearchStripState extends State<_SearchStrip> {
       _selectedGender != null ||
       _selectedAgeRange != null;
 
-  String? get _selectedLanguageLabel => _filterLanguages
-      .where((entry) => entry.code == _selectedLanguageCode)
-      .map((entry) => entry.label)
-      .firstOrNull;
+  String? get _selectedLanguageLabel => _selectedLanguageCode == null
+      ? null
+      : _languageLabelForCode(_selectedLanguageCode!);
 
   List<_QuickSearchEntry> get _activeSearchEntries =>
       _activeSearchTab == _SearchResultsTab.games
@@ -1183,6 +1046,18 @@ class _SearchStripState extends State<_SearchStrip> {
     return _activeSearchEntries
         .where((entry) => entry.label.toLowerCase().contains(query))
         .toList();
+  }
+
+  String _languageLabelForCode(String code) {
+    final panelLabel = _panelLanguageLabels[code];
+    if (panelLabel != null) {
+      return panelLabel;
+    }
+    return _filterLanguages
+            .where((entry) => entry.code == code)
+            .map((entry) => entry.label)
+            .firstOrNull ??
+        code;
   }
 
   @override
@@ -1205,6 +1080,7 @@ class _SearchStripState extends State<_SearchStrip> {
     if (!mounted) {
       return;
     }
+    _refreshAnchorWidthFromContext();
     setState(() {
       _isSearchResultsOpen = _searchFocusNode.hasFocus;
       if (_searchFocusNode.hasFocus) {
@@ -1215,6 +1091,7 @@ class _SearchStripState extends State<_SearchStrip> {
   }
 
   void _toggleOpen() {
+    _refreshAnchorWidthFromContext();
     setState(() {
       _isFilterOpen = !_isFilterOpen;
       if (_isFilterOpen) {
@@ -1223,6 +1100,13 @@ class _SearchStripState extends State<_SearchStrip> {
       }
     });
     _syncPanelOverlay();
+  }
+
+  void _refreshAnchorWidthFromContext() {
+    final renderObject = context.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      _lastAnchorWidth = renderObject.size.width;
+    }
   }
 
   void _collapsePanels() {
@@ -1353,15 +1237,15 @@ class _SearchStripState extends State<_SearchStrip> {
     required bool selected,
     required VoidCallback onTap,
     required double fontSize,
-    double indicatorSize = 19,
+    double indicatorSize = 10,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(3),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.symmetric(vertical: 1.5),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1370,7 +1254,9 @@ class _SearchStripState extends State<_SearchStrip> {
                   label,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.notoSans(
-                    color: Colors.white,
+                    color: selected
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.86),
                     fontWeight: FontWeight.w400,
                     fontSize: fontSize,
                     height: 1.2,
@@ -1384,15 +1270,17 @@ class _SearchStripState extends State<_SearchStrip> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: const Color(0xFF283267),
-                    width: 1.6,
+                    color: selected
+                        ? const Color(0xFF3A5FB5)
+                        : const Color(0xFF2B386F),
+                    width: 1.2,
                   ),
                 ),
                 alignment: Alignment.center,
                 child: selected
                     ? Container(
-                        width: indicatorSize * 0.45,
-                        height: indicatorSize * 0.45,
+                        width: indicatorSize * 0.42,
+                        height: indicatorSize * 0.42,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
                           color: Color(0xFF51D76E),
@@ -1411,8 +1299,8 @@ class _SearchStripState extends State<_SearchStrip> {
     required bool value,
     required VoidCallback onTap,
   }) {
-    const trackWidth = 33.0;
-    const trackHeight = 13.0;
+    const trackWidth = 30.0;
+    const trackHeight = 14.0;
     const thumbSize = 9.0;
 
     return Material(
@@ -1429,10 +1317,10 @@ class _SearchStripState extends State<_SearchStrip> {
             height: trackHeight,
             padding: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
-              color: value ? const Color(0xFF1A7B3C) : const Color(0xFF303030),
+              color: value ? const Color(0xFF1F7741) : const Color(0xFF414762),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 0.5,
               ),
             ),
@@ -1445,14 +1333,14 @@ class _SearchStripState extends State<_SearchStrip> {
                   color: const Color(0xFFECECEC),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: Colors.white.withValues(alpha: 0.28),
                     width: 0.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 6,
-                      offset: const Offset(-1, 2),
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 5,
+                      offset: const Offset(0, 1),
                     ),
                   ],
                 ),
@@ -1471,12 +1359,14 @@ class _SearchStripState extends State<_SearchStrip> {
     required double availableWidth,
     required double textSize,
     int columns = 3,
+    double minItemWidth = 92,
+    double spacing = 14,
+    double runSpacing = 8,
+    double indicatorSize = 10,
   }) {
     final effectiveColumns = math.max(1, columns);
-    const spacing = 16.0;
-    const runSpacing = 10.0;
     final itemWidth = math.max(
-      110.0,
+      minItemWidth,
       (availableWidth - ((effectiveColumns - 1) * spacing)) / effectiveColumns,
     );
 
@@ -1491,6 +1381,40 @@ class _SearchStripState extends State<_SearchStrip> {
               label: option,
               selected: selectedValue == option,
               onTap: () => onSelect(option),
+              fontSize: textSize,
+              indicatorSize: indicatorSize,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLanguageOptionWrap({
+    required List<_FilterLanguageEntry> options,
+    required double availableWidth,
+    required double textSize,
+    int columns = 3,
+  }) {
+    const spacing = 14.0;
+    const runSpacing = 8.0;
+    const minItemWidth = 84.0;
+    final effectiveColumns = math.max(1, columns);
+    final itemWidth = math.max(
+      minItemWidth,
+      (availableWidth - ((effectiveColumns - 1) * spacing)) / effectiveColumns,
+    );
+
+    return Wrap(
+      spacing: spacing,
+      runSpacing: runSpacing,
+      children: [
+        for (final option in options)
+          SizedBox(
+            width: itemWidth,
+            child: _buildFilterOption(
+              label: _languageLabelForCode(option.code),
+              selected: _selectedLanguageCode == option.code,
+              onTap: () => _setLanguage(option.code),
               fontSize: textSize,
             ),
           ),
@@ -1561,13 +1485,17 @@ class _SearchStripState extends State<_SearchStrip> {
     required double labelSize,
     required double badgeSize,
   }) {
+    final rowVerticalPadding = _clampDouble(iconSize * 0.12, 4, 8);
+    final iconCornerRadius = _clampDouble(iconSize * 0.22, 7, 11);
+    final iconLabelGap = _clampDouble(iconSize * 0.26, 8, 12);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _selectSearchEntry(entry),
         borderRadius: BorderRadius.circular(6),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: EdgeInsets.symmetric(vertical: rowVerticalPadding),
           child: Row(
             children: [
               Container(
@@ -1575,7 +1503,7 @@ class _SearchStripState extends State<_SearchStrip> {
                 height: iconSize,
                 decoration: BoxDecoration(
                   color: entry.color,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(iconCornerRadius),
                 ),
                 alignment: Alignment.center,
                 child: Text(
@@ -1588,7 +1516,7 @@ class _SearchStripState extends State<_SearchStrip> {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: iconLabelGap),
               Expanded(
                 child: Text(
                   entry.label,
@@ -1609,175 +1537,182 @@ class _SearchStripState extends State<_SearchStrip> {
   }
 
   Widget _buildFiltersPanel(double width) {
-    final filtersPanelWidth = math.min(560.0, width);
-    final languageColumns = filtersPanelWidth >= 580
-        ? 4
-        : filtersPanelWidth >= 420
-        ? 3
-        : 2;
-    final languageRows = (_visibleLanguages.length / languageColumns).ceil();
-    final panelHeight = _showAllLanguages
-        ? _clampDouble(260 + (languageRows * 34), 360, 620)
-        : 330.0;
+    const panelHorizontalPadding = 16.0;
+    const panelTopPadding = 12.0;
+    const panelBottomPadding = 14.0;
+
+    final panelWidth = _clampDouble(width * 0.46, 300, 500);
+    final panelMaxHeight = math.min(
+      MediaQuery.sizeOf(context).height * 0.58,
+      360.0,
+    );
+    final contentWidth = panelWidth - (panelHorizontalPadding * 2);
     final panelTitleSize = _scaleByWidth(
       width,
-      min: 15,
-      max: 16,
+      min: 13,
+      max: 14,
       minWidth: 320,
       maxWidth: 1200,
     );
     final panelTextSize = _scaleByWidth(
       width,
-      min: 12,
-      max: 14,
+      min: 11,
+      max: 12,
       minWidth: 320,
       maxWidth: 1200,
     );
     final sectionTitleSize = _scaleByWidth(
       width,
-      min: 14,
-      max: 16,
+      min: 13,
+      max: 14,
       minWidth: 320,
       maxWidth: 1200,
     );
     final showMoreSize = _scaleByWidth(
       width,
-      min: 10,
-      max: 12,
+      min: 9,
+      max: 10,
       minWidth: 320,
       maxWidth: 1200,
     );
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        minWidth: math.min(300.0, filtersPanelWidth),
-        maxWidth: filtersPanelWidth,
-        minHeight: 280,
-        maxHeight: panelHeight,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D1220),
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Choose filters',
-                style: GoogleFonts.notoSans(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: panelTitleSize,
-                ),
+    return Align(
+      alignment: Alignment.topRight,
+      child: SizedBox(
+        width: panelWidth,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: panelMaxHeight),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF071330),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: const Color(0xFF2B3F71).withValues(alpha: 0.9),
               ),
-              const SizedBox(height: 12),
-              Row(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                panelHorizontalPadding,
+                panelTopPadding,
+                panelHorizontalPadding,
+                panelBottomPadding,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'View only online buddies',
-                      style: GoogleFonts.notoSans(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                        fontSize: panelTextSize,
+                  Text(
+                    'Choose filters',
+                    style: GoogleFonts.notoSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: panelTitleSize,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'View only online buddies',
+                          style: GoogleFonts.notoSans(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w500,
+                            fontSize: panelTextSize,
+                          ),
+                        ),
+                      ),
+                      _buildOnlineToggle(
+                        value: _onlineOnly,
+                        onTap: () {
+                          setState(() => _onlineOnly = !_onlineOnly);
+                          _syncPanelOverlay();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Language',
+                    style: GoogleFonts.notoSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: sectionTitleSize,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _buildLanguageOptionWrap(
+                    options: _visibleLanguages,
+                    availableWidth: contentWidth,
+                    textSize: panelTextSize,
+                    columns: 3,
+                  ),
+                  const SizedBox(height: 2),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _toggleShowAllLanguages,
+                      borderRadius: BorderRadius.circular(3),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Text(
+                          _showAllLanguages ? 'Show less' : 'Show more',
+                          style: GoogleFonts.notoSans(
+                            color: const Color(0xFF51D76E),
+                            fontWeight: FontWeight.w500,
+                            fontSize: showMoreSize,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  _buildOnlineToggle(
-                    value: _onlineOnly,
-                    onTap: () {
-                      setState(() => _onlineOnly = !_onlineOnly);
-                      _syncPanelOverlay();
-                    },
+                  const SizedBox(height: 8),
+                  Text(
+                    'Gender',
+                    style: GoogleFonts.notoSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: sectionTitleSize,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _buildOptionWrap(
+                    options: const ['Female', 'Male', 'Non-binary'],
+                    selectedValue: _selectedGender,
+                    onSelect: _setGender,
+                    availableWidth: contentWidth,
+                    textSize: panelTextSize,
+                    columns: 3,
+                    minItemWidth: 80,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Age',
+                    style: GoogleFonts.notoSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: sectionTitleSize,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  _buildOptionWrap(
+                    options: const ['18-25', '25-30', '30+'],
+                    selectedValue: _selectedAgeRange,
+                    onSelect: _setAgeRange,
+                    availableWidth: contentWidth,
+                    textSize: panelTextSize,
+                    columns: 3,
+                    minItemWidth: 80,
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Text(
-                'Language',
-                style: GoogleFonts.notoSans(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: sectionTitleSize,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildOptionWrap(
-                options: _visibleLanguages.map((e) => e.label).toList(),
-                selectedValue: _selectedLanguageLabel,
-                onSelect: (value) {
-                  final code = _filterLanguages
-                      .where((entry) => entry.label == value)
-                      .map((entry) => entry.code)
-                      .firstOrNull;
-                  if (code != null) {
-                    _setLanguage(code);
-                  }
-                },
-                availableWidth: filtersPanelWidth - 40,
-                textSize: panelTextSize,
-                columns: languageColumns,
-              ),
-              const SizedBox(height: 6),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _toggleShowAllLanguages,
-                  borderRadius: BorderRadius.circular(3),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Text(
-                      _showAllLanguages ? 'Show less' : 'Show more',
-                      style: GoogleFonts.notoSans(
-                        color: const Color(0xFF51D76E),
-                        fontWeight: FontWeight.w500,
-                        fontSize: showMoreSize,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Gender',
-                style: GoogleFonts.notoSans(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: sectionTitleSize,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildOptionWrap(
-                options: const ['Female', 'Male', 'Non-binary'],
-                selectedValue: _selectedGender,
-                onSelect: _setGender,
-                availableWidth: filtersPanelWidth - 40,
-                textSize: panelTextSize,
-                columns: filtersPanelWidth >= 580 ? 3 : 2,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Age',
-                style: GoogleFonts.notoSans(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: sectionTitleSize,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _buildOptionWrap(
-                options: const ['18-25', '25-30', '30+'],
-                selectedValue: _selectedAgeRange,
-                onSelect: _setAgeRange,
-                availableWidth: filtersPanelWidth - 40,
-                textSize: panelTextSize,
-                columns: filtersPanelWidth >= 580 ? 3 : 2,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1785,18 +1720,17 @@ class _SearchStripState extends State<_SearchStrip> {
   }
 
   Widget _buildSearchResultsPanel(double width) {
-    final searchPanelWidth = math.min(560.0, width);
-    final searchPanelHeight = _scaleByWidth(
-      width,
-      min: 250,
-      max: 320,
-      minWidth: 320,
-      maxWidth: 1200,
-    );
+    const panelHorizontalPadding = 16.0;
+    const panelTopPadding = 12.0;
+    const tabGap = 20.0;
+    const tabBottomGap = 8.0;
+    const listPadding = EdgeInsets.fromLTRB(16, 0, 12, 10);
+    const listSeparatorHeight = 6.0;
+
     final searchTabTitleSize = _scaleByWidth(
       width,
-      min: 15,
-      max: 16,
+      min: 16,
+      max: 18,
       minWidth: 320,
       maxWidth: 1200,
     );
@@ -1809,15 +1743,15 @@ class _SearchStripState extends State<_SearchStrip> {
     );
     final searchLabelSize = _scaleByWidth(
       width,
-      min: 12,
-      max: 13,
+      min: 13,
+      max: 15,
       minWidth: 320,
       maxWidth: 1200,
     );
     final searchIconSizeInPanel = _scaleByWidth(
       width,
-      min: 28,
-      max: 30,
+      min: 26,
+      max: 32,
       minWidth: 320,
       maxWidth: 1200,
     );
@@ -1828,67 +1762,120 @@ class _SearchStripState extends State<_SearchStrip> {
       minWidth: 320,
       maxWidth: 1200,
     );
+    final gamesIndicatorWidth = _clampDouble(searchTabTitleSize * 2.4, 48, 88);
+    final servicesIndicatorWidth = _clampDouble(
+      searchTabTitleSize * 2.8,
+      56,
+      102,
+    );
+    final rowVerticalPadding = _clampDouble(searchIconSizeInPanel * 0.12, 4, 8);
+    final panelWidth = width * 0.5;
+    final rowCount = _filteredSearchEntries.length;
+    final rowHeight = searchIconSizeInPanel + (rowVerticalPadding * 2);
+    final rowSeparatorsHeight = rowCount > 0
+        ? (rowCount - 1) * listSeparatorHeight
+        : 0.0;
+    final listContentHeight = rowCount > 0
+        ? listPadding.top +
+              (rowCount * rowHeight) +
+              rowSeparatorsHeight +
+              listPadding.bottom
+        : 0.0;
+    final headerHeight =
+        panelTopPadding +
+        math.max(searchTabTitleSize, searchTabCountSize) +
+        6 +
+        7 +
+        2 +
+        4 +
+        tabBottomGap;
+    const panelHeightSlack = 6.0;
+    final maxPanelHeight = math.min(
+      MediaQuery.sizeOf(context).height * 0.62,
+      360.0,
+    );
+    final listHeight = math.min(
+      listContentHeight,
+      math.max(0.0, maxPanelHeight - headerHeight - panelHeightSlack),
+    );
+    final panelHeight = headerHeight + listHeight + panelHeightSlack;
+    final listScrollable = listContentHeight > listHeight + 0.5;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        minWidth: math.min(320.0, searchPanelWidth),
-        maxWidth: searchPanelWidth,
-        minHeight: 220,
-        maxHeight: searchPanelHeight,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0D1220),
-          borderRadius: BorderRadius.circular(5),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 20, top: 12, right: 20),
-              child: Row(
-                children: [
-                  _buildSearchTab(
-                    label: 'Games',
-                    count: 20,
-                    isActive: _activeSearchTab == _SearchResultsTab.games,
-                    onTap: () => _setSearchTab(_SearchResultsTab.games),
-                    titleSize: searchTabTitleSize,
-                    countSize: searchTabCountSize,
-                    indicatorWidth: 56,
+    return Align(
+      alignment: Alignment.topLeft,
+      child: SizedBox(
+        width: panelWidth,
+        height: panelHeight,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D1220),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.only(
+                  left: panelHorizontalPadding,
+                  top: panelTopPadding,
+                  right: panelHorizontalPadding,
+                ),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildSearchTab(
+                        label: 'Games',
+                        count: 20,
+                        isActive: _activeSearchTab == _SearchResultsTab.games,
+                        onTap: () => _setSearchTab(_SearchResultsTab.games),
+                        titleSize: searchTabTitleSize,
+                        countSize: searchTabCountSize,
+                        indicatorWidth: gamesIndicatorWidth,
+                      ),
+                      const SizedBox(width: tabGap),
+                      _buildSearchTab(
+                        label: 'Services',
+                        count: 10,
+                        isActive:
+                            _activeSearchTab == _SearchResultsTab.services,
+                        onTap: () => _setSearchTab(_SearchResultsTab.services),
+                        titleSize: searchTabTitleSize,
+                        countSize: searchTabCountSize,
+                        indicatorWidth: servicesIndicatorWidth,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 24),
-                  _buildSearchTab(
-                    label: 'Services',
-                    count: 10,
-                    isActive: _activeSearchTab == _SearchResultsTab.services,
-                    onTap: () => _setSearchTab(_SearchResultsTab.services),
-                    titleSize: searchTabTitleSize,
-                    countSize: searchTabCountSize,
-                    indicatorWidth: 64,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (listHeight > 0)
+                SizedBox(
+                  height: listHeight,
+                  child: ListView.separated(
+                    physics: listScrollable
+                        ? const ClampingScrollPhysics()
+                        : const NeverScrollableScrollPhysics(),
+                    padding: listPadding,
+                    itemCount: _filteredSearchEntries.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: listSeparatorHeight),
+                    itemBuilder: (context, index) {
+                      final entry = _filteredSearchEntries[index];
+                      return _buildQuickSearchRow(
+                        entry: entry,
+                        iconSize: searchIconSizeInPanel,
+                        labelSize: searchLabelSize,
+                        badgeSize: searchBadgeSize,
+                      );
+                    },
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Flexible(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(18, 0, 12, 12),
-                itemCount: _filteredSearchEntries.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 5),
-                itemBuilder: (context, index) {
-                  final entry = _filteredSearchEntries[index];
-                  return _buildQuickSearchRow(
-                    entry: entry,
-                    iconSize: searchIconSizeInPanel,
-                    labelSize: searchLabelSize,
-                    badgeSize: searchBadgeSize,
-                  );
-                },
-              ),
-            ),
-          ],
+                ),
+            ],
+          ),
         ),
       ),
     );

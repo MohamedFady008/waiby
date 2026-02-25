@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../widgets/chat_sidebar.dart';
 import '../widgets/common/responsive_layout.dart';
 
 class PlaygroundPage extends StatefulWidget {
@@ -22,23 +21,15 @@ class _PlaygroundPageState extends State<PlaygroundPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final pageWidth = constraints.maxWidth;
-        final showSidebar = pageWidth >= 1180;
         final compact = pageWidth < WaibyBreakpoints.mobile;
         final outerPadding = pageWidth >= 1300
             ? 26.0
             : pageWidth >= 900
             ? 20.0
             : 12.0;
-        const sidebarWidth = 84.0;
-        const sidebarGap = 14.0;
         final contentWidth = math.min(
           1400.0,
-          math.max(
-            280.0,
-            pageWidth -
-                (outerPadding * 2) -
-                (showSidebar ? sidebarWidth + sidebarGap : 0),
-          ),
+          math.max(280.0, pageWidth - (outerPadding * 2)),
         );
 
         return Container(
@@ -52,60 +43,42 @@ class _PlaygroundPageState extends State<PlaygroundPage> {
           child: Stack(
             children: [
               const Positioned.fill(child: _PlaygroundBackgroundGlow()),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: SizedBox(
-                        width: contentWidth,
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.fromLTRB(
-                            outerPadding,
-                            compact ? 20 : 28,
-                            outerPadding,
-                            compact ? 24 : 30,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Playground',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: compact ? 30 : 36,
-                                  height: 1.1,
-                                ),
-                              ),
-                              SizedBox(height: compact ? 16 : 20),
-                              _PlaygroundToolbar(
-                                activeSection: _activeSection,
-                                onSectionChanged: (section) {
-                                  setState(() => _activeSection = section);
-                                },
-                              ),
-                              SizedBox(height: compact ? 18 : 24),
-                              _LiveRoomGrid(
-                                rooms: _roomsForSection(_activeSection),
-                              ),
-                            ],
+              Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: contentWidth,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      outerPadding,
+                      compact ? 20 : 28,
+                      outerPadding,
+                      compact ? 24 : 30,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Playground',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: compact ? 30 : 36,
+                            height: 1.1,
                           ),
                         ),
-                      ),
+                        SizedBox(height: compact ? 16 : 20),
+                        _PlaygroundToolbar(
+                          activeSection: _activeSection,
+                          onSectionChanged: (section) {
+                            setState(() => _activeSection = section);
+                          },
+                        ),
+                        SizedBox(height: compact ? 18 : 24),
+                        _LiveRoomGrid(rooms: _roomsForSection(_activeSection)),
+                      ],
                     ),
                   ),
-                  if (showSidebar)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        right: outerPadding,
-                        top: 0,
-                        bottom: 0,
-                      ),
-                      child: const _PlaygroundSidebarRail(),
-                    ),
-                ],
+                ),
               ),
             ],
           ),
@@ -496,36 +469,6 @@ class _LiveRoomCard extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-class _PlaygroundSidebarRail extends StatelessWidget {
-  const _PlaygroundSidebarRail();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 84,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          border: Border(
-            left: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            right: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
-          ),
-        ),
-        child: const ChatSidebar(
-          width: 84,
-          backgroundColor: Colors.transparent,
-          padding: EdgeInsets.only(top: 8, bottom: 12),
-          avatarSize: 48,
-          frameSize: 62,
-          itemSpacing: 12,
-          unreadBadgeSize: 20,
-          unreadBadgeFontSize: 11,
-        ),
       ),
     );
   }

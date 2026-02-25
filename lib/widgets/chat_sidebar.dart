@@ -21,6 +21,9 @@ class ChatSidebarItem {
 }
 
 class ChatSidebar extends StatelessWidget {
+  static const double topNavAvatarSize = 30;
+  static const double contentRailWidth = 52;
+
   static const List<ChatSidebarItem> defaultItems = <ChatSidebarItem>[
     ChatSidebarItem(
       avatarAsset: 'assets/pp1.png',
@@ -81,14 +84,14 @@ class ChatSidebar extends StatelessWidget {
   const ChatSidebar({
     super.key,
     this.items = defaultItems,
-    this.width = 76,
-    this.padding = const EdgeInsets.symmetric(vertical: 8),
+    this.width = contentRailWidth,
+    this.padding = EdgeInsets.zero,
     this.backgroundColor = const Color.fromRGBO(255, 255, 255, 0.08),
-    this.avatarSize = 48,
-    this.frameSize = 66,
-    this.itemSpacing = 18,
-    this.unreadBadgeSize = 30,
-    this.unreadBadgeFontSize = 16,
+    this.avatarSize = topNavAvatarSize,
+    this.frameSize = 42,
+    this.itemSpacing = 12,
+    this.unreadBadgeSize = 16,
+    this.unreadBadgeFontSize = 9,
   });
 
   @override
@@ -100,11 +103,11 @@ class ChatSidebar extends StatelessWidget {
             : width;
         final resolvedFrameSize = math
             .min(frameSize, railWidth - 8)
-            .clamp(54.0, frameSize)
+            .clamp(math.min(42.0, frameSize), frameSize)
             .toDouble();
         final resolvedAvatarSize = math
             .min(avatarSize, resolvedFrameSize - 12)
-            .clamp(40.0, avatarSize)
+            .clamp(0.0, avatarSize)
             .toDouble();
         final resolvedSpacing = railWidth < 72 ? 12.0 : itemSpacing;
 
@@ -186,10 +189,10 @@ class _ChatSidebarTile extends StatelessWidget {
                             errorBuilder: (_, _, _) => Container(
                               color: const Color(0xFF1B274E),
                               alignment: Alignment.center,
-                              child: const Icon(
+                              child: Icon(
                                 Icons.person_rounded,
                                 color: Color(0xFF8E98B5),
-                                size: 24,
+                                size: avatarSize * 0.5,
                               ),
                             ),
                           ),
@@ -206,8 +209,8 @@ class _ChatSidebarTile extends StatelessWidget {
                       ),
                     if (item.unreadCount > 0)
                       Positioned(
-                        right: -2,
-                        bottom: -2,
+                        right: 0,
+                        bottom: 0,
                         child: _UnreadBadge(
                           count: item.unreadCount,
                           size: unreadBadgeSize,

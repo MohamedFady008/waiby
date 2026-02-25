@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../widgets/chat_sidebar.dart';
 import '../widgets/common/responsive_layout.dart';
 
 class CreateRoomPage extends StatefulWidget {
@@ -45,23 +44,15 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final pageWidth = constraints.maxWidth;
-        final showSidebar = pageWidth >= 1180;
         final compact = pageWidth < WaibyBreakpoints.mobile;
         final outerPadding = pageWidth >= 1300
             ? 26.0
             : pageWidth >= 900
             ? 18.0
             : 10.0;
-        const sidebarWidth = 84.0;
-        const sidebarGap = 14.0;
         final contentWidth = math.min(
           1420.0,
-          math.max(
-            300.0,
-            pageWidth -
-                (outerPadding * 2) -
-                (showSidebar ? sidebarWidth + sidebarGap : 0),
-          ),
+          math.max(300.0, pageWidth - (outerPadding * 2)),
         );
 
         return Container(
@@ -75,66 +66,54 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
           child: Stack(
             children: [
               const Positioned.fill(child: _CreateRoomBackgroundGlow()),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: SizedBox(
-                        width: contentWidth,
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.fromLTRB(
-                            outerPadding,
-                            compact ? 24 : 60,
-                            outerPadding,
-                            compact ? 24 : 30,
-                          ),
-                          child: _CreateRoomSurface(
-                            roomNameController: _roomNameController,
-                            shortTaglineController: _shortTaglineController,
-                            pinnedMessageController: _pinnedMessageController,
-                            languageController: _languageController,
-                            tagsController: _tagsController,
-                            passwordController: _passwordController,
-                            giftGoalController: _giftGoalController,
-                            privateRoom: _privateRoom,
-                            publicRoom: _publicRoom,
-                            giftGoalEnabled: _giftGoalEnabled,
-                            onPrivateChanged: (value) {
-                              setState(() {
-                                _privateRoom = value;
-                                if (value) {
-                                  _publicRoom = false;
-                                } else if (!_publicRoom) {
-                                  _publicRoom = true;
-                                }
-                              });
-                            },
-                            onPublicChanged: (value) {
-                              setState(() {
-                                _publicRoom = value;
-                                if (value) {
-                                  _privateRoom = false;
-                                } else if (!_privateRoom) {
-                                  _privateRoom = true;
-                                }
-                              });
-                            },
-                            onGiftGoalChanged: (value) {
-                              setState(() => _giftGoalEnabled = value);
-                            },
-                          ),
-                        ),
-                      ),
+              Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: contentWidth,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      outerPadding,
+                      compact ? 24 : 60,
+                      outerPadding,
+                      compact ? 24 : 30,
+                    ),
+                    child: _CreateRoomSurface(
+                      roomNameController: _roomNameController,
+                      shortTaglineController: _shortTaglineController,
+                      pinnedMessageController: _pinnedMessageController,
+                      languageController: _languageController,
+                      tagsController: _tagsController,
+                      passwordController: _passwordController,
+                      giftGoalController: _giftGoalController,
+                      privateRoom: _privateRoom,
+                      publicRoom: _publicRoom,
+                      giftGoalEnabled: _giftGoalEnabled,
+                      onPrivateChanged: (value) {
+                        setState(() {
+                          _privateRoom = value;
+                          if (value) {
+                            _publicRoom = false;
+                          } else if (!_publicRoom) {
+                            _publicRoom = true;
+                          }
+                        });
+                      },
+                      onPublicChanged: (value) {
+                        setState(() {
+                          _publicRoom = value;
+                          if (value) {
+                            _privateRoom = false;
+                          } else if (!_privateRoom) {
+                            _privateRoom = true;
+                          }
+                        });
+                      },
+                      onGiftGoalChanged: (value) {
+                        setState(() => _giftGoalEnabled = value);
+                      },
                     ),
                   ),
-                  if (showSidebar)
-                    Padding(
-                      padding: EdgeInsets.only(right: outerPadding),
-                      child: const _CreateRoomSidebarRail(),
-                    ),
-                ],
+                ),
               ),
             ],
           ),
@@ -937,36 +916,6 @@ class _UploadDropZone extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CreateRoomSidebarRail extends StatelessWidget {
-  const _CreateRoomSidebarRail();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 84,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.06),
-          border: Border(
-            left: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
-            right: BorderSide(color: Colors.white.withValues(alpha: 0.04)),
-          ),
-        ),
-        child: const ChatSidebar(
-          width: 84,
-          backgroundColor: Colors.transparent,
-          padding: EdgeInsets.only(top: 8, bottom: 12),
-          avatarSize: 48,
-          frameSize: 62,
-          itemSpacing: 12,
-          unreadBadgeSize: 20,
-          unreadBadgeFontSize: 11,
         ),
       ),
     );
