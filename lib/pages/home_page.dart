@@ -8,6 +8,8 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../controllers/auth_controller.dart';
+import '../controllers/home_controller.dart';
+import '../data/models/user_profile.dart';
 import '../widgets/chat_sidebar.dart';
 import '../widgets/chat_window.dart';
 import '../widgets/common/responsive_layout.dart';
@@ -84,14 +86,19 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() => _HomeBody(loggedIn: auth.isLoggedIn));
+    final homeController = Get.find<HomeController>();
+    return Obx(
+      () =>
+          _HomeBody(loggedIn: auth.isLoggedIn, homeController: homeController),
+    );
   }
 }
 
 class _HomeBody extends StatelessWidget {
   final bool loggedIn;
+  final HomeController homeController;
 
-  const _HomeBody({required this.loggedIn});
+  const _HomeBody({required this.loggedIn, required this.homeController});
 
   @override
   Widget build(BuildContext context) {
@@ -181,13 +188,9 @@ class _HomeBody extends StatelessWidget {
                             overlayStyle: _BuddyCardOverlayStyle.vibrant,
                           ),
                           SizedBox(height: sectionGap),
-                          const _ProGamersSection(),
+                          _ProGamersSection(controller: homeController),
                           SizedBox(height: sectionGap),
-                          _BuddySection(
-                            title: 'New Budies- Discover',
-                            items: _discoverBuddies,
-                            overlayStyle: _BuddyCardOverlayStyle.mutedBlur,
-                          ),
+                          _NewBuddiesSection(controller: homeController),
                           SizedBox(height: sectionGap),
                           _BuddySection(
                             title: 'High Potential match',
@@ -2136,7 +2139,7 @@ class _BuddySection extends StatelessWidget {
                         entry: entry,
                         overlayStyle: overlayStyle,
                         onTap: () => context.go(
-                          '/profile/${Uri.encodeComponent(entry.name)}',
+                          '/profile/${Uri.encodeComponent(entry.id)}',
                         ),
                       ),
                     );
@@ -2151,92 +2154,163 @@ class _BuddySection extends StatelessWidget {
   }
 }
 
-class _ProGamersSection extends StatelessWidget {
-  const _ProGamersSection();
+class _NewBuddiesSection extends StatelessWidget {
+  final HomeController controller;
 
-  static const double _cardSpacing = WaibySpacing.s16;
-
-  static const _pros = <_ProEntry>[
-    _ProEntry(
-      name: 'Meilin',
-      game: 'LEAGUE OF LEGENDS',
-      rank: 'Grandmaster',
-      asset: 'assets/pp2.png',
-    ),
-    _ProEntry(
-      name: 'Saori',
-      game: 'APEX LEGENDS',
-      rank: 'Apex Predator',
-      asset: 'assets/pp3.png',
-    ),
-    _ProEntry(
-      name: 'Nikkiex',
-      game: 'FORTNITE',
-      rank: 'Unreal',
-      asset: 'assets/pp5.png',
-    ),
-  ];
+  const _NewBuddiesSection({required this.controller});
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final titleGap = width < WaibyBreakpoints.mobile
-            ? WaibySpacing.s12
-            : WaibySpacing.s16;
-        final cardWidth = _clampDouble(
-          (width - (_cardSpacing * 2)) / 3,
-          230,
-          420,
+    return Obx(() {
+      if (controller.loadingNewestCreators.value) {
+        return const _SectionStateCard(
+          title: 'New Buddies',
+          message: 'Loading new creators...',
         );
-        final cardHeight = cardWidth * 0.6;
+      }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _SectionHeaderRow(
-              title: 'Pro Gamers',
-              onViewMore: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const _ProCategoryPage(
-                      title: 'Pro Gamers',
-                      items: _pros,
+      if (controller.newestCreatorsError.value.isNotEmpty) {
+        return _SectionStateCard(
+          title: 'New Buddies',
+          message: controller.newestCreatorsError.value,
+        );
+      }
+
+      final entries = controller.newestCreators
+          .map(_mapCreatorToBuddyEntry)
+          .toList(growable: false);
+      if (entries.isEmpty) {
+        return const _SectionStateCard(
+          title: 'New Buddies',
+          message:
+              'No new creators yet. Make sure user documents include isCreator=true.',
+        );
+      }
+
+      return _BuddySection(
+        title: 'New Buddies',
+        items: entries,
+        overlayStyle: _BuddyCardOverlayStyle.mutedBlur,
+      );
+    });
+  }
+
+  _BuddyEntry _mapCreatorToBuddyEntry(UserProfile profile) {
+    final displayName = _resolveDisplayName(profile);
+    return _BuddyEntry(
+      id: profile.id,
+      name: displayName,
+      rating: 'NEW',
+      photoUrl: profile.avatarUrl,
+      asset: _creatorFallbackAsset(profile.id),
+    );
+  }
+}
+
+class _ProGamersSection extends StatelessWidget {
+  final HomeController controller;
+
+  const _ProGamersSection({required this.controller});
+
+  static const double _cardSpacing = WaibySpacing.s16;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.loadingProGamers.value) {
+        return const _SectionStateCard(
+          title: 'Pro Gamers',
+          message: 'Loading pro gamers...',
+        );
+      }
+
+      if (controller.proGamersError.value.isNotEmpty) {
+        return _SectionStateCard(
+          title: 'Pro Gamers',
+          message: controller.proGamersError.value,
+        );
+      }
+
+      final entries = controller.proGamers
+          .map(_mapProfileToProEntry)
+          .toList(growable: false);
+      if (entries.isEmpty) {
+        return const _SectionStateCard(
+          title: 'Pro Gamers',
+          message: 'No pro gamers are available right now.',
+        );
+      }
+
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final titleGap = width < WaibyBreakpoints.mobile
+              ? WaibySpacing.s12
+              : WaibySpacing.s16;
+          final cardWidth = _clampDouble(
+            (width - (_cardSpacing * 2)) / 3,
+            230,
+            420,
+          );
+          final cardHeight = cardWidth * 0.6;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionHeaderRow(
+                title: 'Pro Gamers',
+                onViewMore: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          _ProCategoryPage(title: 'Pro Gamers', items: entries),
                     ),
-                  ),
-                );
-              },
-            ),
-            SizedBox(height: titleGap),
-            SizedBox(
-              height: cardHeight,
-              child: ScrollConfiguration(
-                behavior: const _HorizontalMouseDragScrollBehavior(),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _pros.length,
-                  physics: const BouncingScrollPhysics(),
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(width: _cardSpacing),
-                  itemBuilder: (context, index) {
-                    final entry = _pros[index];
-                    return SizedBox(
-                      width: cardWidth,
-                      child: _ProCard(
-                        entry: entry,
-                        onTap: () => context.go(
-                          '/profile/${Uri.encodeComponent(entry.name)}',
+                  );
+                },
+              ),
+              SizedBox(height: titleGap),
+              SizedBox(
+                height: cardHeight,
+                child: ScrollConfiguration(
+                  behavior: const _HorizontalMouseDragScrollBehavior(),
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: entries.length,
+                    physics: const BouncingScrollPhysics(),
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(width: _cardSpacing),
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      return SizedBox(
+                        width: cardWidth,
+                        child: _ProCard(
+                          entry: entry,
+                          onTap: () => context.go(
+                            '/profile/${Uri.encodeComponent(entry.id)}',
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      );
+    });
+  }
+
+  _ProEntry _mapProfileToProEntry(UserProfile profile) {
+    final metadata = profile.metadata;
+    final game = metadata['favorite_game']?.toString() ?? 'WAIBY';
+    final rank = metadata['rank']?.toString() ?? 'Pro Gamer';
+    return _ProEntry(
+      id: profile.id,
+      name: _resolveDisplayName(profile),
+      game: game.toUpperCase(),
+      rank: rank,
+      asset: _creatorFallbackAsset(profile.id),
     );
   }
 }
@@ -2311,9 +2385,8 @@ class _BuddyCategoryPage extends StatelessWidget {
                   return _BuddyCard(
                     entry: entry,
                     overlayStyle: overlayStyle,
-                    onTap: () => context.go(
-                      '/profile/${Uri.encodeComponent(entry.name)}',
-                    ),
+                    onTap: () =>
+                        context.go('/profile/${Uri.encodeComponent(entry.id)}'),
                   );
                 },
               ),
@@ -2384,9 +2457,8 @@ class _ProCategoryPage extends StatelessWidget {
                   final entry = items[index];
                   return _ProCard(
                     entry: entry,
-                    onTap: () => context.go(
-                      '/profile/${Uri.encodeComponent(entry.name)}',
-                    ),
+                    onTap: () =>
+                        context.go('/profile/${Uri.encodeComponent(entry.id)}'),
                   );
                 },
               ),
@@ -2396,6 +2468,69 @@ class _ProCategoryPage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SectionStateCard extends StatelessWidget {
+  final String title;
+  final String message;
+
+  const _SectionStateCard({required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeaderRow(title: title, onViewMore: () {}),
+        const SizedBox(height: WaibySpacing.s16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(WaibySpacing.s16),
+          decoration: BoxDecoration(
+            color: const Color(0x191B234B),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Text(
+            message,
+            style: GoogleFonts.poppins(
+              color: Colors.white.withValues(alpha: 0.78),
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _resolveDisplayName(UserProfile profile) {
+  final fullName = profile.fullName?.trim();
+  if (fullName != null && fullName.isNotEmpty) {
+    return fullName;
+  }
+
+  final email = profile.email?.trim();
+  if (email != null && email.isNotEmpty && email.contains('@')) {
+    return email.split('@').first;
+  }
+
+  return profile.id;
+}
+
+String _creatorFallbackAsset(String seed) {
+  const assets = <String>[
+    'assets/pp1.png',
+    'assets/pp2.png',
+    'assets/pp3.png',
+    'assets/pp4.png',
+    'assets/pp5.png',
+    'assets/pp6.png',
+    'assets/pp7.png',
+  ];
+  final hash = seed.codeUnits.fold<int>(0, (acc, value) => acc + value);
+  return assets[hash % assets.length];
 }
 
 class _HowItWorksSection extends StatelessWidget {
@@ -2831,18 +2966,32 @@ class _BuddyCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    entry.asset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => ColoredBox(
-                      color: const Color(0xFF141D38),
-                      child: Icon(
-                        Icons.person_rounded,
-                        color: Colors.white.withValues(alpha: 0.72),
-                        size: _clampDouble(cardWidth * 0.2, 28, 42),
+                  if ((entry.photoUrl ?? '').trim().isNotEmpty)
+                    Image.network(
+                      entry.photoUrl!.trim(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => ColoredBox(
+                        color: const Color(0xFF141D38),
+                        child: Icon(
+                          Icons.person_rounded,
+                          color: Colors.white.withValues(alpha: 0.72),
+                          size: _clampDouble(cardWidth * 0.2, 28, 42),
+                        ),
+                      ),
+                    )
+                  else
+                    Image.asset(
+                      entry.asset ?? 'assets/pp1.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => ColoredBox(
+                        color: const Color(0xFF141D38),
+                        child: Icon(
+                          Icons.person_rounded,
+                          color: Colors.white.withValues(alpha: 0.72),
+                          size: _clampDouble(cardWidth * 0.2, 28, 42),
+                        ),
                       ),
                     ),
-                  ),
                   Positioned(
                     left: 0,
                     right: 0,
@@ -3398,24 +3547,30 @@ const _serviceQuickSearchEntries = <_QuickSearchEntry>[
 ];
 
 class _BuddyEntry {
+  final String id;
   final String name;
   final String rating;
-  final String asset;
+  final String? asset;
+  final String? photoUrl;
 
   const _BuddyEntry({
+    required this.id,
     required this.name,
     required this.rating,
-    required this.asset,
+    this.asset,
+    this.photoUrl,
   });
 }
 
 class _ProEntry {
+  final String id;
   final String name;
   final String game;
   final String rank;
   final String asset;
 
   const _ProEntry({
+    required this.id,
     required this.name,
     required this.game,
     required this.rank,
@@ -3436,25 +3591,57 @@ class _HowStepEntry {
 }
 
 const _bestBuddies = <_BuddyEntry>[
-  _BuddyEntry(name: 'Roxxany', rating: '5.0', asset: 'assets/pp1.png'),
-  _BuddyEntry(name: 'broomi', rating: '4.8', asset: 'assets/pp2.png'),
-  _BuddyEntry(name: 'Levi', rating: '5.0', asset: 'assets/pp3.png'),
-  _BuddyEntry(name: 'Meaniieh', rating: '5.0', asset: 'assets/pp4.png'),
-  _BuddyEntry(name: 'Carla67', rating: '4.9', asset: 'assets/pp5.png'),
-];
-
-const _discoverBuddies = <_BuddyEntry>[
-  _BuddyEntry(name: 'Drup', rating: '5.0', asset: 'assets/pp6.png'),
-  _BuddyEntry(name: 'Winke', rating: '4.9', asset: 'assets/pp7.png'),
-  _BuddyEntry(name: 'Khear', rating: '---', asset: 'assets/pp1.png'),
-  _BuddyEntry(name: 'Lilith', rating: '---', asset: 'assets/pp2.png'),
-  _BuddyEntry(name: 'Jhonny', rating: '5.0', asset: 'assets/pp3.png'),
+  _BuddyEntry(
+    id: 'Roxxany',
+    name: 'Roxxany',
+    rating: '5.0',
+    asset: 'assets/pp1.png',
+  ),
+  _BuddyEntry(
+    id: 'broomi',
+    name: 'broomi',
+    rating: '4.8',
+    asset: 'assets/pp2.png',
+  ),
+  _BuddyEntry(id: 'Levi', name: 'Levi', rating: '5.0', asset: 'assets/pp3.png'),
+  _BuddyEntry(
+    id: 'Meaniieh',
+    name: 'Meaniieh',
+    rating: '5.0',
+    asset: 'assets/pp4.png',
+  ),
+  _BuddyEntry(
+    id: 'Carla67',
+    name: 'Carla67',
+    rating: '4.9',
+    asset: 'assets/pp5.png',
+  ),
 ];
 
 const _matchBuddies = <_BuddyEntry>[
-  _BuddyEntry(name: 'miaTheKAT', rating: '5.0', asset: 'assets/pp4.png'),
-  _BuddyEntry(name: 'Leflorr', rating: '5.0', asset: 'assets/pp5.png'),
-  _BuddyEntry(name: 'SHAYKK', rating: '5.0', asset: 'assets/pp6.png'),
-  _BuddyEntry(name: 'Ori', rating: '5.0', asset: 'assets/pp7.png'),
-  _BuddyEntry(name: 'shaxral', rating: '4.0', asset: 'assets/pp1.png'),
+  _BuddyEntry(
+    id: 'miaTheKAT',
+    name: 'miaTheKAT',
+    rating: '5.0',
+    asset: 'assets/pp4.png',
+  ),
+  _BuddyEntry(
+    id: 'Leflorr',
+    name: 'Leflorr',
+    rating: '5.0',
+    asset: 'assets/pp5.png',
+  ),
+  _BuddyEntry(
+    id: 'SHAYKK',
+    name: 'SHAYKK',
+    rating: '5.0',
+    asset: 'assets/pp6.png',
+  ),
+  _BuddyEntry(id: 'Ori', name: 'Ori', rating: '5.0', asset: 'assets/pp7.png'),
+  _BuddyEntry(
+    id: 'shaxral',
+    name: 'shaxral',
+    rating: '4.0',
+    asset: 'assets/pp1.png',
+  ),
 ];

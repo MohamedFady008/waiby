@@ -20,9 +20,22 @@ class CreatorRequestRepository {
   /// Uses the [CreatorRequest.userId] as the document ID to guarantee
   /// one request per user (prevents duplicate submissions).
   Future<void> submitRequest(CreatorRequest request) async {
-    await _collection
-        .doc(request.userId)
-        .set(request.toFirestoreMap(), SetOptions(merge: false));
+    final docRef = _collection.doc(request.userId);
+    await _firestore.runTransaction((transaction) async {
+      final existing = await transaction.get(docRef);
+      if (existing.exists) {
+        throw FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'already-exists',
+          message: 'Creator request already exists for this user.',
+        );
+      }
+      transaction.set(
+        docRef,
+        request.toFirestoreMap(),
+        SetOptions(merge: false),
+      );
+    });
   }
 
   /// Checks if a creator request already exists for the given [userId].

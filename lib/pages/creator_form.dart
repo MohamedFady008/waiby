@@ -467,10 +467,27 @@ class _LegalAcknowledgementSection extends StatelessWidget {
     );
   }
 
-  void _handleSubmitTap(
+  Future<void> _handleSubmitTap(
     BuildContext context,
     CreatorFormController controller,
-  ) {
+  ) async {
+    await controller.refreshSubmissionState();
+    if (controller.hasExistingRequest.value) {
+      Get.snackbar(
+        'Application Exists',
+        'Your creator application is already submitted. '
+            'Please wait for review.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange.shade700.withValues(alpha: 0.9),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.all(16),
+        borderRadius: 12,
+        icon: const Icon(Icons.info_outline_rounded, color: Colors.white),
+      );
+      return;
+    }
+
     // Validate the form first.
     if (!controller.validateForm()) {
       // Show the first error.
@@ -498,6 +515,16 @@ class _LegalAcknowledgementSection extends StatelessWidget {
         backgroundColor: Colors.orange.shade700.withValues(alpha: 0.9),
         icon: Icons.upload_file_rounded,
       );
+      return;
+    }
+
+    final canAccessTest = await controller.canAccessKnowledgeTest(
+      showFeedback: true,
+    );
+    if (!canAccessTest) {
+      return;
+    }
+    if (!context.mounted) {
       return;
     }
 

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/auth_controller.dart';
@@ -86,12 +87,16 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
                             ),
                     ),
                     const SizedBox(width: WaibySpacing.s12),
-                    _buildActions(
-                      context,
-                      compact: compact,
-                      tiny: tiny,
-                      accentBlue: accentBlue,
-                      accentGreen: accentGreen,
+                    Obx(
+                      () => _buildActions(
+                        context,
+                        compact: compact,
+                        tiny: tiny,
+                        accentBlue: accentBlue,
+                        accentGreen: accentGreen,
+                        loggedIn: auth.loggedIn,
+                        canShowBecomeCreator: auth.canShowBecomeCreatorButton,
+                      ),
                     ),
                   ],
                 );
@@ -109,6 +114,8 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     required bool tiny,
     required Color accentBlue,
     required Color accentGreen,
+    required bool loggedIn,
+    required bool canShowBecomeCreator,
   }) {
     final ButtonStyle solidButton = ElevatedButton.styleFrom(
       backgroundColor: accentBlue,
@@ -126,18 +133,10 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
       ),
     );
 
-    if (!auth.loggedIn) {
+    if (!loggedIn) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (!tiny) ...[
-            ElevatedButton(
-              onPressed: () => context.go('/become-creator'),
-              style: solidButton,
-              child: const Text('Become an Creator'),
-            ),
-            const SizedBox(width: WaibySpacing.s8),
-          ],
           OutlinedButton(
             onPressed: () => context.go('/login'),
             style: solidButton.copyWith(
@@ -145,12 +144,6 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             child: const Text('Login'),
           ),
-          if (tiny) ...[
-            const SizedBox(width: WaibySpacing.s8),
-            _CompactActionMenu(
-              onBecomeCreatorTap: () => context.go('/become-creator'),
-            ),
-          ],
         ],
       );
     }
@@ -158,7 +151,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!compact) ...[
+        if (!compact && canShowBecomeCreator) ...[
           ElevatedButton(
             onPressed: () => context.go('/become-creator'),
             style: solidButton,
@@ -175,7 +168,7 @@ class TopNavBar extends StatelessWidget implements PreferredSizeWidget {
           splashRadius: 20,
           iconSize: compact ? 20 : 22,
         ),
-        if (compact) ...[
+        if (compact && canShowBecomeCreator) ...[
           _CompactActionMenu(
             onBecomeCreatorTap: () => context.go('/become-creator'),
           ),
