@@ -89,6 +89,12 @@ class CreatorStorageService {
     } on FirebaseException catch (e) {
       return IdentityUploadResult.error(_formatStorageError(e));
     } catch (e) {
+      final message = e.toString();
+      if (message.contains('Service storage is not available')) {
+        return const IdentityUploadResult.error(
+          'Upload failed [storage-unavailable]. Firebase Storage web SDK is missing in the deployed bundle. Rebuild/deploy the latest web build and clear browser cache.',
+        );
+      }
       return IdentityUploadResult.error('Unexpected upload error: $e');
     }
   }

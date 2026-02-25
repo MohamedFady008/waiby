@@ -37,12 +37,28 @@
   </script>
   <script type="module">
     const sdkPath = './firebasejs/12.7.0';
+    const sdkVersion = '12.7.0';
+
+    const loadFirebaseModule = async (fileName, globalName) => {
+      const localUrl = `${sdkPath}/${fileName}`;
+      try {
+        return await import(localUrl);
+      } catch (localError) {
+        const cdnUrl = `https://www.gstatic.com/firebasejs/${sdkVersion}/${fileName}`;
+        console.warn(
+          `Failed to load local Firebase module (${globalName}) from ${localUrl}. Falling back to CDN.`,
+          localError,
+        );
+        return import(cdnUrl);
+      }
+    };
+
     window.__flutterfireModulesReady = (async () => {
       const [core, auth, firestore, storage] = await Promise.all([
-        import(`${sdkPath}/firebase-app.js`),
-        import(`${sdkPath}/firebase-auth.js`),
-        import(`${sdkPath}/firebase-firestore.js`),
-        import(`${sdkPath}/firebase-storage.js`),
+        loadFirebaseModule('firebase-app.js', 'core'),
+        loadFirebaseModule('firebase-auth.js', 'auth'),
+        loadFirebaseModule('firebase-firestore.js', 'firestore'),
+        loadFirebaseModule('firebase-storage.js', 'storage'),
       ]);
       window.firebase_core = core;
       window.firebase_auth = auth;
