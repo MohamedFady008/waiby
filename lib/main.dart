@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'app_router.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/creator_form_controller.dart';

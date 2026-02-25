@@ -21,6 +21,7 @@ import 'pages/creator_guidelines_page.dart';
 import 'pages/influencer_guidelines_page.dart';
 
 final router = GoRouter(
+  navigatorKey: Get.key,
   initialLocation: '/',
   routes: [
     // NO TOP NAVBAR HERE
