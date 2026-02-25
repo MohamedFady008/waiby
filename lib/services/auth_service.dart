@@ -7,7 +7,6 @@ import '../core/config/app_config.dart';
 import '../data/models/user_profile.dart';
 import '../data/repositories/user_profile_repository.dart';
 
-/// Result class for authentication operations.
 class AuthResult {
   final bool success;
   final String? message;

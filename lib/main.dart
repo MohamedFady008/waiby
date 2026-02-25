@@ -6,10 +6,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'app_router.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/creator_form_controller.dart';
+import 'core/web/firebase_web_loader.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await ensureFirebaseWebModulesLoaded();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Fonts are not bundled locally in this project, so keep runtime fetch on.
