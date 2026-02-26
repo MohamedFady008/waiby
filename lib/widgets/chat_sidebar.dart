@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 @immutable
 class ChatSidebarItem {
   final String avatarAsset;
+  final String? avatarUrl;
   final String? frameAsset;
   final int unreadCount;
   final bool showUnreadIndicator;
@@ -13,6 +14,7 @@ class ChatSidebarItem {
 
   const ChatSidebarItem({
     required this.avatarAsset,
+    this.avatarUrl,
     this.frameAsset,
     this.unreadCount = 0,
     this.showUnreadIndicator = false,
@@ -183,19 +185,7 @@ class _ChatSidebarTile extends StatelessWidget {
                         child: SizedBox(
                           width: avatarSize,
                           height: avatarSize,
-                          child: Image.asset(
-                            item.avatarAsset,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Container(
-                              color: const Color(0xFF1B274E),
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.person_rounded,
-                                color: Color(0xFF8E98B5),
-                                size: avatarSize * 0.5,
-                              ),
-                            ),
-                          ),
+                          child: _buildAvatarImage(),
                         ),
                       ),
                     ),
@@ -223,6 +213,34 @@ class _ChatSidebarTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarImage() {
+    final avatarUrl = item.avatarUrl?.trim();
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      return Image.network(
+        avatarUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _avatarFallback(),
+      );
+    }
+    return Image.asset(
+      item.avatarAsset,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => _avatarFallback(),
+    );
+  }
+
+  Widget _avatarFallback() {
+    return Container(
+      color: const Color(0xFF1B274E),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.person_rounded,
+        color: const Color(0xFF8E98B5),
+        size: avatarSize * 0.5,
       ),
     );
   }

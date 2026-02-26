@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import 'app_router.dart';
 import 'controllers/auth_controller.dart';
+import 'controllers/chat_controller.dart';
 import 'controllers/creator_form_controller.dart';
 import 'controllers/home_controller.dart';
 import 'core/web/firebase_web_loader.dart';
@@ -17,6 +18,7 @@ void main() async {
   await ensureFirebaseWebModulesLoaded();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   Get.put(AuthController(), permanent: true);
+  Get.put(ChatController(), permanent: true);
   Get.lazyPut(() => CreatorFormController(), fenix: true);
   Get.lazyPut(() => HomeController(), fenix: true);
   runApp(const MyApp());
@@ -29,6 +31,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!Get.isRegistered<AuthController>()) {
       Get.put(AuthController(), permanent: true);
+    }
+    if (!Get.isRegistered<ChatController>()) {
+      Get.put(ChatController(), permanent: true);
     }
 
     return GetMaterialApp.router(

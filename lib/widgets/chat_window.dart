@@ -3,160 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-@immutable
-class WaibyChatMessage {
-  final String text;
-  final bool fromCurrentUser;
-  final DateTime sentAt;
-
-  const WaibyChatMessage({
-    required this.text,
-    required this.fromCurrentUser,
-    required this.sentAt,
-  });
-}
-
-@immutable
-class WaibyChatThread {
-  final String id;
-  final String displayName;
-  final String avatarAsset;
-  final String? frameAsset;
-  final String previewText;
-  final bool previewItalic;
-  final String lastActivityLabel;
-  final int unreadCount;
-  final bool showUnreadIndicator;
-  final bool isOnline;
-  final List<WaibyChatMessage> messages;
-
-  WaibyChatThread({
-    required this.id,
-    required this.displayName,
-    required this.avatarAsset,
-    this.frameAsset,
-    required this.previewText,
-    this.previewItalic = false,
-    required this.lastActivityLabel,
-    this.unreadCount = 0,
-    this.showUnreadIndicator = false,
-    this.isOnline = false,
-    List<WaibyChatMessage> messages = const <WaibyChatMessage>[],
-  }) : messages = List<WaibyChatMessage>.unmodifiable(messages);
-
-  static List<WaibyChatThread> demoThreads() {
-    final anchorTime = DateTime(2026, 1, 21, 8, 50);
-    return <WaibyChatThread>[
-      WaibyChatThread(
-        id: 'arvkiny',
-        displayName: 'Arvkiny',
-        avatarAsset: 'assets/pp1.png',
-        frameAsset: 'assets/medals/vine_wreath.png',
-        previewText: 'we can echat',
-        lastActivityLabel: 'now',
-        unreadCount: 1,
-        showUnreadIndicator: true,
-        isOnline: true,
-        messages: <WaibyChatMessage>[
-          WaibyChatMessage(
-            text: 'Hello, can i order?',
-            fromCurrentUser: true,
-            sentAt: anchorTime,
-          ),
-          WaibyChatMessage(
-            text: 'hello! what u wanna order',
-            fromCurrentUser: false,
-            sentAt: anchorTime.add(const Duration(minutes: 1)),
-          ),
-          WaibyChatMessage(
-            text: 'we can echat',
-            fromCurrentUser: false,
-            sentAt: anchorTime.add(const Duration(minutes: 2)),
-          ),
-        ],
-      ),
-      WaibyChatThread(
-        id: 'miathekat',
-        displayName: 'miatheKAT',
-        avatarAsset: 'assets/pp2.png',
-        frameAsset: 'assets/medals/kittybloom.png',
-        previewText: 'Kirck just placed an ord...',
-        previewItalic: true,
-        lastActivityLabel: '1min ago',
-      ),
-      WaibyChatThread(
-        id: 'issacthetuff',
-        displayName: 'issacthetuff',
-        avatarAsset: 'assets/pp3.png',
-        previewText: 'whos??',
-        lastActivityLabel: '1min ago',
-      ),
-      WaibyChatThread(
-        id: 'ice',
-        displayName: 'ICE',
-        avatarAsset: 'assets/pp4.png',
-        frameAsset: 'assets/medals/golden.png',
-        previewText: 'bruh what',
-        lastActivityLabel: '1min ago',
-        unreadCount: 1,
-        showUnreadIndicator: true,
-      ),
-      WaibyChatThread(
-        id: 'tster',
-        displayName: 'Tster',
-        avatarAsset: 'assets/pp5.png',
-        previewText: 'Tster has completed the or...',
-        previewItalic: true,
-        lastActivityLabel: '2min ago',
-        unreadCount: 1,
-        showUnreadIndicator: true,
-      ),
-      WaibyChatThread(
-        id: 'weed1980',
-        displayName: 'weed1980',
-        avatarAsset: 'assets/pp6.png',
-        frameAsset: 'assets/medals/lolita_pearl.png',
-        previewText: 'no',
-        lastActivityLabel: '5min ago',
-        unreadCount: 1,
-        showUnreadIndicator: true,
-      ),
-      WaibyChatThread(
-        id: 'raion-shiro',
-        displayName: 'Raion Shiro',
-        avatarAsset: 'assets/pp7.png',
-        frameAsset: 'assets/medals/aqua_ring.png',
-        previewText: 'thats what i did idk',
-        lastActivityLabel: '12min ago',
-      ),
-      WaibyChatThread(
-        id: 'lilith',
-        displayName: 'Lilith',
-        avatarAsset: 'assets/pp2.png',
-        frameAsset: 'assets/medals/lolita_pearl.png',
-        previewText: 'LIlith offered a service of...',
-        previewItalic: true,
-        lastActivityLabel: '26min ago',
-      ),
-      WaibyChatThread(
-        id: 'waxal',
-        displayName: 'waxal',
-        avatarAsset: 'assets/pp6.png',
-        frameAsset: 'assets/medals/vine_wreath.png',
-        previewText: 'Sure',
-        lastActivityLabel: '40min ago',
-      ),
-      WaibyChatThread(
-        id: 'nikkiex',
-        displayName: 'Nikkiex',
-        avatarAsset: 'assets/pp5.png',
-        frameAsset: 'assets/medals/aurealux_emblem.png',
-        previewText: 'smile',
-        lastActivityLabel: '2h ago',
-      ),
-    ];
-  }
-}
+import '../data/models/chat_models.dart';
 
 Future<void> showWaibyChatDialog(
   BuildContext context, {
@@ -193,6 +40,8 @@ class WaibyChatWindow extends StatefulWidget {
   final List<WaibyChatThread> threads;
   final String? initialThreadId;
   final VoidCallback? onClose;
+  final ValueChanged<String>? onThreadSelected;
+  final Future<void> Function(String threadId, String message)? onSendMessage;
 
   const WaibyChatWindow({
     super.key,
@@ -201,6 +50,8 @@ class WaibyChatWindow extends StatefulWidget {
     required this.threads,
     this.initialThreadId,
     this.onClose,
+    this.onThreadSelected,
+    this.onSendMessage,
   });
 
   @override
@@ -208,8 +59,8 @@ class WaibyChatWindow extends StatefulWidget {
 }
 
 class _WaibyChatWindowState extends State<WaibyChatWindow> {
-  late final List<_ThreadRuntime> _threads;
-  late String _selectedThreadId;
+  late List<_ThreadRuntime> _threads;
+  String? _selectedThreadId;
   bool _showSettingsPanel = false;
   bool _chatOnlyNotifications = false;
   bool _showGiftPanel = false;
@@ -225,15 +76,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
   @override
   void initState() {
     super.initState();
-    _threads =
-        (widget.threads.isEmpty
-                ? WaibyChatThread.demoThreads()
-                : widget.threads)
-            .map(_ThreadRuntime.fromThread)
-            .toList(growable: false);
-
-    _selectedThreadId = _resolveInitialThreadId();
-    _markThreadRead(_selectedThread);
+    _syncThreadsFromWidget();
 
     _searchController.addListener(_onSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback(
@@ -254,25 +97,42 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
   @override
   void didUpdateWidget(covariant WaibyChatWindow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final nextThreadId = widget.initialThreadId;
-    if (nextThreadId == null || nextThreadId == oldWidget.initialThreadId) {
+    final threadsChanged = widget.threads != oldWidget.threads;
+    final selectedChanged = widget.initialThreadId != oldWidget.initialThreadId;
+    if (!threadsChanged && !selectedChanged) {
       return;
     }
-    if (!_threads.any((thread) => thread.id == nextThreadId)) {
-      return;
-    }
-    final thread = _threads.firstWhere((entry) => entry.id == nextThreadId);
-    setState(() {
-      _selectedThreadId = nextThreadId;
-      _markThreadRead(thread);
-    });
+    setState(_syncThreadsFromWidget);
     _scrollMessagesToBottom(animated: false);
   }
 
-  String _resolveInitialThreadId() {
-    final id = widget.initialThreadId;
-    if (id != null && _threads.any((thread) => thread.id == id)) {
-      return id;
+  void _syncThreadsFromWidget() {
+    final useDemoThreads =
+        widget.threads.isEmpty &&
+        widget.onSendMessage == null &&
+        widget.onThreadSelected == null;
+    final source = useDemoThreads
+        ? WaibyChatThread.demoThreads()
+        : widget.threads;
+    _threads = source.map(_ThreadRuntime.fromThread).toList(growable: false);
+    _selectedThreadId = _resolveInitialThreadId();
+    final selected = _selectedThread;
+    if (selected != null) {
+      _markThreadRead(selected);
+    }
+  }
+
+  String? _resolveInitialThreadId() {
+    if (_threads.isEmpty) {
+      return null;
+    }
+    final preferred = widget.initialThreadId;
+    if (preferred != null && _threads.any((thread) => thread.id == preferred)) {
+      return preferred;
+    }
+    final current = _selectedThreadId;
+    if (current != null && _threads.any((thread) => thread.id == current)) {
+      return current;
     }
     return _threads.first.id;
   }
@@ -293,18 +153,36 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
         .toList(growable: false);
   }
 
-  _ThreadRuntime get _selectedThread {
-    return _threads.firstWhere((thread) => thread.id == _selectedThreadId);
+  _ThreadRuntime? get _selectedThread {
+    final id = _selectedThreadId;
+    if (id == null) {
+      return null;
+    }
+    for (final thread in _threads) {
+      if (thread.id == id) {
+        return thread;
+      }
+    }
+    return _threads.isNotEmpty ? _threads.first : null;
   }
 
   void _selectThread(String threadId) {
-    final thread = _threads.firstWhere((entry) => entry.id == threadId);
+    _ThreadRuntime? thread;
+    for (final entry in _threads) {
+      if (entry.id == threadId) {
+        thread = entry;
+        break;
+      }
+    }
+    final selectedThread = thread;
+    if (selectedThread == null) return;
     setState(() {
       _selectedThreadId = threadId;
-      _markThreadRead(thread);
+      _markThreadRead(selectedThread);
       _showGiftPanel = false;
       _showSettingsPanel = false;
     });
+    widget.onThreadSelected?.call(threadId);
     _scrollMessagesToBottom(animated: false);
   }
 
@@ -313,23 +191,49 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     thread.showUnreadIndicator = false;
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final trimmed = _messageController.text.trim();
     if (trimmed.isEmpty) {
       return;
     }
 
     final active = _selectedThread;
-    setState(() {
-      final sentAt = DateTime.now();
-      active.messages.add(
-        WaibyChatMessage(text: trimmed, fromCurrentUser: true, sentAt: sentAt),
-      );
-      active.previewText = trimmed;
-      active.previewItalic = false;
-      active.lastActivityLabel = 'now';
-    });
+    if (active == null) {
+      return;
+    }
 
+    final sender = widget.onSendMessage;
+    if (sender != null) {
+      try {
+        await sender(active.id, trimmed);
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not send the message right now.',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: const Color(0xFFAD2E2E),
+          ),
+        );
+        return;
+      }
+    } else {
+      setState(() {
+        final sentAt = DateTime.now();
+        active.messages.add(
+          WaibyChatMessage(
+            text: trimmed,
+            fromCurrentUser: true,
+            sentAt: sentAt,
+          ),
+        );
+        active.previewText = trimmed;
+        active.previewItalic = false;
+        active.lastActivityLabel = 'now';
+      });
+    }
     _messageController.clear();
     _scrollMessagesToBottom(animated: true);
   }
@@ -401,27 +305,52 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     setState(() => _giftMultiplier = values[nextIndex]);
   }
 
-  void _sendGift() {
+  Future<void> _sendGift() async {
     final selectedId = _selectedGiftId;
     final gift = _activeGiftItems.firstWhere(
       (item) => item.id == selectedId,
       orElse: () => _activeGiftItems.first,
     );
     final active = _selectedThread;
+    if (active == null) {
+      return;
+    }
 
-    setState(() {
-      active.messages.add(
-        WaibyChatMessage(
-          text: 'Sent ${gift.name} gift x$_giftMultiplier',
-          fromCurrentUser: true,
-          sentAt: DateTime.now(),
-        ),
-      );
-      active.previewText = 'Sent ${gift.name} gift';
-      active.previewItalic = false;
-      active.lastActivityLabel = 'now';
-      _showGiftPanel = false;
-    });
+    final giftMessage = 'Sent ${gift.name} gift x$_giftMultiplier';
+    final sender = widget.onSendMessage;
+    if (sender != null) {
+      try {
+        await sender(active.id, giftMessage);
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not send the gift right now.',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: const Color(0xFFAD2E2E),
+          ),
+        );
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _showGiftPanel = false);
+    } else {
+      setState(() {
+        active.messages.add(
+          WaibyChatMessage(
+            text: giftMessage,
+            fromCurrentUser: true,
+            sentAt: DateTime.now(),
+          ),
+        );
+        active.previewText = 'Sent ${gift.name} gift';
+        active.previewItalic = false;
+        active.lastActivityLabel = 'now';
+        _showGiftPanel = false;
+      });
+    }
 
     _scrollMessagesToBottom(animated: true);
   }
@@ -716,19 +645,35 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: results.length,
-              itemBuilder: (context, index) {
-                final thread = results[index];
-                final selected = thread.id == _selectedThreadId;
-                return _ThreadTile(
-                  thread: thread,
-                  compact: compact,
-                  selected: selected,
-                  onTap: () => _selectThread(thread.id),
-                );
-              },
-            ),
+            child: results.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      child: Text(
+                        'No conversations yet.\nStart chat from a profile.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          color: Colors.white.withValues(alpha: 0.68),
+                          fontWeight: FontWeight.w600,
+                          fontSize: compact ? 11 : 12,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: results.length,
+                    itemBuilder: (context, index) {
+                      final thread = results[index];
+                      final selected = thread.id == _selectedThreadId;
+                      return _ThreadTile(
+                        thread: thread,
+                        compact: compact,
+                        selected: selected,
+                        onTap: () => _selectThread(thread.id),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -736,11 +681,31 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
   }
 
   Widget _buildMessagesPanel(
-    _ThreadRuntime thread, {
+    _ThreadRuntime? thread, {
     required bool compact,
     required double cornerRadius,
     required double panelWidth,
   }) {
+    if (thread == null) {
+      return Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1D1C3E),
+          borderRadius: BorderRadius.circular(cornerRadius),
+        ),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(20),
+        child: Text(
+          'No conversation selected',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            color: Colors.white.withValues(alpha: 0.72),
+            fontWeight: FontWeight.w600,
+            fontSize: compact ? 12 : 13,
+          ),
+        ),
+      );
+    }
+
     final dayLabel = _formatDateStamp(
       thread.messages.isNotEmpty
           ? thread.messages.first.sentAt
@@ -791,6 +756,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                       children: [
                         _FramedAvatar(
                           avatarAsset: thread.avatarAsset,
+                          avatarUrl: thread.avatarUrl,
                           frameAsset: thread.frameAsset,
                           avatarSize: headerAvatarSize,
                           frameSize: headerFrameSize,
@@ -959,7 +925,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                           onCategoryChanged: _selectGiftCategory,
                           onGiftSelected: _selectGift,
                           onCycleMultiplier: _cycleGiftMultiplier,
-                          onGiftTap: _sendGift,
+                          onGiftTap: () => _sendGift(),
                         ),
                       ),
                     ),
@@ -1246,6 +1212,7 @@ class _ThreadRuntime {
   final String id;
   final String displayName;
   final String avatarAsset;
+  final String? avatarUrl;
   final String? frameAsset;
   bool previewItalic;
   String previewText;
@@ -1259,6 +1226,7 @@ class _ThreadRuntime {
     required this.id,
     required this.displayName,
     required this.avatarAsset,
+    this.avatarUrl,
     this.frameAsset,
     required this.previewItalic,
     required this.previewText,
@@ -1274,6 +1242,7 @@ class _ThreadRuntime {
       id: thread.id,
       displayName: thread.displayName,
       avatarAsset: thread.avatarAsset,
+      avatarUrl: thread.avatarUrl,
       frameAsset: thread.frameAsset,
       previewItalic: thread.previewItalic,
       previewText: thread.previewText,
@@ -1328,6 +1297,7 @@ class _ThreadTile extends StatelessWidget {
               ],
               _FramedAvatar(
                 avatarAsset: thread.avatarAsset,
+                avatarUrl: thread.avatarUrl,
                 frameAsset: thread.frameAsset,
                 avatarSize: compact ? 36 : 42,
                 frameSize: compact ? 44 : 50,
@@ -1386,6 +1356,7 @@ class _ThreadTile extends StatelessWidget {
 
 class _FramedAvatar extends StatelessWidget {
   final String avatarAsset;
+  final String? avatarUrl;
   final String? frameAsset;
   final double avatarSize;
   final double frameSize;
@@ -1394,6 +1365,7 @@ class _FramedAvatar extends StatelessWidget {
 
   const _FramedAvatar({
     required this.avatarAsset,
+    this.avatarUrl,
     this.frameAsset,
     required this.avatarSize,
     required this.frameSize,
@@ -1420,19 +1392,7 @@ class _FramedAvatar extends StatelessWidget {
               child: SizedBox(
                 width: avatarSize,
                 height: avatarSize,
-                child: Image.asset(
-                  avatarAsset,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    color: const Color(0xFF1B274E),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      Icons.person_rounded,
-                      color: const Color(0xFF8E98B5),
-                      size: fallbackIconSize,
-                    ),
-                  ),
-                ),
+                child: _buildAvatar(fallbackIconSize),
               ),
             ),
           ),
@@ -1496,6 +1456,34 @@ class _FramedAvatar extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatar(double fallbackIconSize) {
+    final normalizedUrl = avatarUrl?.trim();
+    if (normalizedUrl != null && normalizedUrl.isNotEmpty) {
+      return Image.network(
+        normalizedUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _buildAvatarFallback(fallbackIconSize),
+      );
+    }
+    return Image.asset(
+      avatarAsset,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => _buildAvatarFallback(fallbackIconSize),
+    );
+  }
+
+  Widget _buildAvatarFallback(double fallbackIconSize) {
+    return Container(
+      color: const Color(0xFF1B274E),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.person_rounded,
+        color: const Color(0xFF8E98B5),
+        size: fallbackIconSize,
       ),
     );
   }
@@ -1613,14 +1601,17 @@ class _GiftPanel extends StatelessWidget {
         final compact = panelWidth < 360;
         final tabsPadding = compact ? 16.0 : 22.0;
         final footerMinHeight = compact ? 64.0 : 52.0;
+        final baseMinHeight = compact ? 260.0 : 300.0;
+        final resolvedMaxHeight = panelHeight < 220 ? 220.0 : panelHeight;
+        final resolvedMinHeight = math.min(baseMinHeight, resolvedMaxHeight);
 
         return Material(
           color: Colors.transparent,
           child: Container(
             width: panelWidth,
             constraints: BoxConstraints(
-              minHeight: compact ? 260 : 300,
-              maxHeight: panelHeight,
+              minHeight: resolvedMinHeight,
+              maxHeight: resolvedMaxHeight,
             ),
             decoration: BoxDecoration(
               color: const Color.fromRGBO(4, 6, 28, 0.88),

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 
 import '../controllers/auth_controller.dart';
+import '../controllers/chat_controller.dart';
 import '../widgets/home_chat_dock.dart';
 import '../widgets/top_nav_bar.dart';
 
@@ -15,6 +16,8 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
+    final chatController = Get.find<ChatController>();
+    chatController.handleRouteChanged(path);
     final minWidth = _chatDockMinWidthForPath(path);
     if (minWidth == null) {
       return Scaffold(
@@ -26,26 +29,30 @@ class AppShell extends StatelessWidget {
     return Scaffold(
       appBar: TopNavBar(auth: auth),
       body: LayoutBuilder(
-        builder: (context, constraints) => Obx(() {
+        builder: (context, constraints) {
           const sidebarWidth = WaibyHomeChatDock.defaultSidebarWidth;
           const sidebarGap = WaibyHomeChatDock.defaultSidebarGap;
-          final isLoggedIn = auth.currentUser.value != null;
-          final showChatDock = isLoggedIn && constraints.maxWidth >= minWidth;
+          final showChatDockByWidth = constraints.maxWidth >= minWidth;
 
-          return Stack(
-            children: [
-              child,
-              if (showChatDock)
-                Positioned.fill(
-                  child: WaibyHomeChatDock(
-                    key: ValueKey<String>('chat-dock:$path'),
-                    sidebarWidth: sidebarWidth,
-                    sidebarGap: sidebarGap,
+          return Obx(() {
+            final isLoggedIn = auth.currentUser.value != null;
+            final showChatDock = isLoggedIn && showChatDockByWidth;
+
+            return Stack(
+              children: [
+                child,
+                if (showChatDock)
+                  Positioned.fill(
+                    child: WaibyHomeChatDock(
+                      key: ValueKey<String>('chat-dock:$path'),
+                      sidebarWidth: sidebarWidth,
+                      sidebarGap: sidebarGap,
+                    ),
                   ),
-                ),
-            ],
-          );
-        }),
+              ],
+            );
+          });
+        },
       ),
     );
   }

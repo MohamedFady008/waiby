@@ -13,7 +13,7 @@ class ScoreRateSettingsBody extends StatelessWidget {
     _ActionMetricCardData(
       title: 'PROFILE POWER',
       icon: Icons.person_outline_rounded,
-      score: '6/6',
+      score: '7/7',
       status: _MetricStatus.completed,
       rows: <_ActionMetricRowData>[
         _ActionMetricRowData(label: 'Get verified', value: '1/1'),
@@ -49,7 +49,7 @@ class ScoreRateSettingsBody extends StatelessWidget {
     _ActionMetricCardData(
       title: 'RELIABILITY RANK',
       icon: Icons.person_outline_rounded,
-      score: '13/20',
+      score: '15/20',
       status: _MetricStatus.pending,
       rows: <_ActionMetricRowData>[
         _ActionMetricRowData(label: 'Fast reply time', value: '5/5'),
@@ -68,7 +68,7 @@ class ScoreRateSettingsBody extends StatelessWidget {
     _ActionMetricCardData(
       title: 'BUSINESS IMPACT',
       icon: Icons.person_outline_rounded,
-      score: '6/6',
+      score: '0/65',
       status: _MetricStatus.pending,
       rows: <_ActionMetricRowData>[
         _ActionMetricRowData(label: 'Total Income', value: '0/25'),

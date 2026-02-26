@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/models/chat_models.dart';
 import '../../widgets/settings_sidebar.dart';
 import '../../widgets/chat_window.dart';
 

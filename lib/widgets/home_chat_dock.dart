@@ -1,7 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
+import '../controllers/chat_controller.dart';
+import '../data/models/chat_models.dart';
 import 'chat_sidebar.dart';
 import 'chat_window.dart';
 
@@ -25,39 +28,65 @@ class WaibyHomeChatDock extends StatefulWidget {
 }
 
 class _WaibyHomeChatDockState extends State<WaibyHomeChatDock> {
-  late final List<WaibyChatThread> _threads;
-  String? _activeThreadId;
+  late final List<WaibyChatThread> _providedThreads;
+  String? _providedActiveThreadId;
+  late final ChatController _chatController;
+
+  bool get _usesProvidedThreads => widget.threads != null;
 
   @override
   void initState() {
     super.initState();
-    _threads = _resolveThreads();
+    _providedThreads = _resolveThreads();
+    _chatController = Get.find<ChatController>();
   }
 
   List<WaibyChatThread> _resolveThreads() {
     final provided = widget.threads;
-    if (provided == null || provided.isEmpty) {
+    if (provided == null) {
+      return const <WaibyChatThread>[];
+    }
+    if (provided.isEmpty) {
       return WaibyChatThread.demoThreads();
     }
     return provided.toList(growable: false);
   }
 
-  bool get _panelOpen => _activeThreadId != null;
-
   void _openThread(String threadId) {
-    setState(() => _activeThreadId = threadId);
+    if (_usesProvidedThreads) {
+      setState(() => _providedActiveThreadId = threadId);
+      return;
+    }
+    _chatController.selectThread(threadId);
   }
 
   void _closePanel() {
-    setState(() => _activeThreadId = null);
+    if (_usesProvidedThreads) {
+      setState(() => _providedActiveThreadId = null);
+      return;
+    }
+    _chatController.closePanel();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final sidebarItems = _threads
+  Future<void> _sendMessage(String threadId, String message) {
+    if (_usesProvidedThreads) {
+      return Future<void>.value();
+    }
+    return _chatController.sendMessage(threadId: threadId, text: message);
+  }
+
+  Widget _buildDock({
+    required List<WaibyChatThread> threads,
+    required String? activeThreadId,
+  }) {
+    final panelOpen =
+        activeThreadId != null &&
+        threads.any((thread) => thread.id == activeThreadId);
+    final sidebarItems = threads
         .map(
           (thread) => ChatSidebarItem(
             avatarAsset: thread.avatarAsset,
+            avatarUrl: thread.avatarUrl,
             frameAsset: thread.frameAsset,
             unreadCount: thread.unreadCount,
             showUnreadIndicator: thread.showUnreadIndicator,
@@ -72,11 +101,11 @@ class _WaibyHomeChatDockState extends State<WaibyHomeChatDock> {
         final rawPanelWidth =
             constraints.maxWidth - widget.sidebarWidth - widget.sidebarGap - 24;
         final maxPanelWidth = rawPanelWidth.clamp(520.0, 860.0).toDouble();
-        final visiblePanelWidth = _panelOpen ? maxPanelWidth : 0.0;
+        final visiblePanelWidth = panelOpen ? maxPanelWidth : 0.0;
 
         return Stack(
           children: [
-            if (_panelOpen)
+            if (panelOpen)
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -101,23 +130,29 @@ class _WaibyHomeChatDockState extends State<WaibyHomeChatDock> {
                           width: maxPanelWidth,
                           height: dockHeight,
                           child: IgnorePointer(
-                            ignoring: !_panelOpen,
+                            ignoring: !panelOpen,
                             child: AnimatedOpacity(
                               duration: const Duration(milliseconds: 180),
                               curve: Curves.easeOut,
-                              opacity: _panelOpen ? 1 : 0,
+                              opacity: panelOpen ? 1 : 0,
                               child: AnimatedSlide(
                                 duration: const Duration(milliseconds: 340),
                                 curve: Curves.easeOutCubic,
-                                offset: _panelOpen
+                                offset: panelOpen
                                     ? Offset.zero
                                     : const Offset(0.08, 0),
                                 child: WaibyChatWindow(
                                   width: maxPanelWidth,
                                   height: dockHeight,
-                                  threads: _threads,
-                                  initialThreadId: _activeThreadId,
+                                  threads: threads,
+                                  initialThreadId: activeThreadId,
                                   onClose: _closePanel,
+                                  onThreadSelected: _usesProvidedThreads
+                                      ? null
+                                      : _chatController.selectThread,
+                                  onSendMessage: _usesProvidedThreads
+                                      ? null
+                                      : _sendMessage,
                                 ),
                               ),
                             ),
@@ -130,7 +165,7 @@ class _WaibyHomeChatDockState extends State<WaibyHomeChatDock> {
                   AnimatedSlide(
                     duration: const Duration(milliseconds: 340),
                     curve: Curves.easeOutCubic,
-                    offset: _panelOpen ? const Offset(-0.02, 0) : Offset.zero,
+                    offset: panelOpen ? const Offset(-0.02, 0) : Offset.zero,
                     child: SizedBox(
                       width: widget.sidebarWidth,
                       height: dockHeight,
@@ -147,5 +182,21 @@ class _WaibyHomeChatDockState extends State<WaibyHomeChatDock> {
         );
       },
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_usesProvidedThreads) {
+      return _buildDock(
+        threads: _providedThreads,
+        activeThreadId: _providedActiveThreadId,
+      );
+    }
+    return Obx(() {
+      return _buildDock(
+        threads: _chatController.threads.toList(growable: false),
+        activeThreadId: _chatController.activeThreadId.value,
+      );
+    });
   }
 }

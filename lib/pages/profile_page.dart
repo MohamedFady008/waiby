@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../controllers/auth_controller.dart';
+import '../controllers/chat_controller.dart';
 import '../data/models/user_profile.dart';
 import '../data/repositories/user_profile_repository.dart';
 import '../widgets/common/responsive_layout.dart';
@@ -63,6 +66,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ? _ProfileBody(
                             userName: fallbackUserName,
                             profileUserId: null,
+                            profileAvatarUrl: null,
                             width: width,
                             isViewingOtherAccount: isViewingOtherAccount,
                             selectedTab: _selectedTab,
@@ -85,6 +89,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               return _ProfileBody(
                                 userName: userName,
                                 profileUserId: profileUserId,
+                                profileAvatarUrl: snapshot.data?.avatarUrl,
                                 width: width,
                                 isViewingOtherAccount: isViewingOtherAccount,
                                 selectedTab: _selectedTab,
@@ -107,6 +112,7 @@ class _ProfilePageState extends State<ProfilePage> {
 class _ProfileBody extends StatelessWidget {
   final String userName;
   final String? profileUserId;
+  final String? profileAvatarUrl;
   final double width;
   final bool isViewingOtherAccount;
   final _ProfileTab selectedTab;
@@ -115,6 +121,7 @@ class _ProfileBody extends StatelessWidget {
   const _ProfileBody({
     required this.userName,
     required this.profileUserId,
+    required this.profileAvatarUrl,
     required this.width,
     required this.isViewingOtherAccount,
     required this.selectedTab,
@@ -150,6 +157,9 @@ class _ProfileBody extends StatelessWidget {
                 width: 310,
                 child: _ActionPanel(
                   isViewingOtherAccount: isViewingOtherAccount,
+                  profileUserId: profileUserId,
+                  profileUserName: userName,
+                  profileAvatarUrl: profileAvatarUrl,
                 ),
               ),
             ],
@@ -176,6 +186,9 @@ class _ProfileBody extends StatelessWidget {
                   width: 310,
                   child: _ActionPanel(
                     isViewingOtherAccount: isViewingOtherAccount,
+                    profileUserId: profileUserId,
+                    profileUserName: userName,
+                    profileAvatarUrl: profileAvatarUrl,
                   ),
                 ),
               ),
@@ -188,7 +201,12 @@ class _ProfileBody extends StatelessWidget {
               const SizedBox(height: 12),
               _ServiceDetailsCard(profileUserId: profileUserId),
               const SizedBox(height: 12),
-              _ActionPanel(isViewingOtherAccount: isViewingOtherAccount),
+              _ActionPanel(
+                isViewingOtherAccount: isViewingOtherAccount,
+                profileUserId: profileUserId,
+                profileUserName: userName,
+                profileAvatarUrl: profileAvatarUrl,
+              ),
               const SizedBox(height: 12),
               _ReviewsCard(profileUserId: profileUserId),
             ],
@@ -4418,8 +4436,86 @@ class _ReviewTile extends StatelessWidget {
 
 class _ActionPanel extends StatelessWidget {
   final bool isViewingOtherAccount;
+  final String? profileUserId;
+  final String profileUserName;
+  final String? profileAvatarUrl;
 
-  const _ActionPanel({required this.isViewingOtherAccount});
+  const _ActionPanel({
+    required this.isViewingOtherAccount,
+    required this.profileUserId,
+    required this.profileUserName,
+    required this.profileAvatarUrl,
+  });
+
+  Future<void> _handleChatTap(BuildContext context) async {
+    if (!isViewingOtherAccount) {
+      return;
+    }
+    if (!Get.isRegistered<AuthController>()) {
+      _showProfileActionError(context, 'Sign in first to start chatting.');
+      context.go('/login');
+      return;
+    }
+
+    final auth = Get.find<AuthController>();
+    final currentUser = auth.currentUser.value;
+    if (currentUser == null) {
+      _showProfileActionError(context, 'Sign in first to start chatting.');
+      context.go('/login');
+      return;
+    }
+
+    final targetUserId = profileUserId?.trim();
+    if (targetUserId == null || targetUserId.isEmpty) {
+      _showProfileActionError(
+        context,
+        'This profile is not available for chat.',
+      );
+      return;
+    }
+    if (targetUserId == currentUser.uid) {
+      _showProfileActionError(context, 'Open another profile to start a chat.');
+      return;
+    }
+
+    if (!Get.isRegistered<ChatController>()) {
+      Get.put(ChatController(), permanent: true);
+    }
+    final chatController = Get.find<ChatController>();
+
+    try {
+      await chatController.startDirectConversation(
+        otherUserId: targetUserId,
+        otherUserName: profileUserName,
+        otherUserAvatarUrl: profileAvatarUrl,
+      );
+    } on ArgumentError catch (error) {
+      if (!context.mounted) return;
+      _showProfileActionError(
+        context,
+        error.message?.toString() ?? 'Could not start this chat.',
+      );
+    } on FirebaseException catch (error) {
+      if (!context.mounted) return;
+      final details = error.message?.trim();
+      if (error.code == 'permission-denied') {
+        _showProfileActionError(
+          context,
+          'Chat permission denied. Sign out/in and try again.',
+        );
+      } else {
+        _showProfileActionError(
+          context,
+          details != null && details.isNotEmpty
+              ? details
+              : 'Could not start this chat right now.',
+        );
+      }
+    } catch (_) {
+      if (!context.mounted) return;
+      _showProfileActionError(context, 'Could not start this chat right now.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4465,7 +4561,9 @@ class _ActionPanel extends StatelessWidget {
               SizedBox(
                 height: 52,
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: isViewingOtherAccount
+                      ? () => unawaited(_handleChatTap(context))
+                      : null,
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
                       color: Colors.white.withValues(alpha: 0.28),
