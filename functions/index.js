@@ -163,9 +163,157 @@ const STORE_FRAMES = Object.freeze({
   }),
 });
 
+const CHAT_GIFTS = Object.freeze({
+  kiss: Object.freeze({
+    id: "kiss",
+    name: "Kiss",
+    asset_path: "assets/gifts/kiss.png",
+    price_buds: 2,
+  }),
+  lollipop: Object.freeze({
+    id: "lollipop",
+    name: "LoliPop",
+    asset_path: "assets/gifts/lolipop.png",
+    price_buds: 5,
+  }),
+  "kitty-paw": Object.freeze({
+    id: "kitty-paw",
+    name: "kitty paw",
+    asset_path: "assets/gifts/kitty_paw.png",
+    price_buds: 5,
+  }),
+  waiby: Object.freeze({
+    id: "waiby",
+    name: "Waiby",
+    asset_path: "assets/gifts/waiby.png",
+    price_buds: 10,
+  }),
+  ball: Object.freeze({
+    id: "ball",
+    name: "Ball",
+    asset_path: "assets/gifts/ball.png",
+    price_buds: 10,
+  }),
+  disco: Object.freeze({
+    id: "disco",
+    name: "Disco",
+    asset_path: "assets/gifts/disco.png",
+    price_buds: 20,
+  }),
+  "kitty-paw-treasure": Object.freeze({
+    id: "kitty-paw-treasure",
+    name: "Kitty paw",
+    asset_path: "assets/gifts/kitty_paw.png",
+    price_buds: 5,
+  }),
+  "forever-ring": Object.freeze({
+    id: "forever-ring",
+    name: "Forever Ring",
+    asset_path: "assets/gifts/forever_ring.png",
+    price_buds: 20,
+  }),
+  cake: Object.freeze({
+    id: "cake",
+    name: "Cake",
+    asset_path: "assets/gifts/cake.png",
+    price_buds: 25,
+  }),
+  "magic-bell": Object.freeze({
+    id: "magic-bell",
+    name: "Magic Bell",
+    asset_path: "assets/gifts/magic_bell.png",
+    price_buds: 50,
+  }),
+  rocket: Object.freeze({
+    id: "rocket",
+    name: "Rocket",
+    asset_path: "assets/gifts/rocket.png",
+    price_buds: 100,
+  }),
+  "party-teddy": Object.freeze({
+    id: "party-teddy",
+    name: "Party Teddy",
+    asset_path: "assets/gifts/party_teddy.png",
+    price_buds: 150,
+  }),
+  "big-chest": Object.freeze({
+    id: "big-chest",
+    name: "Big Chest",
+    asset_path: "assets/gifts/big_chest.png",
+    price_buds: 200,
+  }),
+  "rocket-illusion": Object.freeze({
+    id: "rocket-illusion",
+    name: "Rocket",
+    asset_path: "assets/gifts/rocket.png",
+    price_buds: 100,
+  }),
+  "princess-treatment": Object.freeze({
+    id: "princess-treatment",
+    name: "Princess treatment",
+    asset_path: "assets/gifts/princess_treatment.png",
+    price_buds: 200,
+  }),
+  wubycar: Object.freeze({
+    id: "wubycar",
+    name: "WubyCar",
+    asset_path: "assets/gifts/wuby_car.png",
+    price_buds: 350,
+  }),
+  island: Object.freeze({
+    id: "island",
+    name: "Island",
+    asset_path: "assets/gifts/island.png",
+    price_buds: 500,
+  }),
+  "dream-castle": Object.freeze({
+    id: "dream-castle",
+    name: "Dream Castle",
+    asset_path: "assets/gifts/dream_castle.png",
+    price_buds: 1000,
+  }),
+  "party-vibe": Object.freeze({
+    id: "party-vibe",
+    name: "Party vibe",
+    asset_path: "assets/medals/steam_pipe.png",
+    price_buds: 20,
+  }),
+  "heart-cloud": Object.freeze({
+    id: "heart-cloud",
+    name: "Heart cloud",
+    asset_path: "assets/medals/heartwing.png",
+    price_buds: 30,
+  }),
+  "night-sigil": Object.freeze({
+    id: "night-sigil",
+    name: "Night sigil",
+    asset_path: "assets/medals/night_sigil.png",
+    price_buds: 40,
+  }),
+  "gold-butterfly": Object.freeze({
+    id: "gold-butterfly",
+    name: "Gold butterfly",
+    asset_path: "assets/medals/goldbutterfly.png",
+    price_buds: 70,
+  }),
+  "ocean-bubble": Object.freeze({
+    id: "ocean-bubble",
+    name: "Ocean bubble",
+    asset_path: "assets/medals/oceanbubble.png",
+    price_buds: 80,
+  }),
+  vip: Object.freeze({
+    id: "vip",
+    name: "VIP",
+    asset_path: "assets/medals/vip.png",
+    price_buds: 100,
+  }),
+});
+
 const TOPUP_CHECKOUT_PATH = "/wallet/topup";
 const CORS_HEADERS = "Authorization, Content-Type";
 const WITHDRAWAL_FEE_RATE = 0.15;
+const CHAT_GIFT_RECEIVER_SHARE_RATE = 0.9;
 
 let stripeClient = null;
 
@@ -257,6 +405,17 @@ function resolveStoreFrame(frameId) {
     return null;
   }
   return STORE_FRAMES[normalized] || null;
+}
+
+function resolveChatGift(giftId) {
+  if (typeof giftId !== "string") {
+    return null;
+  }
+  const normalized = giftId.trim();
+  if (normalized === "") {
+    return null;
+  }
+  return CHAT_GIFTS[normalized] || null;
 }
 
 function resolveStoreFrameAssetPath(frameId) {
@@ -1106,6 +1265,318 @@ exports.requestWalletWithdrawal = onRequest(
         message: error?.message || String(error),
       });
       res.status(500).json({ error: "Could not create withdrawal request" });
+    }
+  },
+);
+
+exports.sendChatGift = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const conversationId = String(body?.conversationId || "").trim();
+    if (!conversationId) {
+      res.status(400).json({ error: "conversationId is required." });
+      return;
+    }
+
+    const giftId = String(body?.giftId || "").trim();
+    const gift = resolveChatGift(giftId);
+    if (!gift) {
+      res.status(400).json({ error: "Invalid giftId." });
+      return;
+    }
+
+    const multiplier = Math.floor(toFiniteNumber(body?.multiplier, 0));
+    if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 100) {
+      res.status(400).json({ error: "multiplier must be between 1 and 100." });
+      return;
+    }
+
+    const conversationRef = db.collection("conversations").doc(conversationId);
+    const senderWalletRef = db.collection("wallets").doc(uid);
+    const senderUserRef = db.collection("users").doc(uid);
+    const messageRef = conversationRef.collection("messages").doc();
+
+    try {
+      const result = await db.runTransaction(async (transaction) => {
+        const [conversationSnapshot, senderWalletSnapshot, senderUserSnapshot] = await Promise.all([
+          transaction.get(conversationRef),
+          transaction.get(senderWalletRef),
+          transaction.get(senderUserRef),
+        ]);
+
+        const conversationData = conversationSnapshot.data() || {};
+        if (!conversationSnapshot.exists) {
+          throw new Error("CONVERSATION_NOT_FOUND");
+        }
+
+        const participants = Array.isArray(conversationData.participants)
+          ? conversationData.participants
+            .map((entry) => String(entry || "").trim())
+            .filter((entry) => entry !== "")
+          : [];
+        if (!participants.includes(uid)) {
+          throw new Error("NOT_CONVERSATION_PARTICIPANT");
+        }
+
+        const receiverId = participants.find((entry) => entry !== uid) || "";
+        if (!receiverId) {
+          throw new Error("DIRECT_CHAT_REQUIRED");
+        }
+
+        const receiverWalletRef = db.collection("wallets").doc(receiverId);
+        const receiverUserRef = db.collection("users").doc(receiverId);
+        const [receiverWalletSnapshot, receiverUserSnapshot] = await Promise.all([
+          transaction.get(receiverWalletRef),
+          transaction.get(receiverUserRef),
+        ]);
+
+        const senderWallet = normalizeWalletData(uid, senderWalletSnapshot.data() || {});
+        const receiverWallet = normalizeWalletData(
+          receiverId,
+          receiverWalletSnapshot.data() || {},
+        );
+
+        const chargedBuds = roundTo2(toFiniteNumber(gift.price_buds, 0) * multiplier);
+        if (!Number.isFinite(chargedBuds) || chargedBuds <= 0) {
+          throw new Error("GIFT_PRICE_INVALID");
+        }
+        if (senderWallet.buds_balance < chargedBuds) {
+          throw new Error("INSUFFICIENT_BUDS_BALANCE");
+        }
+
+        const receiverIncomeUsd = roundTo2(chargedBuds * CHAT_GIFT_RECEIVER_SHARE_RATE);
+        const nextSenderBudsBalance = roundTo2(senderWallet.buds_balance - chargedBuds);
+        const nextReceiverIncomeUsd = roundTo2(
+          receiverWallet.income_balance_usd + receiverIncomeUsd,
+        );
+
+        const nextSenderWallet = {
+          ...senderWallet,
+          buds_balance: nextSenderBudsBalance,
+          balance_buds: nextSenderBudsBalance,
+        };
+        const nextReceiverWallet = {
+          ...receiverWallet,
+          income_balance_usd: nextReceiverIncomeUsd,
+          wallet_income_usd: nextReceiverIncomeUsd,
+        };
+
+        transaction.set(
+          senderWalletRef,
+          {
+            ...nextSenderWallet,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+        transaction.set(
+          receiverWalletRef,
+          {
+            ...nextReceiverWallet,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        if (senderUserSnapshot.exists) {
+          transaction.update(senderUserRef, {
+            buds_balance: nextSenderWallet.buds_balance,
+            balance_buds: nextSenderWallet.buds_balance,
+            "metadata.wallet_balance_buds": nextSenderWallet.buds_balance,
+            "metadata.buds_balance": nextSenderWallet.buds_balance,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            senderUserRef,
+            {
+              buds_balance: nextSenderWallet.buds_balance,
+              balance_buds: nextSenderWallet.buds_balance,
+              metadata: {
+                wallet_balance_buds: nextSenderWallet.buds_balance,
+                buds_balance: nextSenderWallet.buds_balance,
+              },
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        if (receiverUserSnapshot.exists) {
+          transaction.update(receiverUserRef, {
+            "metadata.wallet_income_usd": nextReceiverWallet.income_balance_usd,
+            "metadata.wallet_on_hold_usd": nextReceiverWallet.on_hold_usd,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            receiverUserRef,
+            {
+              metadata: {
+                wallet_income_usd: nextReceiverWallet.income_balance_usd,
+                wallet_on_hold_usd: nextReceiverWallet.on_hold_usd,
+              },
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        const unreadCountsRaw = conversationData.unread_counts || {};
+        const unreadCounts = {};
+        for (const [participantId, value] of Object.entries(unreadCountsRaw)) {
+          unreadCounts[participantId] = Math.max(0, Math.floor(toFiniteNumber(value, 0)));
+        }
+        for (const participantId of participants) {
+          if (participantId === uid) {
+            unreadCounts[participantId] = 0;
+            continue;
+          }
+          unreadCounts[participantId] = (unreadCounts[participantId] || 0) + 1;
+        }
+
+        const giftText = `Sent ${gift.name} gift x${multiplier}`;
+        transaction.set(messageRef, {
+          conversation_id: conversationId,
+          sender_id: uid,
+          text: giftText,
+          message_type: "gift",
+          gift_id: gift.id,
+          gift_name: gift.name,
+          gift_asset_path: gift.asset_path,
+          gift_price_buds: gift.price_buds,
+          gift_multiplier: multiplier,
+          gift_total_buds: chargedBuds,
+          receiver_income_usd: receiverIncomeUsd,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        transaction.update(conversationRef, {
+          last_message_text: giftText,
+          last_message_sender_id: uid,
+          last_message_at: admin.firestore.FieldValue.serverTimestamp(),
+          unread_counts: unreadCounts,
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const senderTxRef = db.collection("wallet_transactions").doc();
+        const senderTxData = {
+          user_id: uid,
+          flow: "chat_gift_send",
+          type: "debit",
+          status: "completed",
+          source: "chat_gift",
+          amount_buds: chargedBuds,
+          buds_balance_after: nextSenderWallet.buds_balance,
+          counterparty: receiverId,
+          order_id: messageRef.id,
+          conversation_id: conversationId,
+          gift_id: gift.id,
+          gift_name: gift.name,
+          gift_multiplier: multiplier,
+          description: `Sent ${gift.name} x${multiplier}`,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        transaction.set(senderTxRef, senderTxData);
+        transaction.set(
+          senderWalletRef.collection("transactions").doc(senderTxRef.id),
+          senderTxData,
+        );
+
+        const receiverTxRef = db.collection("wallet_transactions").doc();
+        const receiverTxData = {
+          user_id: receiverId,
+          flow: "gift",
+          type: "credit",
+          status: "completed",
+          source: "chat_gift",
+          amount_usd: receiverIncomeUsd,
+          income_balance_usd_after: nextReceiverWallet.income_balance_usd,
+          counterparty: uid,
+          order_id: messageRef.id,
+          conversation_id: conversationId,
+          gift_id: gift.id,
+          gift_name: gift.name,
+          gift_multiplier: multiplier,
+          description: `Received ${gift.name} x${multiplier}`,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        transaction.set(receiverTxRef, receiverTxData);
+        transaction.set(
+          receiverWalletRef.collection("transactions").doc(receiverTxRef.id),
+          receiverTxData,
+        );
+
+        return {
+          senderWallet: nextSenderWallet,
+          receiverWallet: nextReceiverWallet,
+          chargedBuds,
+          receiverIncomeUsd,
+        };
+      });
+
+      logger.info("Chat gift sent successfully.", {
+        uid,
+        conversationId,
+        giftId: gift.id,
+        multiplier,
+      });
+      res.status(200).json(result);
+    } catch (error) {
+      if (error?.message === "CONVERSATION_NOT_FOUND") {
+        res.status(404).json({ error: "Conversation does not exist." });
+        return;
+      }
+      if (error?.message === "NOT_CONVERSATION_PARTICIPANT") {
+        res.status(403).json({ error: "You are not part of this conversation." });
+        return;
+      }
+      if (error?.message === "DIRECT_CHAT_REQUIRED") {
+        res.status(400).json({ error: "Gifts are available in direct chats only." });
+        return;
+      }
+      if (error?.message === "INSUFFICIENT_BUDS_BALANCE") {
+        res.status(400).json({ error: "Insufficient Buds balance." });
+        return;
+      }
+      if (error?.message === "GIFT_PRICE_INVALID") {
+        res.status(400).json({ error: "Selected gift price is invalid." });
+        return;
+      }
+
+      logger.error("Failed to send chat gift.", {
+        uid,
+        conversationId,
+        giftId,
+        multiplier,
+        message: error?.message || String(error),
+      });
+      res.status(500).json({ error: "Could not send gift right now." });
     }
   },
 );

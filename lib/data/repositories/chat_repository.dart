@@ -5,21 +5,25 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/store/frame_catalog.dart';
 import '../models/chat_models.dart';
 import '../models/user_profile.dart';
+import '../../services/chat_gift_service.dart';
 import 'user_profile_repository.dart';
 
 class ChatRepository {
   ChatRepository({
     FirebaseFirestore? firestore,
     UserProfileRepository? userProfileRepository,
+    ChatGiftService? chatGiftService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _userProfileRepository =
            userProfileRepository ??
            UserProfileRepository(
              firestore: firestore ?? FirebaseFirestore.instance,
-           );
+           ),
+       _chatGiftService = chatGiftService ?? ChatGiftService();
 
   final FirebaseFirestore _firestore;
   final UserProfileRepository _userProfileRepository;
+  final ChatGiftService _chatGiftService;
   final Set<String> _frameBackfillInFlight = <String>{};
 
   CollectionReference<Map<String, dynamic>> get _conversations =>
@@ -247,6 +251,28 @@ class ChatRepository {
         'updated_at': FieldValue.serverTimestamp(),
       });
     });
+  }
+
+  Future<double> sendGift({
+    required String conversationId,
+    required WaibyChatGift gift,
+  }) async {
+    final trimmedConversationId = conversationId.trim();
+    if (trimmedConversationId.isEmpty) {
+      throw const ChatGiftException('Conversation is missing.');
+    }
+
+    final normalizedMultiplier = gift.multiplier;
+    if (normalizedMultiplier <= 0) {
+      throw const ChatGiftException('Invalid gift quantity.');
+    }
+
+    final result = await _chatGiftService.sendGift(
+      conversationId: trimmedConversationId,
+      giftId: gift.id,
+      multiplier: normalizedMultiplier,
+    );
+    return result.senderBudsBalance;
   }
 
   Future<void> markConversationRead({

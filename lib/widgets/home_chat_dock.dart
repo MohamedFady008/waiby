@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:go_router/go_router.dart';
 
 import '../controllers/chat_controller.dart';
 import '../data/models/chat_models.dart';
@@ -75,6 +76,13 @@ class _WaibyHomeChatDockState extends State<WaibyHomeChatDock> {
     return _chatController.sendMessage(threadId: threadId, text: message);
   }
 
+  Future<double?> _sendGift(String threadId, WaibyChatGift gift) {
+    if (_usesProvidedThreads) {
+      return Future<double?>.value(null);
+    }
+    return _chatController.sendGift(threadId: threadId, gift: gift);
+  }
+
   Widget _buildDock({
     required List<WaibyChatThread> threads,
     required String? activeThreadId,
@@ -145,6 +153,9 @@ class _WaibyHomeChatDockState extends State<WaibyHomeChatDock> {
                                   width: maxPanelWidth,
                                   height: dockHeight,
                                   threads: threads,
+                                  budsBalance: _usesProvidedThreads
+                                      ? 0
+                                      : _chatController.budsBalance.value,
                                   initialThreadId: activeThreadId,
                                   onClose: _closePanel,
                                   onThreadSelected: _usesProvidedThreads
@@ -153,6 +164,12 @@ class _WaibyHomeChatDockState extends State<WaibyHomeChatDock> {
                                   onSendMessage: _usesProvidedThreads
                                       ? null
                                       : _sendMessage,
+                                  onSendGift: _usesProvidedThreads
+                                      ? null
+                                      : _sendGift,
+                                  onRechargeTap: _usesProvidedThreads
+                                      ? null
+                                      : () => context.go('/wallet/topup'),
                                 ),
                               ),
                             ),

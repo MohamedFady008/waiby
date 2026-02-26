@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 
@@ -21,8 +22,11 @@ class ChatController extends GetxController {
   final RxList<WaibyChatThread> threads = <WaibyChatThread>[].obs;
   final RxnString activeThreadId = RxnString();
   final RxBool isStartingConversation = false.obs;
+  final RxDouble budsBalance = 0.0.obs;
 
   StreamSubscription<List<ChatConversation>>? _conversationsSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _walletSubscription;
   final Map<String, StreamSubscription<List<ChatMessageRecord>>>
   _messagesSubscriptions =
       <String, StreamSubscription<List<ChatMessageRecord>>>{};
@@ -134,16 +138,44 @@ class ChatController extends GetxController {
     );
   }
 
+  Future<double?> sendGift({
+    required String threadId,
+    required WaibyChatGift gift,
+  }) async {
+    final selfId = currentUserId;
+    if (selfId == null || selfId.isEmpty) {
+      throw StateError('You must be signed in to send a gift.');
+    }
+
+    final nextBalance = await _chatRepository.sendGift(
+      conversationId: threadId,
+      gift: gift,
+    );
+    budsBalance.value = nextBalance;
+    return nextBalance;
+  }
+
   void _syncForAuthUser(User? user) {
     if (user == null || user.uid.trim().isEmpty) {
       _cancelStreamSubscriptions();
       threads.clear();
       activeThreadId.value = null;
+      budsBalance.value = 0;
       return;
     }
 
     final userId = user.uid.trim();
     _cancelStreamSubscriptions();
+    _walletSubscription = FirebaseFirestore.instance
+        .collection('wallets')
+        .doc(userId)
+        .snapshots(includeMetadataChanges: true)
+        .listen((snapshot) {
+          final data = snapshot.data();
+          budsBalance.value = _toDouble(
+            data?['buds_balance'] ?? data?['balance_buds'],
+          );
+        }, onError: (_) {});
     _conversationsSubscription = _chatRepository
         .watchConversationsForUser(userId)
         .listen(_onConversationsUpdated);
@@ -207,6 +239,11 @@ class ChatController extends GetxController {
             text: message.text,
             fromCurrentUser: message.senderId == selfId,
             sentAt: message.sentAt,
+            messageType: message.messageType,
+            giftAssetPath: message.giftAssetPath,
+            giftName: message.giftName,
+            giftMultiplier: message.giftMultiplier,
+            giftTotalBuds: message.giftTotalBuds,
           ),
         );
       }
@@ -269,6 +306,8 @@ class ChatController extends GetxController {
   }
 
   void _cancelStreamSubscriptions() {
+    _walletSubscription?.cancel();
+    _walletSubscription = null;
     _conversationsSubscription?.cancel();
     _conversationsSubscription = null;
 
@@ -305,4 +344,10 @@ String _fallbackAvatarAsset(String seed) {
   final hash = normalized.isEmpty ? 0 : normalized.hashCode;
   final index = hash.abs() % avatars.length;
   return avatars[index];
+}
+
+double _toDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0;
+  return 0;
 }

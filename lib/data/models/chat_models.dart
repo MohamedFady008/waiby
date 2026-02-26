@@ -6,12 +6,43 @@ class WaibyChatMessage {
   final String text;
   final bool fromCurrentUser;
   final DateTime sentAt;
+  final String messageType;
+  final String? giftAssetPath;
+  final String? giftName;
+  final int? giftMultiplier;
+  final double? giftTotalBuds;
 
   const WaibyChatMessage({
     required this.text,
     required this.fromCurrentUser,
     required this.sentAt,
+    this.messageType = 'text',
+    this.giftAssetPath,
+    this.giftName,
+    this.giftMultiplier,
+    this.giftTotalBuds,
   });
+
+  bool get isGift => messageType == 'gift' && giftAssetPath != null;
+}
+
+@immutable
+class WaibyChatGift {
+  final String id;
+  final String name;
+  final String assetPath;
+  final double priceBuds;
+  final int multiplier;
+
+  const WaibyChatGift({
+    required this.id,
+    required this.name,
+    required this.assetPath,
+    required this.priceBuds,
+    required this.multiplier,
+  });
+
+  double get totalCostBuds => priceBuds * multiplier;
 }
 
 @immutable
@@ -294,6 +325,11 @@ class ChatMessageRecord {
   final String senderId;
   final String text;
   final DateTime sentAt;
+  final String messageType;
+  final String? giftAssetPath;
+  final String? giftName;
+  final int? giftMultiplier;
+  final double? giftTotalBuds;
 
   const ChatMessageRecord({
     required this.id,
@@ -301,6 +337,11 @@ class ChatMessageRecord {
     required this.senderId,
     required this.text,
     required this.sentAt,
+    this.messageType = 'text',
+    this.giftAssetPath,
+    this.giftName,
+    this.giftMultiplier,
+    this.giftTotalBuds,
   });
 
   factory ChatMessageRecord.fromSnapshot(
@@ -318,12 +359,34 @@ class ChatMessageRecord {
     }
 
     final data = snapshot.data() ?? const <String, dynamic>{};
+    final parsedMessageType = data['message_type']
+        ?.toString()
+        .trim()
+        .toLowerCase();
+    int? toInt(dynamic value) {
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value);
+      return null;
+    }
+
+    double? toDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
     return ChatMessageRecord(
       id: snapshot.id,
       conversationId: conversationId,
       senderId: data['sender_id']?.toString() ?? '',
       text: data['text']?.toString() ?? '',
       sentAt: toDate(data['created_at']),
+      messageType: parsedMessageType == 'gift' ? 'gift' : 'text',
+      giftAssetPath: data['gift_asset_path']?.toString(),
+      giftName: data['gift_name']?.toString(),
+      giftMultiplier: toInt(data['gift_multiplier']),
+      giftTotalBuds: toDouble(data['gift_total_buds']),
     );
   }
 }

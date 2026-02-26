@@ -39,20 +39,27 @@ class WaibyChatWindow extends StatefulWidget {
   final double width;
   final double height;
   final List<WaibyChatThread> threads;
+  final double budsBalance;
   final String? initialThreadId;
   final VoidCallback? onClose;
   final ValueChanged<String>? onThreadSelected;
   final Future<void> Function(String threadId, String message)? onSendMessage;
+  final Future<double?> Function(String threadId, WaibyChatGift gift)?
+  onSendGift;
+  final VoidCallback? onRechargeTap;
 
   const WaibyChatWindow({
     super.key,
     required this.width,
     required this.height,
     required this.threads,
+    this.budsBalance = 0,
     this.initialThreadId,
     this.onClose,
     this.onThreadSelected,
     this.onSendMessage,
+    this.onSendGift,
+    this.onRechargeTap,
   });
 
   @override
@@ -69,7 +76,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
   _GiftCategory _activeGiftCategory = _GiftCategory.sweet;
   int _giftMultiplier = 1;
   String? _selectedGiftId;
-  static const double _giftBalance = 12.80;
+  double _giftBalance = 0;
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
@@ -80,6 +87,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
   void initState() {
     super.initState();
     _syncThreadsFromWidget();
+    _giftBalance = widget.budsBalance;
 
     _searchController.addListener(_onSearchChanged);
     WidgetsBinding.instance.addPostFrameCallback(
@@ -101,6 +109,9 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
   @override
   void didUpdateWidget(covariant WaibyChatWindow oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.budsBalance != oldWidget.budsBalance) {
+      _giftBalance = widget.budsBalance;
+    }
     final threadsChanged = widget.threads != oldWidget.threads;
     final selectedChanged = widget.initialThreadId != oldWidget.initialThreadId;
     if (!threadsChanged && !selectedChanged) {
@@ -393,26 +404,73 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
       return;
     }
 
+    final giftPayload = WaibyChatGift(
+      id: gift.id,
+      name: gift.name,
+      assetPath: gift.assetPath,
+      priceBuds: gift.price.toDouble(),
+      multiplier: _giftMultiplier,
+    );
+
+    if (widget.onSendGift != null &&
+        _giftBalance + 0.0001 < giftPayload.totalCostBuds) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Not enough Buds. Please recharge first.',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: const Color(0xFFAD2E2E),
+          action: widget.onRechargeTap == null
+              ? null
+              : SnackBarAction(
+                  label: 'Top-up',
+                  textColor: const Color(0xFF8FBFFA),
+                  onPressed: widget.onRechargeTap!,
+                ),
+        ),
+      );
+      return;
+    }
+
     final giftMessage = 'Sent ${gift.name} gift x$_giftMultiplier';
-    final sender = widget.onSendMessage;
-    if (sender != null) {
+    final sendGiftHandler = widget.onSendGift;
+    if (sendGiftHandler != null) {
       try {
-        await sender(active.id, giftMessage);
-      } catch (_) {
+        final nextBalance = await sendGiftHandler(active.id, giftPayload);
         if (!mounted) return;
+        setState(() {
+          _showGiftPanel = false;
+          if (nextBalance != null && nextBalance >= 0) {
+            _giftBalance = nextBalance;
+          }
+        });
+      } catch (error) {
+        if (!mounted) return;
+        final errorMessage = error.toString().replaceFirst('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Could not send the gift right now.',
+              errorMessage.isEmpty
+                  ? 'Could not send the gift right now.'
+                  : errorMessage,
               style: GoogleFonts.inter(fontWeight: FontWeight.w600),
             ),
             backgroundColor: const Color(0xFFAD2E2E),
+            action:
+                widget.onRechargeTap != null &&
+                    errorMessage.toLowerCase().contains('insufficient')
+                ? SnackBarAction(
+                    label: 'Top-up',
+                    textColor: const Color(0xFF8FBFFA),
+                    onPressed: widget.onRechargeTap!,
+                  )
+                : null,
           ),
         );
         return;
       }
-      if (!mounted) return;
-      setState(() => _showGiftPanel = false);
     } else {
       setState(() {
         active.messages.add(
@@ -420,12 +478,18 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
             text: giftMessage,
             fromCurrentUser: true,
             sentAt: DateTime.now(),
+            messageType: 'gift',
+            giftAssetPath: gift.assetPath,
+            giftName: gift.name,
+            giftMultiplier: _giftMultiplier,
+            giftTotalBuds: giftPayload.totalCostBuds,
           ),
         );
         active.previewText = 'Sent ${gift.name} gift';
         active.previewItalic = false;
         active.lastActivityLabel = 'now';
         _showGiftPanel = false;
+        _giftBalance = math.max(0, _giftBalance - giftPayload.totalCostBuds);
       });
     }
 
@@ -1024,6 +1088,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                           onGiftSelected: _selectGift,
                           onCycleMultiplier: _cycleGiftMultiplier,
                           onGiftTap: () => _sendGift(),
+                          onRechargeTap: widget.onRechargeTap,
                         ),
                       ),
                     ),
@@ -1617,25 +1682,112 @@ class _MessageBubble extends StatelessWidget {
         alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxBubbleWidth),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: alignRight
-                  ? const Color(0xFF2F88FF)
-                  : const Color(0xFFADADAD),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-              child: Text(
-                message.text,
-                style: GoogleFonts.inter(
-                  color: alignRight ? Colors.white : Colors.black,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
+          child: message.isGift
+              ? _GiftMessageBubble(message: message, alignRight: alignRight)
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: alignRight
+                        ? const Color(0xFF2F88FF)
+                        : const Color(0xFFADADAD),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 6,
+                    ),
+                    child: Text(
+                      message.text,
+                      style: GoogleFonts.inter(
+                        color: alignRight ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GiftMessageBubble extends StatelessWidget {
+  final WaibyChatMessage message;
+  final bool alignRight;
+
+  const _GiftMessageBubble({required this.message, required this.alignRight});
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaceColor = alignRight
+        ? const Color(0xFF2F88FF)
+        : const Color(0xFFADADAD);
+    final primaryTextColor = alignRight ? Colors.white : Colors.black;
+    final secondaryTextColor = alignRight
+        ? Colors.white.withValues(alpha: 0.86)
+        : Colors.black.withValues(alpha: 0.7);
+    final multiplier = message.giftMultiplier ?? 1;
+    final totalBuds = message.giftTotalBuds ?? 0;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Image.asset(
+                message.giftAssetPath ?? '',
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => Icon(
+                  Icons.card_giftcard_rounded,
+                  color: primaryTextColor.withValues(alpha: 0.84),
+                  size: 18,
                 ),
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  message.giftName?.trim().isNotEmpty == true
+                      ? message.giftName!
+                      : 'Gift',
+                  style: GoogleFonts.inter(
+                    color: primaryTextColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'x$multiplier • ${_formatGiftBuds(totalBuds)} Buds',
+                  style: GoogleFonts.inter(
+                    color: secondaryTextColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -1777,6 +1929,7 @@ class _GiftPanel extends StatelessWidget {
   final ValueChanged<String> onGiftSelected;
   final VoidCallback onCycleMultiplier;
   final VoidCallback onGiftTap;
+  final VoidCallback? onRechargeTap;
 
   const _GiftPanel({
     required this.width,
@@ -1790,6 +1943,7 @@ class _GiftPanel extends StatelessWidget {
     required this.onGiftSelected,
     required this.onCycleMultiplier,
     required this.onGiftTap,
+    this.onRechargeTap,
   });
 
   @override
@@ -1922,17 +2076,27 @@ class _GiftPanel extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                Text(
-                                  'Recharge',
-                                  style: GoogleFonts.inter(
-                                    color: const Color.fromRGBO(
-                                      98,
-                                      195,
-                                      255,
-                                      0.93,
+                                InkWell(
+                                  onTap: onRechargeTap,
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 2,
+                                      vertical: 1,
                                     ),
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
+                                    child: Text(
+                                      'Recharge',
+                                      style: GoogleFonts.inter(
+                                        color: const Color.fromRGBO(
+                                          98,
+                                          195,
+                                          255,
+                                          0.93,
+                                        ),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1972,12 +2136,27 @@ class _GiftPanel extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              'Recharge',
-                              style: GoogleFonts.inter(
-                                color: const Color.fromRGBO(98, 195, 255, 0.93),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
+                            InkWell(
+                              onTap: onRechargeTap,
+                              borderRadius: BorderRadius.circular(4),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                  vertical: 1,
+                                ),
+                                child: Text(
+                                  'Recharge',
+                                  style: GoogleFonts.inter(
+                                    color: const Color.fromRGBO(
+                                      98,
+                                      195,
+                                      255,
+                                      0.93,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
                               ),
                             ),
                             const Spacer(),
@@ -2427,4 +2606,11 @@ String _formatDateStamp(DateTime value) {
   final hour = value.hour.toString().padLeft(2, '0');
   final minute = value.minute.toString().padLeft(2, '0');
   return '$month $day, ${value.year} at $hour.$minute';
+}
+
+String _formatGiftBuds(double value) {
+  if (value == value.roundToDouble()) {
+    return value.toStringAsFixed(0);
+  }
+  return value.toStringAsFixed(2);
 }
