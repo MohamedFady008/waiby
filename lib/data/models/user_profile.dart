@@ -113,9 +113,12 @@ class UserProfile {
         : const <String>[];
 
     final metadataRaw = data['metadata'];
-    final metadata = metadataRaw is Map<String, dynamic>
-        ? metadataRaw
-        : <String, dynamic>{};
+    final metadata = <String, dynamic>{};
+    if (metadataRaw is Map) {
+      metadataRaw.forEach((key, value) {
+        metadata[key.toString()] = value;
+      });
+    }
 
     return UserProfile(
       id: id,

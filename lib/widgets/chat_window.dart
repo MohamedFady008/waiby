@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart' as ep;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -64,6 +65,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
   bool _showSettingsPanel = false;
   bool _chatOnlyNotifications = false;
   bool _showGiftPanel = false;
+  bool _showEmojiPanel = false;
   _GiftCategory _activeGiftCategory = _GiftCategory.sweet;
   int _giftMultiplier = 1;
   String? _selectedGiftId;
@@ -72,6 +74,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _messagesController = ScrollController();
+  final FocusNode _messageFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -91,6 +94,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
       ..dispose();
     _messageController.dispose();
     _messagesController.dispose();
+    _messageFocusNode.dispose();
     super.dispose();
   }
 
@@ -181,6 +185,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
       _markThreadRead(selectedThread);
       _showGiftPanel = false;
       _showSettingsPanel = false;
+      _showEmojiPanel = false;
     });
     widget.onThreadSelected?.call(threadId);
     _scrollMessagesToBottom(animated: false);
@@ -243,6 +248,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
       _showSettingsPanel = !_showSettingsPanel;
       if (_showSettingsPanel) {
         _showGiftPanel = false;
+        _showEmojiPanel = false;
       }
     });
   }
@@ -259,6 +265,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
       _showGiftPanel = !_showGiftPanel;
       if (_showGiftPanel) {
         _showSettingsPanel = false;
+        _showEmojiPanel = false;
         final activeItems = _giftItemsByCategory[_activeGiftCategory]!;
         if (_selectedGiftId == null ||
             activeItems.every((item) => item.id != _selectedGiftId)) {
@@ -268,13 +275,83 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
     });
   }
 
+  void _toggleEmojiPanel() {
+    setState(() {
+      _showEmojiPanel = !_showEmojiPanel;
+      if (_showEmojiPanel) {
+        _showGiftPanel = false;
+        _showSettingsPanel = false;
+        _messageFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _insertEmoji(String emoji) {
+    final value = _messageController.value;
+    final text = value.text;
+    final selection = value.selection;
+    final insertionStart = selection.start >= 0 ? selection.start : text.length;
+    final insertionEnd = selection.end >= 0 ? selection.end : text.length;
+    final nextText = text.replaceRange(insertionStart, insertionEnd, emoji);
+    final caretOffset = insertionStart + emoji.length;
+    _messageController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: caretOffset),
+      composing: TextRange.empty,
+    );
+  }
+
+  void _backspaceFromEmojiPanel() {
+    final value = _messageController.value;
+    final text = value.text;
+    if (text.isEmpty) {
+      return;
+    }
+
+    final selection = value.selection;
+    if (selection.start >= 0 &&
+        selection.end >= 0 &&
+        selection.start != selection.end) {
+      final start = math.min(selection.start, selection.end);
+      final end = math.max(selection.start, selection.end);
+      final nextText = text.replaceRange(start, end, '');
+      _messageController.value = TextEditingValue(
+        text: nextText,
+        selection: TextSelection.collapsed(offset: start),
+        composing: TextRange.empty,
+      );
+      return;
+    }
+
+    if (selection.start > 0 && selection.end > 0) {
+      final beforeCursor = text.substring(0, selection.start);
+      final afterCursor = text.substring(selection.end);
+      final trimmedBefore = beforeCursor.characters.skipLast(1).toString();
+      final nextText = '$trimmedBefore$afterCursor';
+      _messageController.value = TextEditingValue(
+        text: nextText,
+        selection: TextSelection.collapsed(offset: trimmedBefore.length),
+        composing: TextRange.empty,
+      );
+      return;
+    }
+
+    final nextText = text.characters.skipLast(1).toString();
+    _messageController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextText.length),
+      composing: TextRange.empty,
+    );
+  }
+
   void _closeFloatingPanels() {
-    if (!_showGiftPanel && !_showSettingsPanel) {
+    if (!_showGiftPanel && !_showSettingsPanel && !_showEmojiPanel) {
       return;
     }
     setState(() {
       _showGiftPanel = false;
       _showSettingsPanel = false;
+      _showEmojiPanel = false;
     });
   }
 
@@ -837,6 +914,27 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
                             ),
                           ),
                           SizedBox(height: compact ? 8 : 10),
+                          AnimatedCrossFade(
+                            firstChild: const SizedBox.shrink(),
+                            secondChild: _EmojiPanel(
+                              compact: compact,
+                              onEmojiTap: (emoji) {
+                                _insertEmoji(emoji);
+                                _messageFocusNode.requestFocus();
+                              },
+                              onBackspaceTap: () {
+                                _backspaceFromEmojiPanel();
+                                _messageFocusNode.requestFocus();
+                              },
+                            ),
+                            crossFadeState: _showEmojiPanel
+                                ? CrossFadeState.showSecond
+                                : CrossFadeState.showFirst,
+                            duration: const Duration(milliseconds: 160),
+                            sizeCurve: Curves.easeOut,
+                          ),
+                          if (_showEmojiPanel)
+                            SizedBox(height: compact ? 6 : 8),
                           _buildComposer(
                             thread.displayName,
                             compact: compact,
@@ -948,6 +1046,7 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
       height: compact ? 40 : 44,
       child: TextField(
         controller: _messageController,
+        focusNode: _messageFocusNode,
         onSubmitted: (_) => _sendMessage(),
         style: GoogleFonts.inter(
           color: Colors.white,
@@ -979,10 +1078,21 @@ class _WaibyChatWindowState extends State<WaibyChatWindow> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Icon(
-                  Icons.emoji_emotions_outlined,
-                  color: Colors.white.withValues(alpha: 0.54),
-                  size: compact ? 18 : 20,
+                InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _toggleEmojiPanel,
+                  child: Padding(
+                    padding: const EdgeInsets.all(3),
+                    child: Icon(
+                      Icons.emoji_emotions_outlined,
+                      color:
+                          (_showEmojiPanel
+                                  ? const Color(0xFF51D76E)
+                                  : Colors.white)
+                              .withValues(alpha: _showEmojiPanel ? 1 : 0.54),
+                      size: compact ? 18 : 20,
+                    ),
+                  ),
                 ),
                 SizedBox(width: compact ? 6 : 8),
                 InkWell(
@@ -1555,6 +1665,100 @@ class _HeaderIcon extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(3),
           child: Icon(icon, color: Colors.white, size: iconSize),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmojiPanel extends StatelessWidget {
+  final bool compact;
+  final ValueChanged<String> onEmojiTap;
+  final VoidCallback? onBackspaceTap;
+
+  const _EmojiPanel({
+    required this.compact,
+    required this.onEmojiTap,
+    this.onBackspaceTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.24),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          height: compact ? 250 : 286,
+          child: ep.EmojiPicker(
+            onEmojiSelected: (category, emoji) {
+              onEmojiTap(emoji.emoji);
+            },
+            onBackspacePressed: onBackspaceTap,
+            config: ep.Config(
+              height: compact ? 250 : 286,
+              emojiViewConfig: ep.EmojiViewConfig(
+                columns: compact ? 8 : 10,
+                emojiSizeMax: compact ? 24 : 26,
+                backgroundColor: const Color(0xFF101634),
+                noRecents: Text(
+                  'No Recents',
+                  style: GoogleFonts.inter(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontWeight: FontWeight.w600,
+                    fontSize: compact ? 11 : 12,
+                  ),
+                ),
+              ),
+              categoryViewConfig: ep.CategoryViewConfig(
+                initCategory: ep.Category.SMILEYS,
+                recentTabBehavior: ep.RecentTabBehavior.RECENT,
+                backgroundColor: const Color(0xFF0E1430),
+                indicatorColor: const Color(0xFF51D76E),
+                iconColor: Colors.white.withValues(alpha: 0.54),
+                iconColorSelected: const Color(0xFF51D76E),
+                dividerColor: Colors.white.withValues(alpha: 0.08),
+              ),
+              bottomActionBarConfig: ep.BottomActionBarConfig(
+                enabled: true,
+                showBackspaceButton: true,
+                showSearchViewButton: true,
+                backgroundColor: const Color(0xFF0E1430),
+                buttonColor: const Color(0xFF1A234E),
+                buttonIconColor: Colors.white.withValues(alpha: 0.78),
+              ),
+              searchViewConfig: ep.SearchViewConfig(
+                backgroundColor: const Color(0xFF101634),
+                buttonIconColor: Colors.white.withValues(alpha: 0.62),
+                hintText: 'Search emoji',
+                inputTextStyle: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: compact ? 12 : 13,
+                ),
+                hintTextStyle: GoogleFonts.inter(
+                  color: Colors.white.withValues(alpha: 0.58),
+                  fontWeight: FontWeight.w600,
+                  fontSize: compact ? 12 : 13,
+                ),
+              ),
+              skinToneConfig: ep.SkinToneConfig(
+                enabled: true,
+                indicatorColor: Colors.white.withValues(alpha: 0.45),
+                dialogBackgroundColor: const Color(0xFF11193A),
+              ),
+              viewOrderConfig: const ep.ViewOrderConfig(
+                top: ep.EmojiPickerItem.categoryBar,
+                middle: ep.EmojiPickerItem.emojiView,
+                bottom: ep.EmojiPickerItem.searchBar,
+              ),
+            ),
+          ),
         ),
       ),
     );

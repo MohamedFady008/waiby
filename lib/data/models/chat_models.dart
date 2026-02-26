@@ -164,6 +164,7 @@ class ChatConversation {
   final List<String> participants;
   final Map<String, String> participantNames;
   final Map<String, String> participantAvatarUrls;
+  final Map<String, String> participantFrameAssets;
   final Map<String, bool> participantOnline;
   final Map<String, int> unreadCounts;
   final String? lastMessageText;
@@ -177,6 +178,7 @@ class ChatConversation {
     required this.participants,
     required this.participantNames,
     required this.participantAvatarUrls,
+    required this.participantFrameAssets,
     required this.participantOnline,
     required this.unreadCounts,
     this.lastMessageText,
@@ -244,6 +246,7 @@ class ChatConversation {
       participants: participants,
       participantNames: toStringMap(data['participant_names']),
       participantAvatarUrls: toStringMap(data['participant_avatar_urls']),
+      participantFrameAssets: toStringMap(data['participant_frame_assets']),
       participantOnline: toBoolMap(data['participant_online']),
       unreadCounts: toIntMap(data['unread_counts']),
       lastMessageText: data['last_message_text']?.toString(),
@@ -271,6 +274,12 @@ class ChatConversation {
 
   String? avatarUrlFor(String userId) {
     final value = participantAvatarUrls[userId]?.trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  String? frameAssetFor(String userId) {
+    final value = participantFrameAssets[userId]?.trim();
     if (value == null || value.isEmpty) return null;
     return value;
   }

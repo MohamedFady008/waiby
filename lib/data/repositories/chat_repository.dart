@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../core/store/frame_catalog.dart';
 import '../models/chat_models.dart';
+import '../models/user_profile.dart';
 import 'user_profile_repository.dart';
 
 class ChatRepository {
@@ -16,6 +20,7 @@ class ChatRepository {
 
   final FirebaseFirestore _firestore;
   final UserProfileRepository _userProfileRepository;
+  final Set<String> _frameBackfillInFlight = <String>{};
 
   CollectionReference<Map<String, dynamic>> get _conversations =>
       _firestore.collection('conversations');
@@ -43,6 +48,9 @@ class ChatRepository {
           final conversations = snapshot.docs
               .map(ChatConversation.fromSnapshot)
               .toList(growable: false);
+          for (final conversation in conversations) {
+            _scheduleConversationFrameBackfill(conversation);
+          }
           final sorted = conversations.toList(growable: false)
             ..sort((a, b) {
               final aTime = a.lastMessageAt ?? a.updatedAt ?? a.createdAt;
@@ -99,8 +107,16 @@ class ChatRepository {
     final conversationId = directConversationId(left, right);
     final conversationRef = _conversationDoc(conversationId);
 
-    final currentProfile = await _userProfileRepository.fetchById(left);
-    final otherProfile = await _userProfileRepository.fetchById(right);
+    final preload = await Future.wait<Object?>(<Future<Object?>>[
+      _userProfileRepository.fetchById(left),
+      _userProfileRepository.fetchById(right),
+      _fetchUserRawData(left),
+      _fetchUserRawData(right),
+    ]);
+    final currentProfile = preload[0] as UserProfile?;
+    final otherProfile = preload[1] as UserProfile?;
+    final currentRawData = preload[2] as Map<String, dynamic>?;
+    final otherRawData = preload[3] as Map<String, dynamic>?;
 
     final resolvedCurrentName = _firstNonEmpty(<String?>[
       currentUserName,
@@ -119,6 +135,14 @@ class ChatRepository {
       otherUserAvatarUrl,
       otherProfile?.avatarUrl,
     ]);
+    final resolvedCurrentFrame = _resolveProfileFrameAsset(
+      profile: currentProfile,
+      rawData: currentRawData,
+    );
+    final resolvedOtherFrame = _resolveProfileFrameAsset(
+      profile: otherProfile,
+      rawData: otherRawData,
+    );
 
     final participants = <String>[left, right]..sort();
     final names = <String, String>{
@@ -129,6 +153,10 @@ class ChatRepository {
       left: resolvedCurrentAvatar ?? '',
       right: resolvedOtherAvatar ?? '',
     };
+    final frameAssets = <String, String>{
+      left: resolvedCurrentFrame ?? '',
+      right: resolvedOtherFrame ?? '',
+    };
     final online = <String, bool>{
       left: currentProfile?.isOnline ?? false,
       right: otherProfile?.isOnline ?? false,
@@ -138,6 +166,7 @@ class ChatRepository {
       'participants': participants,
       'participant_names': names,
       'participant_avatar_urls': avatars,
+      'participant_frame_assets': frameAssets,
       'participant_online': online,
       'updated_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -162,6 +191,18 @@ class ChatRepository {
 
     final conversationRef = _conversationDoc(trimmedConversationId);
     final messageRef = conversationRef.collection('messages').doc();
+    final senderProfileAndRaw = await Future.wait<Object?>(<Future<Object?>>[
+      _userProfileRepository.fetchById(trimmedSenderId),
+      _fetchUserRawData(trimmedSenderId),
+    ]);
+    final senderProfile = senderProfileAndRaw[0] as UserProfile?;
+    final senderRawData = senderProfileAndRaw[1] as Map<String, dynamic>?;
+    final senderFrameAsset =
+        _resolveProfileFrameAsset(
+          profile: senderProfile,
+          rawData: senderRawData,
+        ) ??
+        '';
 
     await _firestore.runTransaction((transaction) async {
       final conversationSnapshot = await transaction.get(conversationRef);
@@ -202,6 +243,7 @@ class ChatRepository {
         'last_message_sender_id': trimmedSenderId,
         'last_message_at': FieldValue.serverTimestamp(),
         'unread_counts': unreadCounts,
+        'participant_frame_assets.$trimmedSenderId': senderFrameAsset,
         'updated_at': FieldValue.serverTimestamp(),
       });
     });
@@ -233,6 +275,72 @@ class ChatRepository {
         'updated_at': FieldValue.serverTimestamp(),
       });
     });
+  }
+
+  Future<Map<String, dynamic>?> _fetchUserRawData(String userId) async {
+    final trimmedUserId = userId.trim();
+    if (trimmedUserId.isEmpty) {
+      return null;
+    }
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(trimmedUserId)
+        .get();
+    final data = snapshot.data();
+    if (!snapshot.exists || data == null) {
+      return null;
+    }
+    return data;
+  }
+
+  void _scheduleConversationFrameBackfill(ChatConversation conversation) {
+    if (_frameBackfillInFlight.contains(conversation.id)) {
+      return;
+    }
+
+    final missingParticipants = conversation.participants
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .where((id) {
+          final existing = conversation.participantFrameAssets[id]?.trim();
+          return existing == null || existing.isEmpty;
+        })
+        .toList(growable: false);
+    if (missingParticipants.isEmpty) {
+      return;
+    }
+
+    _frameBackfillInFlight.add(conversation.id);
+    unawaited(
+      _backfillConversationFrames(
+        conversationId: conversation.id,
+        participantIds: missingParticipants,
+      ).whenComplete(() {
+        _frameBackfillInFlight.remove(conversation.id);
+      }),
+    );
+  }
+
+  Future<void> _backfillConversationFrames({
+    required String conversationId,
+    required List<String> participantIds,
+  }) async {
+    final updates = <String, dynamic>{};
+    for (final participantId in participantIds) {
+      final profileRawData = await _fetchUserRawData(participantId);
+      final frameAssetPath = _resolveProfileFrameAsset(rawData: profileRawData);
+      if (frameAssetPath != null && frameAssetPath.isNotEmpty) {
+        updates['participant_frame_assets.$participantId'] = frameAssetPath;
+      }
+    }
+    if (updates.isEmpty) {
+      return;
+    }
+    try {
+      await _conversationDoc(conversationId).update(updates);
+    } catch (_) {
+      // Ignore transient failures; next snapshots will retry as needed.
+    }
   }
 }
 
@@ -267,4 +375,61 @@ String? _firstNonEmptyOrNull(Iterable<String?> values) {
     }
   }
   return null;
+}
+
+String? _resolveProfileFrameAsset({
+  UserProfile? profile,
+  Map<String, dynamic>? rawData,
+}) {
+  final normalizedRawData = _toStringKeyMap(rawData);
+  final normalizedRawMetadata = _toStringKeyMap(normalizedRawData['metadata']);
+  final normalizedProfileMetadata = _toStringKeyMap(profile?.metadata);
+  final candidateSources = <Map<String, dynamic>>[
+    normalizedRawData,
+    normalizedRawMetadata,
+    normalizedProfileMetadata,
+  ];
+
+  const directFrameKeys = <String>[
+    'profile_frame_asset',
+    'active_frame_asset',
+    'profileFrameAsset',
+    'activeFrameAsset',
+  ];
+  final directFrameCandidate = _firstNonEmptyOrNull(
+    candidateSources.expand(
+      (source) => directFrameKeys.map((key) => source[key]?.toString()),
+    ),
+  );
+  if (directFrameCandidate != null) {
+    final mappedDirectCandidate = frameAssetPathById(directFrameCandidate);
+    return mappedDirectCandidate ?? directFrameCandidate;
+  }
+
+  const frameIdKeys = <String>[
+    'active_frame_id',
+    'profile_frame_id',
+    'activeFrameId',
+    'profileFrameId',
+  ];
+  final frameIdCandidate = _firstNonEmptyOrNull(
+    candidateSources.expand(
+      (source) => frameIdKeys.map((key) => source[key]?.toString()),
+    ),
+  );
+  if (frameIdCandidate == null) {
+    return null;
+  }
+  return frameAssetPathById(frameIdCandidate);
+}
+
+Map<String, dynamic> _toStringKeyMap(dynamic value) {
+  if (value is! Map) {
+    return <String, dynamic>{};
+  }
+  final result = <String, dynamic>{};
+  value.forEach((key, entryValue) {
+    result[key.toString()] = entryValue;
+  });
+  return result;
 }

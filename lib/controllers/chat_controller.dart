@@ -233,7 +233,7 @@ class ChatController extends GetxController {
           ),
           avatarAsset: _fallbackAvatarAsset(otherUserId),
           avatarUrl: conversation.avatarUrlFor(otherUserId),
-          frameAsset: null,
+          frameAsset: conversation.frameAssetFor(otherUserId),
           previewText: previewText,
           previewItalic: false,
           lastActivityLabel: lastActivityLabel,
