@@ -131,6 +131,96 @@ class ProfileTabsRepository {
     });
   }
 
+  Future<void> createOrUpdateService(
+    String userId,
+    ProfileServiceItem item, {
+    String? id,
+  }) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      return;
+    }
+
+    final targetRef = (id == null || id.trim().isEmpty)
+        ? _services(normalizedUserId).doc()
+        : _services(normalizedUserId).doc(id.trim());
+    final servicesRef = _services(normalizedUserId);
+    final data = item.toFirestoreMap();
+
+    if (item.selected) {
+      final selectedSnapshot = await servicesRef
+          .where('selected', isEqualTo: true)
+          .get();
+      final batch = _firestore.batch();
+
+      for (final doc in selectedSnapshot.docs) {
+        if (doc.id == targetRef.id) {
+          continue;
+        }
+        batch.set(doc.reference, <String, dynamic>{
+          'selected': false,
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      batch.set(targetRef, data, SetOptions(merge: true));
+      await batch.commit();
+      return;
+    }
+
+    await targetRef.set(data, SetOptions(merge: true));
+  }
+
+  Future<void> setSelectedService(String userId, String serviceId) async {
+    final normalizedUserId = userId.trim();
+    final normalizedServiceId = serviceId.trim();
+    if (normalizedUserId.isEmpty || normalizedServiceId.isEmpty) {
+      return;
+    }
+
+    final snapshot = await _services(normalizedUserId).get();
+    final batch = _firestore.batch();
+    final now = FieldValue.serverTimestamp();
+
+    for (final doc in snapshot.docs) {
+      batch.set(doc.reference, <String, dynamic>{
+        'selected': doc.id == normalizedServiceId,
+        'updated_at': now,
+      }, SetOptions(merge: true));
+    }
+
+    await batch.commit();
+  }
+
+  Future<void> deleteService(String userId, String serviceId) async {
+    final normalizedUserId = userId.trim();
+    final normalizedServiceId = serviceId.trim();
+    if (normalizedUserId.isEmpty || normalizedServiceId.isEmpty) {
+      return;
+    }
+
+    final servicesRef = _services(normalizedUserId);
+    final targetRef = servicesRef.doc(normalizedServiceId);
+    final targetSnapshot = await targetRef.get();
+    final wasSelected = targetSnapshot.data()?['selected'] == true;
+
+    await targetRef.delete();
+
+    if (!wasSelected) {
+      return;
+    }
+
+    final remaining = await servicesRef.orderBy('sort_order').limit(1).get();
+    if (remaining.docs.isEmpty) {
+      return;
+    }
+
+    await remaining.docs.first.reference.set(<String, dynamic>{
+      'selected': true,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   Stream<List<ProfileReviewEntry>> watchReviews(String userId) {
     if (userId.trim().isEmpty) {
       return Stream.value(const <ProfileReviewEntry>[]);
