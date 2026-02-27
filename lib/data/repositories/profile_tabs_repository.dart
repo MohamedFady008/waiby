@@ -221,6 +221,26 @@ class ProfileTabsRepository {
     }, SetOptions(merge: true));
   }
 
+  Future<void> setServicePaused(
+    String userId,
+    String serviceId, {
+    required bool isPaused,
+  }) async {
+    final normalizedUserId = userId.trim();
+    final normalizedServiceId = serviceId.trim();
+    if (normalizedUserId.isEmpty || normalizedServiceId.isEmpty) {
+      return;
+    }
+
+    await _services(normalizedUserId).doc(normalizedServiceId).set(
+      <String, dynamic>{
+        'is_paused': isPaused,
+        'updated_at': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
   Stream<List<ProfileReviewEntry>> watchReviews(String userId) {
     if (userId.trim().isEmpty) {
       return Stream.value(const <ProfileReviewEntry>[]);

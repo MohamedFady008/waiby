@@ -34,6 +34,8 @@ class ChatController extends GetxController {
       <String, ChatConversation>{};
   final Map<String, List<ChatMessageRecord>> _messagesByConversationId =
       <String, List<ChatMessageRecord>>{};
+  bool _chatPermissionDenied = false;
+  bool _walletPermissionDenied = false;
 
   Worker? _authWorker;
   String? _lastPath;
@@ -161,24 +163,53 @@ class ChatController extends GetxController {
       threads.clear();
       activeThreadId.value = null;
       budsBalance.value = 0;
+      _chatPermissionDenied = false;
+      _walletPermissionDenied = false;
       return;
     }
 
     final userId = user.uid.trim();
     _cancelStreamSubscriptions();
+    _chatPermissionDenied = false;
+    _walletPermissionDenied = false;
     _walletSubscription = FirebaseFirestore.instance
         .collection('wallets')
         .doc(userId)
         .snapshots(includeMetadataChanges: true)
-        .listen((snapshot) {
-          final data = snapshot.data();
-          budsBalance.value = _toDouble(
-            data?['buds_balance'] ?? data?['balance_buds'],
-          );
-        }, onError: (_) {});
+        .listen(
+          (snapshot) {
+            final data = snapshot.data();
+            budsBalance.value = _toDouble(
+              data?['buds_balance'] ?? data?['balance_buds'],
+            );
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (_isPermissionDenied(error)) {
+              budsBalance.value = 0;
+              if (!_walletPermissionDenied) {
+                _walletPermissionDenied = true;
+                _walletSubscription?.cancel();
+                _walletSubscription = null;
+              }
+            }
+          },
+        );
     _conversationsSubscription = _chatRepository
         .watchConversationsForUser(userId)
-        .listen(_onConversationsUpdated);
+        .listen(
+          _onConversationsUpdated,
+          onError: (Object error, StackTrace stackTrace) {
+            if (_isPermissionDenied(error)) {
+              if (_chatPermissionDenied) return;
+              _chatPermissionDenied = true;
+              _clearConversationState();
+              _conversationsSubscription?.cancel();
+              _conversationsSubscription = null;
+              threads.clear();
+              activeThreadId.value = null;
+            }
+          },
+        );
   }
 
   void _onConversationsUpdated(List<ChatConversation> conversations) {
@@ -199,22 +230,36 @@ class ChatController extends GetxController {
 
     for (final conversation in conversations) {
       _conversationsById[conversation.id] = conversation;
-      _messagesSubscriptions[conversation.id] ??= _chatRepository
-          .watchMessages(conversation.id)
-          .listen((messages) {
-            _messagesByConversationId[conversation.id] = messages;
-            _rebuildThreads();
+      if (_messagesSubscriptions.containsKey(conversation.id)) {
+        continue;
+      }
 
-            final activeId = activeThreadId.value;
-            if (activeId == conversation.id) {
-              unawaited(
-                _chatRepository.markConversationRead(
-                  conversationId: conversation.id,
-                  userId: selfId,
-                ),
-              );
-            }
-          });
+      final subscription = _chatRepository
+          .watchMessages(conversation.id)
+          .listen(
+            (messages) {
+              _messagesByConversationId[conversation.id] = messages;
+              _rebuildThreads();
+
+              final activeId = activeThreadId.value;
+              if (activeId == conversation.id) {
+                unawaited(
+                  _chatRepository.markConversationRead(
+                    conversationId: conversation.id,
+                    userId: selfId,
+                  ),
+                );
+              }
+            },
+            onError: (Object error, StackTrace stackTrace) {
+              if (_isPermissionDenied(error)) {
+                _messagesSubscriptions.remove(conversation.id)?.cancel();
+                _messagesByConversationId.remove(conversation.id);
+                _rebuildThreads();
+              }
+            },
+          );
+      _messagesSubscriptions[conversation.id] = subscription;
     }
 
     _rebuildThreads();
@@ -310,7 +355,10 @@ class ChatController extends GetxController {
     _walletSubscription = null;
     _conversationsSubscription?.cancel();
     _conversationsSubscription = null;
+    _clearConversationState();
+  }
 
+  void _clearConversationState() {
     for (final entry in _messagesSubscriptions.values) {
       entry.cancel();
     }
@@ -350,4 +398,8 @@ double _toDouble(dynamic value) {
   if (value is num) return value.toDouble();
   if (value is String) return double.tryParse(value) ?? 0;
   return 0;
+}
+
+bool _isPermissionDenied(Object error) {
+  return error is FirebaseException && error.code == 'permission-denied';
 }

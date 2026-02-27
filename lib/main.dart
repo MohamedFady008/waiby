@@ -7,13 +7,17 @@ import 'controllers/auth_controller.dart';
 import 'controllers/chat_controller.dart';
 import 'controllers/creator_form_controller.dart';
 import 'controllers/home_controller.dart';
+import 'core/web/audioplayers_web_plugin_config.dart';
 import 'core/web/firebase_web_loader.dart';
+import 'core/web/record_web_plugin_config.dart';
 import 'core/web/url_strategy_config.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   configureWebUrlStrategy();
+  ensureAudioplayersWebPluginRegistered();
+  ensureRecordWebPluginRegistered();
 
   await ensureFirebaseWebModulesLoaded();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

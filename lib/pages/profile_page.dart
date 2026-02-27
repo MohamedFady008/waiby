@@ -1,19 +1,23 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 
 import '../controllers/auth_controller.dart';
 import '../controllers/chat_controller.dart';
+import '../core/audio/voice_preview_web_player.dart';
 import '../data/models/user_profile.dart';
 import '../data/repositories/user_profile_repository.dart';
-import '../widgets/common/responsive_layout.dart';
 import '../data/models/profile_tab_models.dart';
 import '../data/repositories/profile_tabs_repository.dart';
+import '../widgets/common/responsive_layout.dart';
 
 enum _ProfileTab { services, wishlist, gallery, posts }
 
@@ -130,87 +134,13 @@ class _ProfileBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final desktop = width >= 1260;
-    final tablet = width >= 920 && !desktop;
-
-    final middleColumn = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _ServiceDetailsCard(profileUserId: profileUserId),
-        const SizedBox(height: 14),
-        _ReviewsCard(profileUserId: profileUserId),
-      ],
+    final servicesLayout = _ServicesTabPanel(
+      width: width,
+      profileUserId: profileUserId,
+      isViewingOtherAccount: isViewingOtherAccount,
+      profileUserName: userName,
+      profileAvatarUrl: profileAvatarUrl,
     );
-
-    final servicesLayout = desktop
-        ? Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 280,
-                child: _ServicesMenuPanel(profileUserId: profileUserId),
-              ),
-              const SizedBox(width: 20),
-              Expanded(child: middleColumn),
-              const SizedBox(width: 20),
-              SizedBox(
-                width: 310,
-                child: _ActionPanel(
-                  isViewingOtherAccount: isViewingOtherAccount,
-                  profileUserId: profileUserId,
-                  profileUserName: userName,
-                  profileAvatarUrl: profileAvatarUrl,
-                ),
-              ),
-            ],
-          )
-        : tablet
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 242,
-                    child: _ServicesMenuPanel(profileUserId: profileUserId),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(child: middleColumn),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Align(
-                alignment: Alignment.centerRight,
-                child: SizedBox(
-                  width: 310,
-                  child: _ActionPanel(
-                    isViewingOtherAccount: isViewingOtherAccount,
-                    profileUserId: profileUserId,
-                    profileUserName: userName,
-                    profileAvatarUrl: profileAvatarUrl,
-                  ),
-                ),
-              ),
-            ],
-          )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _ServicesMenuPanel(profileUserId: profileUserId),
-              const SizedBox(height: 12),
-              _ServiceDetailsCard(profileUserId: profileUserId),
-              const SizedBox(height: 12),
-              _ActionPanel(
-                isViewingOtherAccount: isViewingOtherAccount,
-                profileUserId: profileUserId,
-                profileUserName: userName,
-                profileAvatarUrl: profileAvatarUrl,
-              ),
-              const SizedBox(height: 12),
-              _ReviewsCard(profileUserId: profileUserId),
-            ],
-          );
 
     Widget tabBody;
     switch (selectedTab) {
@@ -3880,55 +3810,211 @@ class _EmptyProfileTab extends StatelessWidget {
   }
 }
 
-class _ServicesMenuPanel extends StatelessWidget {
+class _ServicesTabPanel extends StatefulWidget {
+  final double width;
   final String? profileUserId;
-  final ProfileTabsRepository _repository = ProfileTabsRepository();
+  final bool isViewingOtherAccount;
+  final String profileUserName;
+  final String? profileAvatarUrl;
 
-  _ServicesMenuPanel({required this.profileUserId});
+  const _ServicesTabPanel({
+    required this.width,
+    required this.profileUserId,
+    required this.isViewingOtherAccount,
+    required this.profileUserName,
+    required this.profileAvatarUrl,
+  });
+
+  @override
+  State<_ServicesTabPanel> createState() => _ServicesTabPanelState();
+}
+
+class _ServicesTabPanelState extends State<_ServicesTabPanel> {
+  final ProfileTabsRepository _repository = ProfileTabsRepository();
+  String? _selectedServiceId;
 
   @override
   Widget build(BuildContext context) {
-    final userId = profileUserId?.trim();
-
-    Widget servicesList(List<_ServiceItem> items) {
-      return Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF060E2B),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-        ),
-        child: Column(
-          children: [
-            for (var i = 0; i < items.length; i++) ...[
-              _ServiceTile(item: items[i]),
-              if (i < items.length - 1)
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-            ],
-          ],
-        ),
-      );
-    }
-
-    Widget content;
+    final userId = widget.profileUserId?.trim();
     if (userId == null || userId.isEmpty) {
-      content = servicesList(_services);
-    } else {
-      content = StreamBuilder<List<ProfileServiceItem>>(
-        stream: _repository.watchServices(userId),
-        builder: (context, snapshot) {
-          final backendItems = (snapshot.data ?? const <ProfileServiceItem>[])
-              .map(_ServiceItem.fromProfileServiceItem)
-              .toList();
-          final resolved = backendItems.isEmpty ? _services : backendItems;
-          return servicesList(resolved);
-        },
+      return _buildLayout(_services);
+    }
+
+    return StreamBuilder<List<ProfileServiceItem>>(
+      stream: _repository.watchServices(userId),
+      builder: (context, snapshot) {
+        final backendItems = (snapshot.data ?? const <ProfileServiceItem>[])
+            .map(_ServiceItem.fromProfileServiceItem)
+            .toList();
+        if (backendItems.isEmpty) {
+          return _buildLayout(_services);
+        }
+        final visibleItems = backendItems
+            .where((item) => !item.isPaused)
+            .toList(growable: false);
+        return _buildLayout(visibleItems);
+      },
+    );
+  }
+
+  Widget _buildLayout(List<_ServiceItem> items) {
+    final hasServices = items.isNotEmpty;
+    final selectedServiceId = hasServices
+        ? _resolveSelectedServiceId(items)
+        : null;
+    final selectedService = hasServices
+        ? items.firstWhere(
+            (item) => item.id == selectedServiceId,
+            orElse: () => items.first,
+          )
+        : null;
+    final desktop = widget.width >= 1260;
+    final tablet = widget.width >= 920 && !desktop;
+    final serviceDetailsWidget = hasServices
+        ? _ServiceDetailsCard(
+            services: items,
+            selectedServiceId: selectedServiceId!,
+            onServiceChanged: _handleServiceSelected,
+          )
+        : const _NoActiveServicesCard();
+
+    final middleColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        serviceDetailsWidget,
+        const SizedBox(height: 14),
+        _ReviewsCard(profileUserId: widget.profileUserId),
+      ],
+    );
+
+    if (desktop) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 280,
+            child: _ServicesMenuPanel(
+              items: items,
+              selectedServiceId: selectedServiceId,
+              onServiceTap: _handleServiceSelected,
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(child: middleColumn),
+          const SizedBox(width: 20),
+          SizedBox(
+            width: 310,
+            child: _ActionPanel(
+              isViewingOtherAccount: widget.isViewingOtherAccount,
+              profileUserId: widget.profileUserId,
+              profileUserName: widget.profileUserName,
+              profileAvatarUrl: widget.profileAvatarUrl,
+              serviceImageUrl: selectedService?.bannerImageUrl,
+              serviceImageAsset: selectedService?.bannerImageAsset,
+            ),
+          ),
+        ],
       );
     }
 
+    if (tablet) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 242,
+                child: _ServicesMenuPanel(
+                  items: items,
+                  selectedServiceId: selectedServiceId,
+                  onServiceTap: _handleServiceSelected,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(child: middleColumn),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              width: 310,
+              child: _ActionPanel(
+                isViewingOtherAccount: widget.isViewingOtherAccount,
+                profileUserId: widget.profileUserId,
+                profileUserName: widget.profileUserName,
+                profileAvatarUrl: widget.profileAvatarUrl,
+                serviceImageUrl: selectedService?.bannerImageUrl,
+                serviceImageAsset: selectedService?.bannerImageAsset,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ServicesMenuPanel(
+          items: items,
+          selectedServiceId: selectedServiceId,
+          onServiceTap: _handleServiceSelected,
+        ),
+        const SizedBox(height: 12),
+        serviceDetailsWidget,
+        const SizedBox(height: 12),
+        _ActionPanel(
+          isViewingOtherAccount: widget.isViewingOtherAccount,
+          profileUserId: widget.profileUserId,
+          profileUserName: widget.profileUserName,
+          profileAvatarUrl: widget.profileAvatarUrl,
+          serviceImageUrl: selectedService?.bannerImageUrl,
+          serviceImageAsset: selectedService?.bannerImageAsset,
+        ),
+        const SizedBox(height: 12),
+        _ReviewsCard(profileUserId: widget.profileUserId),
+      ],
+    );
+  }
+
+  String _resolveSelectedServiceId(List<_ServiceItem> items) {
+    final currentId = _selectedServiceId;
+    if (currentId != null && items.any((item) => item.id == currentId)) {
+      return currentId;
+    }
+
+    final fallback = items.firstWhere(
+      (item) => item.selected,
+      orElse: () => items.first,
+    );
+    _selectedServiceId = fallback.id;
+    return fallback.id;
+  }
+
+  void _handleServiceSelected(String serviceId) {
+    if (serviceId == _selectedServiceId) {
+      return;
+    }
+    setState(() => _selectedServiceId = serviceId);
+  }
+}
+
+class _ServicesMenuPanel extends StatelessWidget {
+  final List<_ServiceItem> items;
+  final String? selectedServiceId;
+  final ValueChanged<String> onServiceTap;
+
+  const _ServicesMenuPanel({
+    required this.items,
+    required this.selectedServiceId,
+    required this.onServiceTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0x120A1A45),
@@ -3949,8 +4035,70 @@ class _ServicesMenuPanel extends StatelessWidget {
               ),
             ),
           ),
-          content,
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF060E2B),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            ),
+            child: items.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    child: Text(
+                      'No active services right now.',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white.withValues(alpha: 0.76),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (var i = 0; i < items.length; i++) ...[
+                        _ServiceTile(
+                          item: items[i],
+                          isSelected: items[i].id == selectedServiceId,
+                          onTap: () => onServiceTap(items[i].id),
+                        ),
+                        if (i < items.length - 1)
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: Colors.white.withValues(alpha: 0.1),
+                          ),
+                      ],
+                    ],
+                  ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _NoActiveServicesCard extends StatelessWidget {
+  const _NoActiveServicesCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF060E2A),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      child: Text(
+        'This user has no active services right now.',
+        style: GoogleFonts.poppins(
+          color: Colors.white.withValues(alpha: 0.84),
+          fontWeight: FontWeight.w500,
+          fontSize: 13,
+        ),
       ),
     );
   }
@@ -3958,104 +4106,469 @@ class _ServicesMenuPanel extends StatelessWidget {
 
 class _ServiceTile extends StatelessWidget {
   final _ServiceItem item;
+  final bool isSelected;
+  final VoidCallback onTap;
 
-  const _ServiceTile({required this.item});
+  const _ServiceTile({
+    required this.item,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 82,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      color: item.selected ? const Color(0xFF2D3448) : Colors.transparent,
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: item.iconBackground,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(item.icon, color: item.iconColor, size: 25),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 21,
-                    height: 1,
-                  ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 82,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          color: isSelected ? const Color(0xFF2D3448) : Colors.transparent,
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: item.iconBackground,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${item.price}/${item.unit}',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 16,
-                    height: 1,
-                  ),
+                child: Icon(item.icon, color: item.iconColor, size: 25),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 21,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${item.price}/${item.unit}',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontWeight: FontWeight.w500,
+                        fontSize: 16,
+                        height: 1,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _ServiceDetailsCard extends StatelessWidget {
-  final String? profileUserId;
-  final ProfileTabsRepository _repository = ProfileTabsRepository();
+class _ServiceDetailsCard extends StatefulWidget {
+  final List<_ServiceItem> services;
+  final String selectedServiceId;
+  final ValueChanged<String> onServiceChanged;
 
-  _ServiceDetailsCard({required this.profileUserId});
+  const _ServiceDetailsCard({
+    required this.services,
+    required this.selectedServiceId,
+    required this.onServiceChanged,
+  });
+
+  @override
+  State<_ServiceDetailsCard> createState() => _ServiceDetailsCardState();
+}
+
+class _ServiceDetailsCardState extends State<_ServiceDetailsCard> {
+  AudioPlayer? _voicePreviewPlayer;
+  final VoicePreviewWebPlayer _webVoicePreviewPlayer = VoicePreviewWebPlayer();
+  StreamSubscription<PlayerState>? _playerStateSubscription;
+  String? _playingServiceId;
+  String? _loadingServiceId;
+  bool _isWebPlaybackPaused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb && _webVoicePreviewPlayer.isAvailable) {
+      _webVoicePreviewPlayer.setOnEnded(() {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _playingServiceId = null;
+          _isWebPlaybackPaused = false;
+        });
+      });
+      return;
+    }
+
+    final player = _voicePreviewPlayer = AudioPlayer();
+    _playerStateSubscription = player.onPlayerStateChanged.listen((state) {
+      if (!mounted) {
+        return;
+      }
+      if (state == PlayerState.stopped || state == PlayerState.completed) {
+        setState(() => _playingServiceId = null);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _ServiceDetailsCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedServiceId != widget.selectedServiceId &&
+        _playingServiceId != null &&
+        _playingServiceId != widget.selectedServiceId) {
+      unawaited(_stopPreview());
+    }
+  }
+
+  @override
+  void dispose() {
+    _playerStateSubscription?.cancel();
+    if (kIsWeb && _webVoicePreviewPlayer.isAvailable) {
+      unawaited(_webVoicePreviewPlayer.dispose());
+    } else {
+      final player = _voicePreviewPlayer;
+      if (player != null) {
+        unawaited(player.dispose());
+      }
+    }
+    super.dispose();
+  }
+
+  int get _selectedIndex {
+    final index = widget.services.indexWhere(
+      (item) => item.id == widget.selectedServiceId,
+    );
+    return index >= 0 ? index : 0;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final userId = profileUserId?.trim();
-    if (userId == null || userId.isEmpty) {
-      final defaultService = _services.firstWhere(
-        (item) => item.selected,
-        orElse: () => _services.first,
-      );
-      return _buildCard(defaultService, defaultService.options);
+    if (widget.services.isEmpty) {
+      return const SizedBox.shrink();
     }
 
-    return StreamBuilder<List<ProfileServiceItem>>(
-      stream: _repository.watchServices(userId),
-      builder: (context, snapshot) {
-        final backendItems = (snapshot.data ?? const <ProfileServiceItem>[])
-            .map(_ServiceItem.fromProfileServiceItem)
-            .toList();
-        final resolvedItems = backendItems.isEmpty ? _services : backendItems;
-        final selectedService = resolvedItems.firstWhere(
-          (item) => item.selected,
-          orElse: () => resolvedItems.first,
-        );
-        return _buildCard(selectedService, selectedService.options);
-      },
+    final selectedService = widget.services[_selectedIndex];
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: _handleSwipe,
+      child: _buildCard(selectedService),
     );
   }
 
-  Widget _buildCard(
-    _ServiceItem selectedService,
-    List<_ServiceOption> options,
-  ) {
+  void _handleSwipe(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity.abs() < 220) {
+      return;
+    }
+    if (velocity < 0) {
+      _moveSelection(1);
+      return;
+    }
+    _moveSelection(-1);
+  }
+
+  void _moveSelection(int delta) {
+    final nextIndex = _selectedIndex + delta;
+    if (nextIndex < 0 || nextIndex >= widget.services.length) {
+      return;
+    }
+    widget.onServiceChanged(widget.services[nextIndex].id);
+  }
+
+  Future<void> _toggleVoicePreview(_ServiceItem service) async {
+    if (kIsWeb && _webVoicePreviewPlayer.isAvailable) {
+      await _toggleVoicePreviewWeb(service);
+      return;
+    }
+    final player = _voicePreviewPlayer;
+    if (player == null) {
+      return;
+    }
+
+    if (_loadingServiceId != null) {
+      return;
+    }
+
+    final voiceUrl = service.voiceClipUrl?.trim();
+    if (voiceUrl == null || voiceUrl.isEmpty) {
+      _showSnack('No voice preview uploaded for this service.');
+      return;
+    }
+
+    final playerState = player.state;
+    if (_playingServiceId == service.id && playerState == PlayerState.playing) {
+      await player.pause();
+      if (mounted) {
+        setState(() => _playingServiceId = null);
+      }
+      return;
+    }
+
+    if (_playingServiceId == service.id && playerState == PlayerState.paused) {
+      await player.resume();
+      if (mounted) {
+        setState(() => _playingServiceId = service.id);
+      }
+      return;
+    }
+
+    setState(() {
+      _loadingServiceId = service.id;
+    });
+    final normalizedUrl = voiceUrl.toLowerCase();
+    final preferBytesSource =
+        normalizedUrl.contains('firebasestorage.googleapis.com') ||
+        normalizedUrl.contains('.webm');
+
+    try {
+      if (preferBytesSource) {
+        final playedFromBytes = await _tryPlayVoiceFromBytes(
+          voiceUrl: voiceUrl,
+          serviceId: service.id,
+        );
+        if (playedFromBytes) {
+          return;
+        }
+      }
+
+      await player.stop();
+      await player.play(UrlSource(voiceUrl));
+      if (mounted) {
+        setState(() => _playingServiceId = service.id);
+      }
+    } catch (_) {
+      final playedFromBytes = await _tryPlayVoiceFromBytes(
+        voiceUrl: voiceUrl,
+        serviceId: service.id,
+      );
+      if (!playedFromBytes) {
+        _showSnack('Could not play this voice preview right now.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingServiceId = null);
+      }
+    }
+  }
+
+  Future<void> _toggleVoicePreviewWeb(_ServiceItem service) async {
+    if (_loadingServiceId != null) {
+      return;
+    }
+
+    final voiceUrl = service.voiceClipUrl?.trim();
+    if (voiceUrl == null || voiceUrl.isEmpty) {
+      _showSnack('No voice preview uploaded for this service.');
+      return;
+    }
+
+    if (_playingServiceId == service.id && _webVoicePreviewPlayer.isPlaying) {
+      await _webVoicePreviewPlayer.pause();
+      if (mounted) {
+        setState(() {
+          _playingServiceId = null;
+          _isWebPlaybackPaused = true;
+        });
+      }
+      return;
+    }
+
+    if (_playingServiceId == service.id && _isWebPlaybackPaused) {
+      try {
+        await _webVoicePreviewPlayer.resume();
+        if (mounted) {
+          setState(() {
+            _playingServiceId = service.id;
+            _isWebPlaybackPaused = false;
+          });
+        }
+      } catch (_) {
+        _showSnack('Could not resume this voice preview.');
+      }
+      return;
+    }
+
+    setState(() => _loadingServiceId = service.id);
+    try {
+      await _webVoicePreviewPlayer.stop();
+      _isWebPlaybackPaused = false;
+      await _webVoicePreviewPlayer.play(voiceUrl);
+      if (mounted) {
+        setState(() => _playingServiceId = service.id);
+      }
+    } catch (_) {
+      _showSnack('Could not play this voice preview right now.');
+    } finally {
+      if (mounted) {
+        setState(() => _loadingServiceId = null);
+      }
+    }
+  }
+
+  Future<bool> _tryPlayVoiceFromBytes({
+    required String voiceUrl,
+    required String serviceId,
+  }) async {
+    final player = _voicePreviewPlayer;
+    if (player == null) {
+      return false;
+    }
+    try {
+      final response = await http.get(Uri.parse(voiceUrl));
+      if (response.statusCode < 200 ||
+          response.statusCode >= 300 ||
+          response.bodyBytes.isEmpty) {
+        return false;
+      }
+
+      final mimeType = _resolveVoiceMimeType(
+        bytes: response.bodyBytes,
+        headerMimeType: response.headers['content-type'],
+        sourceUrl: voiceUrl,
+      );
+
+      await player.stop();
+      await player.play(BytesSource(response.bodyBytes, mimeType: mimeType));
+      if (mounted) {
+        setState(() => _playingServiceId = serviceId);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _resolveVoiceMimeType({
+    required Uint8List bytes,
+    required String? headerMimeType,
+    required String sourceUrl,
+  }) {
+    bool startsWith(List<int> signature) {
+      if (bytes.length < signature.length) {
+        return false;
+      }
+      for (var i = 0; i < signature.length; i++) {
+        if (bytes[i] != signature[i]) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    if (startsWith(const [0x52, 0x49, 0x46, 0x46]) &&
+        bytes.length >= 12 &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x41 &&
+        bytes[10] == 0x56 &&
+        bytes[11] == 0x45) {
+      return 'audio/wav';
+    }
+
+    if (startsWith(const [0x1A, 0x45, 0xDF, 0xA3])) {
+      return 'audio/webm';
+    }
+
+    if (startsWith(const [0x4F, 0x67, 0x67, 0x53])) {
+      return 'audio/ogg';
+    }
+
+    if (bytes.length >= 8 &&
+        bytes[4] == 0x66 &&
+        bytes[5] == 0x74 &&
+        bytes[6] == 0x79 &&
+        bytes[7] == 0x70) {
+      return 'audio/mp4';
+    }
+
+    if (startsWith(const [0x49, 0x44, 0x33])) {
+      return 'audio/mpeg';
+    }
+
+    if (bytes.length >= 2 && bytes[0] == 0xFF && (bytes[1] & 0xE0) == 0xE0) {
+      return 'audio/mpeg';
+    }
+
+    final normalizedHeader = headerMimeType
+        ?.split(';')
+        .first
+        .trim()
+        .toLowerCase();
+    if (normalizedHeader != null && normalizedHeader.startsWith('audio/')) {
+      return normalizedHeader;
+    }
+
+    final url = sourceUrl.toLowerCase();
+    if (url.contains('.wav')) {
+      return 'audio/wav';
+    }
+    if (url.contains('.webm')) {
+      return 'audio/webm';
+    }
+    if (url.contains('.ogg') || url.contains('.opus')) {
+      return 'audio/ogg';
+    }
+    if (url.contains('.m4a') || url.contains('.mp4')) {
+      return 'audio/mp4';
+    }
+
+    return 'audio/mpeg';
+  }
+
+  Future<void> _stopPreview() async {
+    try {
+      if (kIsWeb && _webVoicePreviewPlayer.isAvailable) {
+        await _webVoicePreviewPlayer.stop();
+      } else {
+        await _voicePreviewPlayer?.stop();
+      }
+    } catch (_) {
+      // Ignore audio driver state errors during rapid service switching.
+    }
+    if (mounted) {
+      setState(() {
+        _playingServiceId = null;
+        _isWebPlaybackPaused = false;
+      });
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  Widget _buildCard(_ServiceItem selectedService) {
     final resolvedDescription = selectedService.description.trim().isEmpty
         ? 'If you are looking for a chill and open-minded talking companion, '
               'I am your girl. I am always ready to hear your stories and share mine too.'
         : selectedService.description;
-    final resolvedOptions = options.isEmpty ? _options : options;
+    final resolvedOptions = selectedService.options.isEmpty
+        ? _options
+        : selectedService.options;
+    final hasVoicePreview =
+        selectedService.voiceClipUrl?.trim().isNotEmpty == true;
+    final nonWebState = _voicePreviewPlayer?.state;
+    final isPlaying =
+        _playingServiceId == selectedService.id &&
+        (kIsWeb && _webVoicePreviewPlayer.isAvailable
+            ? _webVoicePreviewPlayer.isPlaying
+            : nonWebState == PlayerState.playing);
+    final isLoading = _loadingServiceId == selectedService.id;
 
     return Container(
       decoration: BoxDecoration(
@@ -4097,17 +4610,42 @@ class _ServiceDetailsCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF2F86F9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 30,
+                Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    onTap: () => _toggleVoicePreview(selectedService),
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: hasVoicePreview
+                            ? const Color(0xFF2F86F9)
+                            : const Color(0xFF2F86F9).withValues(alpha: 0.45),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                hasVoicePreview
+                                    ? (isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded)
+                                    : Icons.music_off_rounded,
+                                color: Colors.white,
+                                size: hasVoicePreview ? 30 : 22,
+                              ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -4124,17 +4662,28 @@ class _ServiceDetailsCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               child: AspectRatio(
                 aspectRatio: 16 / 6,
-                child: selectedService.bannerImageUrl != null
+                child:
+                    selectedService.coverImageUrl != null &&
+                        selectedService.coverImageUrl!.trim().isNotEmpty
                     ? Image.network(
-                        selectedService.bannerImageUrl!,
+                        selectedService.coverImageUrl!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => _serviceImageFallback(),
                       )
-                    : Image.asset(
-                        selectedService.bannerImageAsset,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => _serviceImageFallback(),
-                      ),
+                    : (selectedService.bannerImageUrl != null &&
+                              selectedService.bannerImageUrl!.trim().isNotEmpty
+                          ? Image.network(
+                              selectedService.bannerImageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) =>
+                                  _serviceImageFallback(),
+                            )
+                          : Image.asset(
+                              selectedService.bannerImageAsset,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) =>
+                                  _serviceImageFallback(),
+                            )),
               ),
             ),
           ),
@@ -4439,12 +4988,16 @@ class _ActionPanel extends StatelessWidget {
   final String? profileUserId;
   final String profileUserName;
   final String? profileAvatarUrl;
+  final String? serviceImageUrl;
+  final String? serviceImageAsset;
 
   const _ActionPanel({
     required this.isViewingOtherAccount,
     required this.profileUserId,
     required this.profileUserName,
     required this.profileAvatarUrl,
+    this.serviceImageUrl,
+    this.serviceImageAsset,
   });
 
   Future<void> _handleChatTap(BuildContext context) async {
@@ -4542,19 +5095,21 @@ class _ActionPanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 child: AspectRatio(
                   aspectRatio: 1.1,
-                  child: Image.asset(
-                    'assets/pp6.png',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      color: const Color(0xFF253A63),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.person_rounded,
-                        color: Colors.white70,
-                        size: 46,
-                      ),
-                    ),
-                  ),
+                  child:
+                      serviceImageUrl != null &&
+                          serviceImageUrl!.trim().isNotEmpty
+                      ? Image.network(
+                          serviceImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => _servicePreviewFallback(),
+                        )
+                      : Image.asset(
+                          serviceImageAsset?.trim().isNotEmpty == true
+                              ? serviceImageAsset!.trim()
+                              : 'assets/pp6.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => _servicePreviewFallback(),
+                        ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -4623,6 +5178,14 @@ class _ActionPanel extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _servicePreviewFallback() {
+    return Container(
+      color: const Color(0xFF253A63),
+      alignment: Alignment.center,
+      child: const Icon(Icons.person_rounded, color: Colors.white70, size: 46),
     );
   }
 }
@@ -4695,6 +5258,7 @@ String _resolveUserName(String? raw) {
 }
 
 class _ServiceItem {
+  final String id;
   final String title;
   final String price;
   final String unit;
@@ -4702,14 +5266,18 @@ class _ServiceItem {
   final Color iconBackground;
   final Color iconColor;
   final bool selected;
+  final bool isPaused;
   final int servedCount;
   final int ratingPercent;
   final String description;
   final String bannerImageAsset;
   final String? bannerImageUrl;
+  final String? coverImageUrl;
+  final String? voiceClipUrl;
   final List<_ServiceOption> options;
 
   const _ServiceItem({
+    required this.id,
     required this.title,
     required this.price,
     required this.unit,
@@ -4717,11 +5285,14 @@ class _ServiceItem {
     required this.iconBackground,
     required this.iconColor,
     this.selected = false,
+    this.isPaused = false,
     this.servedCount = 0,
     this.ratingPercent = 0,
     this.description = '',
     this.bannerImageAsset = 'assets/login.png',
     this.bannerImageUrl,
+    this.coverImageUrl,
+    this.voiceClipUrl,
     this.options = const <_ServiceOption>[],
   });
 
@@ -4730,6 +5301,7 @@ class _ServiceItem {
         .map(_ServiceOption.fromProfileServiceOption)
         .toList();
     return _ServiceItem(
+      id: item.id,
       title: item.title,
       price: item.price,
       unit: item.unit,
@@ -4737,11 +5309,14 @@ class _ServiceItem {
       iconBackground: Color(item.iconBackgroundColor),
       iconColor: Color(item.iconColor),
       selected: item.selected,
+      isPaused: item.isPaused,
       servedCount: item.servedCount,
       ratingPercent: item.ratingPercent,
       description: item.description,
       bannerImageAsset: item.bannerImageAsset,
       bannerImageUrl: item.bannerImageUrl,
+      coverImageUrl: item.coverImageUrl,
+      voiceClipUrl: item.voiceClipUrl,
       options: parsedOptions.isEmpty ? _options : parsedOptions,
     );
   }
@@ -4990,6 +5565,7 @@ const _gifterEntries = <_GifterEntry>[
 
 const _services = <_ServiceItem>[
   _ServiceItem(
+    id: 'service_echat',
     title: 'Echat',
     price: '7.99',
     unit: '15 Min',
@@ -5006,6 +5582,7 @@ const _services = <_ServiceItem>[
     options: _options,
   ),
   _ServiceItem(
+    id: 'service_lol',
     title: 'League Of Legends',
     price: '4.99',
     unit: 'Game',
@@ -5014,6 +5591,7 @@ const _services = <_ServiceItem>[
     iconColor: Color(0xFF1A152C),
   ),
   _ServiceItem(
+    id: 'service_watch_together',
     title: 'Watch Together',
     price: '22.22',
     unit: 'Time',
@@ -5022,6 +5600,7 @@ const _services = <_ServiceItem>[
     iconColor: Colors.white,
   ),
   _ServiceItem(
+    id: 'service_valorant',
     title: 'Valorant',
     price: '6.99',
     unit: 'Game',
@@ -5030,6 +5609,7 @@ const _services = <_ServiceItem>[
     iconColor: Color(0xFF360810),
   ),
   _ServiceItem(
+    id: 'service_tft',
     title: 'Teamfight Tactics',
     price: '4.99',
     unit: 'Game',
@@ -5038,6 +5618,7 @@ const _services = <_ServiceItem>[
     iconColor: Color(0xFF201028),
   ),
   _ServiceItem(
+    id: 'service_tarot',
     title: 'Tarot',
     price: '4.99',
     unit: 'Game',

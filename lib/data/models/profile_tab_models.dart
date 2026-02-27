@@ -151,17 +151,22 @@ class ProfileServiceOption {
 class ProfileServiceItem {
   final String id;
   final String title;
+  final String shortIntro;
   final String price;
   final String unit;
   final String iconKey;
   final int iconBackgroundColor;
   final int iconColor;
   final bool selected;
+  final bool isPaused;
   final int servedCount;
   final int ratingPercent;
   final String description;
   final String bannerImageAsset;
   final String? bannerImageUrl;
+  final String? coverImageUrl;
+  final String? voiceClipUrl;
+  final String? voiceClipName;
   final List<ProfileServiceOption> options;
   final int sortOrder;
   final DateTime? createdAt;
@@ -170,17 +175,22 @@ class ProfileServiceItem {
   const ProfileServiceItem({
     required this.id,
     required this.title,
+    this.shortIntro = '',
     required this.price,
     required this.unit,
     required this.iconKey,
     required this.iconBackgroundColor,
     required this.iconColor,
     required this.selected,
+    this.isPaused = false,
     required this.servedCount,
     required this.ratingPercent,
     required this.description,
     required this.bannerImageAsset,
     required this.bannerImageUrl,
+    this.coverImageUrl,
+    this.voiceClipUrl,
+    this.voiceClipName,
     required this.options,
     required this.sortOrder,
     this.createdAt,
@@ -190,17 +200,22 @@ class ProfileServiceItem {
   Map<String, dynamic> toFirestoreMap() {
     return <String, dynamic>{
       'title': title,
+      'short_intro': shortIntro,
       'price': price,
       'unit': unit,
       'icon_key': iconKey,
       'icon_background_color': iconBackgroundColor,
       'icon_color': iconColor,
       'selected': selected,
+      'is_paused': isPaused,
       'served_count': servedCount,
       'rating_percent': ratingPercent,
       'description': description,
       'banner_image_asset': bannerImageAsset,
       'banner_image_url': bannerImageUrl,
+      'cover_image_url': coverImageUrl,
+      'voice_clip_url': voiceClipUrl,
+      'voice_clip_name': voiceClipName,
       'options': options.map((item) => item.toFirestoreMap()).toList(),
       'sort_order': sortOrder,
       'created_at': createdAt != null
@@ -231,6 +246,7 @@ class ProfileServiceItem {
       title: data['title']?.toString().trim().isNotEmpty == true
           ? data['title'].toString().trim()
           : 'Service',
+      shortIntro: data['short_intro']?.toString().trim() ?? '',
       price: data['price']?.toString().trim().isNotEmpty == true
           ? data['price'].toString().trim()
           : '0.00',
@@ -246,6 +262,7 @@ class ProfileServiceItem {
       ),
       iconColor: _toInt(data['icon_color'], fallback: 0xFF06163A),
       selected: data['selected'] == true,
+      isPaused: data['is_paused'] == true || data['paused'] == true,
       servedCount: _toInt(data['served_count']),
       ratingPercent: _toInt(data['rating_percent']),
       description: data['description']?.toString().trim().isNotEmpty == true
@@ -256,6 +273,9 @@ class ProfileServiceItem {
           ? data['banner_image_asset'].toString().trim()
           : 'assets/login.png',
       bannerImageUrl: _toNullableTrimmed(data['banner_image_url']),
+      coverImageUrl: _toNullableTrimmed(data['cover_image_url']),
+      voiceClipUrl: _toNullableTrimmed(data['voice_clip_url']),
+      voiceClipName: _toNullableTrimmed(data['voice_clip_name']),
       options: parsedOptions,
       sortOrder: _toInt(data['sort_order']),
       createdAt: _toDateTime(data['created_at']),
