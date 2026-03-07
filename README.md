@@ -1,6 +1,17 @@
 # Waiby
 
-Waiby is a Flutter + GetX app backed by Firebase Auth, Firestore, Storage, and Cloud Functions.
+Waiby is a social gaming platform where users can discover creators, chat, and book private gaming sessions.
+This repository contains the client app and backend functions that power user auth, profiles, chat gifts, wallet top-ups, and creator workflows.
+
+## What Is Waiby
+
+Waiby focuses on connecting players with creators for interactive, paid experiences.
+
+- User accounts with email/social sign-in
+- Creator onboarding and review flows
+- Real-time profile/chat data backed by Firebase
+- Wallet and top-up flow using Stripe Checkout
+- Multi-platform Flutter app (web, Android, iOS, desktop)
 
 ## Stack
 
