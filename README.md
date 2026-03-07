@@ -76,4 +76,4 @@ firebase deploy --only hosting
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+Non-commercial custom license. See [`LICENSE`](LICENSE).
