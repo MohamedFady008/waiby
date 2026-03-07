@@ -472,6 +472,10 @@ class _LegalAcknowledgementSection extends StatelessWidget {
     CreatorFormController controller,
   ) async {
     await controller.refreshSubmissionState();
+    if (!context.mounted) {
+      return;
+    }
+
     if (controller.hasExistingRequest.value) {
       Get.snackbar(
         'Application Exists',

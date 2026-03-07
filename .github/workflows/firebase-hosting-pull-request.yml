@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build_and_preview:
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && vars.FIREBASE_PROJECT_ID != '' && secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,5 +31,5 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WAIBY_89732 }}
-          projectId: waiby-89732
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ vars.FIREBASE_PROJECT_ID }}

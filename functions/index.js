@@ -532,7 +532,7 @@ function defaultTopupReturnUrl(req) {
     return `${origin.replace(/\/$/, "")}${TOPUP_CHECKOUT_PATH}`;
   }
 
-  return `https://waiby.web.app${TOPUP_CHECKOUT_PATH}`;
+  return `https://example.com${TOPUP_CHECKOUT_PATH}`;
 }
 
 async function extractUidFromAuthorization(req) {

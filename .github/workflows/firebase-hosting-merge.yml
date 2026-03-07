@@ -6,9 +6,11 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build_and_deploy:
+    if: ${{ vars.FIREBASE_PROJECT_ID != '' && secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +31,6 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WAIBY_89732 }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           channelId: live
-          projectId: waiby-89732
+          projectId: ${{ vars.FIREBASE_PROJECT_ID }}

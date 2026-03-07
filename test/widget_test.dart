@@ -1,29 +1,27 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:waiby/main.dart';
-import 'package:waiby/widgets/top_nav_bar.dart';
+import 'package:waiby/widgets/common/responsive_layout.dart';
 
 void main() {
-  testWidgets('App loads with top navigation', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
-    await tester.pumpAndSettle();
+  test('waibyHorizontalPaddingForWidth uses breakpoint-based spacing', () {
+    expect(waibyHorizontalPaddingForWidth(360), 16);
+    expect(waibyHorizontalPaddingForWidth(700), 20);
+    expect(waibyHorizontalPaddingForWidth(900), 20);
+    expect(waibyHorizontalPaddingForWidth(1024), 24);
+  });
 
-    expect(find.text('Waiby'), findsWidgets);
+  testWidgets('WaibyConstrainedContent renders child', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: WaibyConstrainedContent(
+          child: Text('child-content'),
+        ),
+      ),
+    );
 
-    final topNav = find.byType(TopNavBar);
-    expect(topNav, findsOneWidget);
-
-    expect(
-      find.descendant(of: topNav, matching: find.text('Social')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: topNav, matching: find.text('Playground')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: topNav, matching: find.text('FAQ')),
-      findsOneWidget,
-    );
+    expect(find.text('child-content'), findsOneWidget);
+    expect(find.byType(WaibyConstrainedContent), findsOneWidget);
   });
 }

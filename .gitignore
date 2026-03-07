@@ -44,3 +44,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 .firebase/
+
+# Local environment and credentials
+.env.firebase.json
+firebase-debug.log
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+functions/.env
+functions/.runtimeconfig.json

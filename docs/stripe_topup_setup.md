@@ -15,9 +15,9 @@ This project now uses a server-side Stripe flow for Buds top-up:
 STRIPE_SECRET_KEY=sk_live_or_test_key
 STRIPE_WEBHOOK_SECRET=whsec_from_stripe_webhook
 # Optional for native/desktop callback fallback:
-# DEFAULT_TOPUP_RETURN_URL=https://waiby.web.app/wallet/topup
+# DEFAULT_TOPUP_RETURN_URL=https://your-domain.com/wallet/topup
 # Optional CORS allow-list value:
-# CORS_ALLOW_ORIGIN=https://waiby.web.app
+# CORS_ALLOW_ORIGIN=https://your-domain.com
 ```
 
 Do not put the secret key in Flutter code.
