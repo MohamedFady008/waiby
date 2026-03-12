@@ -66,7 +66,13 @@ final router = GoRouter(
           builder: (context, state) {
             final role = state.uri.queryParameters['role'];
             final isHost = role == 'host';
-            return LiveRoomPage(isHost: isHost);
+            return LiveRoomPage(
+              isHost: isHost,
+              roomName: state.uri.queryParameters['roomName'],
+              tagline: state.uri.queryParameters['tagline'],
+              language: state.uri.queryParameters['language'],
+              tags: state.uri.queryParameters['tags'],
+            );
           },
         ),
         GoRoute(path: '/pricing', redirect: (context, state) => '/playground'),

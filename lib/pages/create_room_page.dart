@@ -27,6 +27,38 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   bool _publicRoom = true;
   bool _giftGoalEnabled = true;
 
+  void _startLive(BuildContext context) {
+    final roomName = _roomNameController.text.trim();
+    if (roomName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Room name is required to start live.')),
+      );
+      return;
+    }
+
+    final queryParameters = <String, String>{
+      'role': 'host',
+      'roomName': roomName,
+      if (_shortTaglineController.text.trim().isNotEmpty)
+        'tagline': _shortTaglineController.text.trim(),
+      if (_languageController.text.trim().isNotEmpty)
+        'language': _languageController.text.trim(),
+      if (_tagsController.text.trim().isNotEmpty)
+        'tags': _tagsController.text.trim(),
+      if (_pinnedMessageController.text.trim().isNotEmpty)
+        'pinnedMessage': _pinnedMessageController.text.trim(),
+      if (_giftGoalEnabled && _giftGoalController.text.trim().isNotEmpty)
+        'giftGoal': _giftGoalController.text.trim(),
+      'private': _privateRoom.toString(),
+      'giftGoalEnabled': _giftGoalEnabled.toString(),
+    };
+
+    context.go(
+      Uri(path: '/playground/live-room', queryParameters: queryParameters)
+          .toString(),
+    );
+  }
+
   @override
   void dispose() {
     _roomNameController.dispose();
@@ -111,6 +143,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                       onGiftGoalChanged: (value) {
                         setState(() => _giftGoalEnabled = value);
                       },
+                      onConfirm: () => _startLive(context),
                     ),
                   ),
                 ),
@@ -137,6 +170,7 @@ class _CreateRoomSurface extends StatelessWidget {
   final ValueChanged<bool> onPrivateChanged;
   final ValueChanged<bool> onPublicChanged;
   final ValueChanged<bool> onGiftGoalChanged;
+  final VoidCallback onConfirm;
 
   const _CreateRoomSurface({
     required this.roomNameController,
@@ -152,6 +186,7 @@ class _CreateRoomSurface extends StatelessWidget {
     required this.onPrivateChanged,
     required this.onPublicChanged,
     required this.onGiftGoalChanged,
+    required this.onConfirm,
   });
 
   @override
@@ -301,8 +336,7 @@ class _CreateRoomSurface extends StatelessWidget {
                   width: 112,
                   height: 32,
                   child: ElevatedButton(
-                    onPressed: () =>
-                        context.go('/playground/live-room?role=host'),
+                    onPressed: onConfirm,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2F88FF),
                       foregroundColor: Colors.white,

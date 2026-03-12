@@ -7,8 +7,46 @@ import 'package:google_fonts/google_fonts.dart';
 
 class LiveRoomPage extends StatelessWidget {
   final bool isHost;
+  final String? roomName;
+  final String? tagline;
+  final String? language;
+  final String? tags;
 
-  const LiveRoomPage({super.key, this.isHost = false});
+  const LiveRoomPage({
+    super.key,
+    this.isHost = false,
+    this.roomName,
+    this.tagline,
+    this.language,
+    this.tags,
+  });
+
+  String get displayRoomName {
+    final value = roomName?.trim();
+    if (value == null || value.isEmpty) return 'Untitled room';
+    return value;
+  }
+
+  String get displaySubtitle {
+    final parts = <String>[];
+    final trimmedTagline = tagline?.trim();
+    if (trimmedTagline != null && trimmedTagline.isNotEmpty) {
+      parts.add(trimmedTagline);
+    }
+
+    final trimmedLanguage = language?.trim();
+    if (trimmedLanguage != null && trimmedLanguage.isNotEmpty) {
+      parts.add(trimmedLanguage);
+    }
+
+    final trimmedTags = tags?.trim();
+    if (trimmedTags != null && trimmedTags.isNotEmpty) {
+      parts.add(trimmedTags);
+    }
+
+    parts.add('9 viewers');
+    return parts.join(' | ');
+  }
 
   Future<void> _onBackInvoked(BuildContext context) async {
     final shouldLeave = await _showLeaveLiveDialog(context, isHost: isHost);
@@ -52,7 +90,11 @@ class LiveRoomPage extends StatelessWidget {
                     height: h,
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(pad, 22, pad, 16),
-                      child: _LiveShell(isHost: isHost),
+                      child: _LiveShell(
+                        isHost: isHost,
+                        roomName: displayRoomName,
+                        subtitle: displaySubtitle,
+                      ),
                     ),
                   ),
                 ),
@@ -67,8 +109,14 @@ class LiveRoomPage extends StatelessWidget {
 
 class _LiveShell extends StatelessWidget {
   final bool isHost;
+  final String roomName;
+  final String subtitle;
 
-  const _LiveShell({required this.isHost});
+  const _LiveShell({
+    required this.isHost,
+    required this.roomName,
+    required this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +156,11 @@ class _LiveShell extends StatelessWidget {
                   children: [
                     SizedBox(
                       width: tightDesktop ? 292 : 312,
-                      child: _LeftColumn(compact: tightDesktop),
+                      child: _LeftColumn(
+                        compact: tightDesktop,
+                        roomName: roomName,
+                        subtitle: subtitle,
+                      ),
                     ),
                     SizedBox(width: tightDesktop ? 14 : 24),
                     Expanded(
@@ -139,10 +191,16 @@ class _LiveShell extends StatelessWidget {
                 children: [
                   _CenterColumn(compact: true, isHost: isHost),
                   const SizedBox(height: 16),
-                  const Row(
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: _LeftColumn(compact: true)),
+                      Expanded(
+                        child: _LeftColumn(
+                          compact: true,
+                          roomName: roomName,
+                          subtitle: subtitle,
+                        ),
+                      ),
                       SizedBox(width: 16),
                       Expanded(child: _RightColumn(compact: true)),
                     ],
@@ -158,7 +216,11 @@ class _LiveShell extends StatelessWidget {
               children: [
                 _CenterColumn(compact: true, narrow: true, isHost: isHost),
                 const SizedBox(height: 14),
-                const _LeftColumn(compact: true),
+                _LeftColumn(
+                  compact: true,
+                  roomName: roomName,
+                  subtitle: subtitle,
+                ),
                 const SizedBox(height: 14),
                 const _RightColumn(compact: true),
               ],
@@ -172,8 +234,14 @@ class _LiveShell extends StatelessWidget {
 
 class _LeftColumn extends StatelessWidget {
   final bool compact;
+  final String roomName;
+  final String subtitle;
 
-  const _LeftColumn({this.compact = false});
+  const _LeftColumn({
+    this.compact = false,
+    required this.roomName,
+    required this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -218,7 +286,7 @@ class _LeftColumn extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            'MAtalks joinn',
+                            roomName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
@@ -234,7 +302,7 @@ class _LeftColumn extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      'CallmeMA | 9 viewers',
+                      subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
