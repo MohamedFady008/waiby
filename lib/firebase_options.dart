@@ -29,70 +29,16 @@ const _firebaseWindowsMeasurementId = 'G-0W636N58LV';
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      _assertRequired(const {
-        'FIREBASE_WEB_API_KEY': String.fromEnvironment('FIREBASE_WEB_API_KEY'),
-        'FIREBASE_WEB_APP_ID': String.fromEnvironment('FIREBASE_WEB_APP_ID'),
-        'FIREBASE_PROJECT_ID': String.fromEnvironment('FIREBASE_PROJECT_ID'),
-        'FIREBASE_MESSAGING_SENDER_ID': String.fromEnvironment(
-          'FIREBASE_MESSAGING_SENDER_ID',
-        ),
-      });
       return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        _assertRequired(const {
-          'FIREBASE_ANDROID_API_KEY': String.fromEnvironment(
-            'FIREBASE_ANDROID_API_KEY',
-          ),
-          'FIREBASE_ANDROID_APP_ID': String.fromEnvironment(
-            'FIREBASE_ANDROID_APP_ID',
-          ),
-          'FIREBASE_PROJECT_ID': String.fromEnvironment('FIREBASE_PROJECT_ID'),
-          'FIREBASE_MESSAGING_SENDER_ID': String.fromEnvironment(
-            'FIREBASE_MESSAGING_SENDER_ID',
-          ),
-        });
         return android;
       case TargetPlatform.iOS:
-        _assertRequired(const {
-          'FIREBASE_IOS_API_KEY': String.fromEnvironment(
-            'FIREBASE_IOS_API_KEY',
-          ),
-          'FIREBASE_IOS_APP_ID': String.fromEnvironment('FIREBASE_IOS_APP_ID'),
-          'FIREBASE_PROJECT_ID': String.fromEnvironment('FIREBASE_PROJECT_ID'),
-          'FIREBASE_MESSAGING_SENDER_ID': String.fromEnvironment(
-            'FIREBASE_MESSAGING_SENDER_ID',
-          ),
-        });
         return ios;
       case TargetPlatform.macOS:
-        _assertRequired(const {
-          'FIREBASE_MACOS_API_KEY': String.fromEnvironment(
-            'FIREBASE_MACOS_API_KEY',
-          ),
-          'FIREBASE_MACOS_APP_ID': String.fromEnvironment(
-            'FIREBASE_MACOS_APP_ID',
-          ),
-          'FIREBASE_PROJECT_ID': String.fromEnvironment('FIREBASE_PROJECT_ID'),
-          'FIREBASE_MESSAGING_SENDER_ID': String.fromEnvironment(
-            'FIREBASE_MESSAGING_SENDER_ID',
-          ),
-        });
         return macos;
       case TargetPlatform.windows:
-        _assertRequired(const {
-          'FIREBASE_WINDOWS_API_KEY': String.fromEnvironment(
-            'FIREBASE_WINDOWS_API_KEY',
-          ),
-          'FIREBASE_WINDOWS_APP_ID': String.fromEnvironment(
-            'FIREBASE_WINDOWS_APP_ID',
-          ),
-          'FIREBASE_PROJECT_ID': String.fromEnvironment('FIREBASE_PROJECT_ID'),
-          'FIREBASE_MESSAGING_SENDER_ID': String.fromEnvironment(
-            'FIREBASE_MESSAGING_SENDER_ID',
-          ),
-        });
         return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
@@ -273,20 +219,4 @@ class DefaultFirebaseOptions {
     ),
   );
 
-  static void _assertRequired(Map<String, String> requiredDefines) {
-    final missingKeys = requiredDefines.entries
-        .where((entry) => entry.value.trim().isEmpty)
-        .map((entry) => entry.key)
-        .toList();
-
-    if (missingKeys.isEmpty) {
-      return;
-    }
-
-    throw UnsupportedError(
-      'Missing Firebase dart-defines: ${missingKeys.join(', ')}. '
-      'Copy .env.firebase.example.json to .env.firebase.json and run with '
-      '--dart-define-from-file=.env.firebase.json.',
-    );
-  }
 }
