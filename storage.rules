@@ -32,6 +32,7 @@ service firebase.storage {
     }
 
     match /live_room_media/{userId}/{fileName} {
+      allow read: if true;
       allow create, update: if owner(userId) && hasAllowedMimeType() && hasAllowedSize();
       allow delete: if owner(userId);
     }
