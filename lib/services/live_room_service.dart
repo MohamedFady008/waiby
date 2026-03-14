@@ -145,6 +145,8 @@ class LiveRoomService {
     return _firestore
         .collection('live_rooms')
         .where('status', isEqualTo: 'live')
+        .where('visibility', isEqualTo: 'public')
+        .where('is_private', isEqualTo: false)
         .limit(limit)
         .snapshots()
         .map((snapshot) {

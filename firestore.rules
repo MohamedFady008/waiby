@@ -9,6 +9,19 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function isPublicLiveRoomData(data) {
+      return data != null
+             && data.status == "live"
+             && data.visibility == "public"
+             && data.is_private == false;
+    }
+
+    function canReadPublicLiveRoom(roomId) {
+      return isPublicLiveRoomData(
+        get(/databases/$(database)/documents/live_rooms/$(roomId)).data
+      );
+    }
+
     match /users/{userId} {
       allow read: if true;
       allow create, update, delete: if isSelf(userId);
@@ -77,11 +90,11 @@ service cloud.firestore {
     }
 
     match /live_rooms/{roomId} {
-      allow read: if signedIn();
+      allow read: if signedIn() || isPublicLiveRoomData(resource.data);
       allow create, update, delete: if false;
 
       match /participants/{userId} {
-        allow read: if signedIn();
+        allow read: if signedIn() || canReadPublicLiveRoom(roomId);
         allow create, update: if isSelf(userId);
         allow delete: if isSelf(userId);
       }

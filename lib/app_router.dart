@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 
@@ -19,6 +20,14 @@ import 'pages/settings_page.dart';
 import 'pages/creator_form.dart';
 import 'pages/creator_guidelines_page.dart';
 import 'pages/influencer_guidelines_page.dart';
+
+String? _redirectToLoginIfLoggedOut(BuildContext context, GoRouterState state) {
+  final authController = Get.find<AuthController>();
+  if (authController.isLoggedIn) {
+    return null;
+  }
+  return '/login';
+}
 
 final router = GoRouter(
   navigatorKey: Get.key,
@@ -59,10 +68,12 @@ final router = GoRouter(
         ),
         GoRoute(
           path: '/playground/create-room',
+          redirect: _redirectToLoginIfLoggedOut,
           builder: (context, state) => const CreateRoomPage(),
         ),
         GoRoute(
           path: '/playground/live-room',
+          redirect: _redirectToLoginIfLoggedOut,
           builder: (context, state) {
             final role = state.uri.queryParameters['role'];
             final isHost = role == 'host';
