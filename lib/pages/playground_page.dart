@@ -429,6 +429,8 @@ class _LiveRoomCard extends StatelessWidget {
                           Image.network(
                             room.overviewImageUrl,
                             fit: BoxFit.cover,
+                            webHtmlElementStrategy:
+                                WebHtmlElementStrategy.fallback,
                             errorBuilder: (_, _, _) => _cardFallbackArt(),
                           )
                         else

@@ -1160,6 +1160,8 @@ class _UploadDropZone extends StatelessWidget {
                   Image.network(
                     imageUrl!,
                     fit: BoxFit.cover,
+                    webHtmlElementStrategy:
+                        WebHtmlElementStrategy.fallback,
                     errorBuilder: (context, error, stackTrace) =>
                         _emptyBackground(),
                   )

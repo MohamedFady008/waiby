@@ -1108,6 +1108,7 @@ class _LiveRoomSurface extends StatelessWidget {
               Image.network(
                 atmosphereImageUrl,
                 fit: BoxFit.cover,
+                webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
               ),
             Positioned.fill(
