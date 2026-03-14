@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Play, chat, and enjoy private sessions with verified creators worldwide.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://waiby.gg/">
+  <meta property="og:site_name" content="WAIBY">
+  <meta property="og:title" content="WAIBY | Find Your Perfect Gaming Buddy">
+  <meta property="og:description" content="Play, chat, and enjoy private sessions with verified creators worldwide.">
+  <meta property="og:image" content="https://waiby.gg/og-image.jpg">
+  <meta property="og:image:secure_url" content="https://waiby.gg/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="WAIBY | Find Your Perfect Gaming Buddy">
+  <meta name="twitter:description" content="Play, chat, and enjoy private sessions with verified creators worldwide.">
+  <meta name="twitter:image" content="https://waiby.gg/og-image.jpg">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="waiby">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>WAIBY | Find Your Perfect Gaming Buddy</title>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    // Use local Firebase web SDK modules to avoid runtime CDN import failures.
+    window.flutterfire_ignore_scripts = ['core', 'auth', 'firestore', 'storage'];
+  </script>
+  <script type="module">
+    const sdkPath = './firebasejs/12.7.0';
+    const sdkVersion = '12.7.0';
+
+    const loadFirebaseModule = async (fileName, globalName) => {
+      const localUrl = `${sdkPath}/${fileName}`;
+      try {
+        return await import(localUrl);
+      } catch (localError) {
+        const cdnUrl = `https://www.gstatic.com/firebasejs/${sdkVersion}/${fileName}`;
+        console.warn(
+          `Failed to load local Firebase module (${globalName}) from ${localUrl}. Falling back to CDN.`,
+          localError,
+        );
+        return import(cdnUrl);
+      }
+    };
+
+    window.__flutterfireModulesReady = (async () => {
+      const [core, auth, firestore, storage] = await Promise.all([
+        loadFirebaseModule('firebase-app.js', 'core'),
+        loadFirebaseModule('firebase-auth.js', 'auth'),
+        loadFirebaseModule('firebase-firestore.js', 'firestore'),
+        loadFirebaseModule('firebase-storage.js', 'storage'),
+      ]);
+      window.firebase_core = core;
+      window.firebase_auth = auth;
+      window.firebase_firestore = firestore;
+      window.firebase_storage = storage;
+    })().catch((error) => {
+      console.error('Failed to preload local Firebase web SDK modules.', error);
+      throw error;
+    });
+  </script>
+</head>
+<body>
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #050816;
+    }
+  </style>
+  <script src="flutter_bootstrap.js" defer></script>
+</body>
+</html>

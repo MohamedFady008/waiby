@@ -1,0 +1,43 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function hasAllowedMimeType() {
+      return request.resource != null &&
+          request.resource.contentType != null &&
+          (
+            request.resource.contentType.matches('image/(jpeg|png|webp)') ||
+            request.resource.contentType.matches('application/pdf')
+          );
+    }
+
+    function hasAllowedSize() {
+      return request.resource != null &&
+          request.resource.size > 0 &&
+          request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    match /creator_identity_documents/{userId}/{fileName} {
+      allow read: if owner(userId);
+      allow create, update: if owner(userId) && hasAllowedMimeType() && hasAllowedSize();
+      allow delete: if owner(userId);
+    }
+
+    match /live_room_media/{userId}/{fileName} {
+      allow create, update: if owner(userId) && hasAllowedMimeType() && hasAllowedSize();
+      allow delete: if owner(userId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,2813 @@
+const admin = require("firebase-admin");
+const { logger } = require("firebase-functions");
+const { onRequest } = require("firebase-functions/v2/https");
+const { AccessToken, RoomServiceClient } = require("livekit-server-sdk");
+const Stripe = require("stripe");
+
+admin.initializeApp();
+
+const db = admin.firestore();
+
+const TOPUP_PACKS = Object.freeze({
+  mini: Object.freeze({
+    id: "mini",
+    buds: 9.99,
+    bonusBuds: 0,
+    totalBuds: 9.99,
+    unitAmountCents: 999,
+    currency: "usd",
+    displayName: "Mini Buds Pack",
+  }),
+  small: Object.freeze({
+    id: "small",
+    buds: 30,
+    bonusBuds: 0,
+    totalBuds: 30,
+    unitAmountCents: 3000,
+    currency: "usd",
+    displayName: "Small Buds Pack",
+  }),
+  medium: Object.freeze({
+    id: "medium",
+    buds: 250,
+    bonusBuds: 5,
+    totalBuds: 255,
+    unitAmountCents: 25000,
+    currency: "usd",
+    displayName: "Medium Buds Pack",
+  }),
+  large: Object.freeze({
+    id: "large",
+    buds: 500,
+    bonusBuds: 10,
+    totalBuds: 510,
+    unitAmountCents: 50000,
+    currency: "usd",
+    displayName: "Large Buds Pack",
+  }),
+  featured: Object.freeze({
+    id: "featured",
+    buds: 100,
+    bonusBuds: 2,
+    totalBuds: 102,
+    unitAmountCents: 10000,
+    currency: "usd",
+    displayName: "Featured Buds Pack",
+  }),
+});
+
+const STORE_FRAMES = Object.freeze({
+  nautic_ring: Object.freeze({
+    id: "nautic_ring",
+    name: "Nautic Ring",
+    asset_path: "assets/medals/nautic_ring.png",
+    price_buds: 9.99,
+    giftable: true,
+  }),
+  goldbutterfly: Object.freeze({
+    id: "goldbutterfly",
+    name: "Gold Butterfly",
+    asset_path: "assets/medals/goldbutterfly.png",
+    price_buds: 9.99,
+    giftable: true,
+  }),
+  happy_sprinkles: Object.freeze({
+    id: "happy_sprinkles",
+    name: "Happy Sprinkles",
+    asset_path: "assets/medals/happy_sprinkles.png",
+    price_buds: 9.99,
+    giftable: false,
+  }),
+  lotus_aura: Object.freeze({
+    id: "lotus_aura",
+    name: "Lotus Aura",
+    asset_path: "assets/medals/lotus_aura.png",
+    price_buds: 15.99,
+    giftable: true,
+  }),
+  lolita_pearl: Object.freeze({
+    id: "lolita_pearl",
+    name: "Lolita Pearl",
+    asset_path: "assets/medals/lolita_pearl.png",
+    price_buds: 9.99,
+    giftable: true,
+  }),
+  steam_pipe: Object.freeze({
+    id: "steam_pipe",
+    name: "Steam Pipe",
+    asset_path: "assets/medals/steam_pipe.png",
+    price_buds: 9.99,
+    giftable: false,
+  }),
+  golden: Object.freeze({
+    id: "golden",
+    name: "Golden",
+    asset_path: "assets/medals/golden.png",
+    price_buds: 9.99,
+    giftable: false,
+  }),
+  aqua_ring: Object.freeze({
+    id: "aqua_ring",
+    name: "Aqua Ring",
+    asset_path: "assets/medals/aqua_ring.png",
+    price_buds: 9.99,
+    giftable: false,
+  }),
+  luminova: Object.freeze({
+    id: "luminova",
+    name: "Luminova",
+    asset_path: "assets/medals/luminova.png",
+    price_buds: 9.99,
+    giftable: false,
+  }),
+  kittybloom: Object.freeze({
+    id: "kittybloom",
+    name: "Kittybloom",
+    asset_path: "assets/medals/kittybloom.png",
+    price_buds: 15.99,
+    giftable: true,
+  }),
+  aurealux_emblem: Object.freeze({
+    id: "aurealux_emblem",
+    name: "Aurealux Emblem",
+    asset_path: "assets/medals/aurealux_emblem.png",
+    price_buds: 15.99,
+    giftable: false,
+  }),
+  moumou: Object.freeze({
+    id: "moumou",
+    name: "Moumou",
+    asset_path: "assets/medals/moumou.png",
+    price_buds: 9.99,
+    giftable: true,
+  }),
+  boblin_treasure: Object.freeze({
+    id: "boblin_treasure",
+    name: "Boblin Treasure",
+    asset_path: "assets/medals/boblin_treasure.png",
+    price_buds: 9.99,
+    giftable: true,
+  }),
+  demon1: Object.freeze({
+    id: "demon1",
+    name: "Demon",
+    asset_path: "assets/medals/demon1.png",
+    price_buds: 9.99,
+    giftable: true,
+  }),
+  sugarland: Object.freeze({
+    id: "sugarland",
+    name: "Sugarland",
+    asset_path: "assets/medals/sugarland.png",
+    price_buds: 15.99,
+    giftable: true,
+  }),
+});
+
+const CHAT_GIFTS = Object.freeze({
+  kiss: Object.freeze({
+    id: "kiss",
+    name: "Kiss",
+    asset_path: "assets/gifts/kiss.png",
+    price_buds: 2,
+  }),
+  lollipop: Object.freeze({
+    id: "lollipop",
+    name: "LoliPop",
+    asset_path: "assets/gifts/lolipop.png",
+    price_buds: 5,
+  }),
+  "kitty-paw": Object.freeze({
+    id: "kitty-paw",
+    name: "kitty paw",
+    asset_path: "assets/gifts/kitty_paw.png",
+    price_buds: 5,
+  }),
+  waiby: Object.freeze({
+    id: "waiby",
+    name: "Waiby",
+    asset_path: "assets/gifts/waiby.png",
+    price_buds: 10,
+  }),
+  ball: Object.freeze({
+    id: "ball",
+    name: "Ball",
+    asset_path: "assets/gifts/ball.png",
+    price_buds: 10,
+  }),
+  disco: Object.freeze({
+    id: "disco",
+    name: "Disco",
+    asset_path: "assets/gifts/disco.png",
+    price_buds: 20,
+  }),
+  "kitty-paw-treasure": Object.freeze({
+    id: "kitty-paw-treasure",
+    name: "Kitty paw",
+    asset_path: "assets/gifts/kitty_paw.png",
+    price_buds: 5,
+  }),
+  "forever-ring": Object.freeze({
+    id: "forever-ring",
+    name: "Forever Ring",
+    asset_path: "assets/gifts/forever_ring.png",
+    price_buds: 20,
+  }),
+  cake: Object.freeze({
+    id: "cake",
+    name: "Cake",
+    asset_path: "assets/gifts/cake.png",
+    price_buds: 25,
+  }),
+  "magic-bell": Object.freeze({
+    id: "magic-bell",
+    name: "Magic Bell",
+    asset_path: "assets/gifts/magic_bell.png",
+    price_buds: 50,
+  }),
+  rocket: Object.freeze({
+    id: "rocket",
+    name: "Rocket",
+    asset_path: "assets/gifts/rocket.png",
+    price_buds: 100,
+  }),
+  "party-teddy": Object.freeze({
+    id: "party-teddy",
+    name: "Party Teddy",
+    asset_path: "assets/gifts/party_teddy.png",
+    price_buds: 150,
+  }),
+  "big-chest": Object.freeze({
+    id: "big-chest",
+    name: "Big Chest",
+    asset_path: "assets/gifts/big_chest.png",
+    price_buds: 200,
+  }),
+  "rocket-illusion": Object.freeze({
+    id: "rocket-illusion",
+    name: "Rocket",
+    asset_path: "assets/gifts/rocket.png",
+    price_buds: 100,
+  }),
+  "princess-treatment": Object.freeze({
+    id: "princess-treatment",
+    name: "Princess treatment",
+    asset_path: "assets/gifts/princess_treatment.png",
+    price_buds: 200,
+  }),
+  wubycar: Object.freeze({
+    id: "wubycar",
+    name: "WubyCar",
+    asset_path: "assets/gifts/wuby_car.png",
+    price_buds: 350,
+  }),
+  island: Object.freeze({
+    id: "island",
+    name: "Island",
+    asset_path: "assets/gifts/island.png",
+    price_buds: 500,
+  }),
+  "dream-castle": Object.freeze({
+    id: "dream-castle",
+    name: "Dream Castle",
+    asset_path: "assets/gifts/dream_castle.png",
+    price_buds: 1000,
+  }),
+  "party-vibe": Object.freeze({
+    id: "party-vibe",
+    name: "Party vibe",
+    asset_path: "assets/medals/steam_pipe.png",
+    price_buds: 20,
+  }),
+  "heart-cloud": Object.freeze({
+    id: "heart-cloud",
+    name: "Heart cloud",
+    asset_path: "assets/medals/heartwing.png",
+    price_buds: 30,
+  }),
+  "night-sigil": Object.freeze({
+    id: "night-sigil",
+    name: "Night sigil",
+    asset_path: "assets/medals/night_sigil.png",
+    price_buds: 40,
+  }),
+  "gold-butterfly": Object.freeze({
+    id: "gold-butterfly",
+    name: "Gold butterfly",
+    asset_path: "assets/medals/goldbutterfly.png",
+    price_buds: 70,
+  }),
+  "ocean-bubble": Object.freeze({
+    id: "ocean-bubble",
+    name: "Ocean bubble",
+    asset_path: "assets/medals/oceanbubble.png",
+    price_buds: 80,
+  }),
+  vip: Object.freeze({
+    id: "vip",
+    name: "VIP",
+    asset_path: "assets/medals/vip.png",
+    price_buds: 100,
+  }),
+});
+
+const TOPUP_CHECKOUT_PATH = "/wallet/topup";
+const CORS_HEADERS = "Authorization, Content-Type";
+const WITHDRAWAL_FEE_RATE = 0.15;
+const CHAT_GIFT_RECEIVER_SHARE_RATE = 0.9;
+const LIVE_ROOM_MAX_PARTICIPANTS = 32;
+const LIVE_ROOM_EMPTY_TIMEOUT_SECONDS = 5 * 60;
+const LIVE_ROOM_DEPARTURE_TIMEOUT_SECONDS = 2 * 60;
+
+let stripeClient = null;
+let liveKitRoomServiceClient = null;
+
+function getStripeClient() {
+  if (stripeClient != null) {
+    return stripeClient;
+  }
+
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    throw new Error("STRIPE_SECRET_KEY is not configured.");
+  }
+
+  stripeClient = new Stripe(stripeSecretKey);
+  return stripeClient;
+}
+
+function requireEnv(name) {
+  const value = process.env[name];
+  if (!value || value.trim() === "") {
+    throw new Error(`${name} is not configured.`);
+  }
+  return value.trim();
+}
+
+function normalizeLiveKitUrl(rawUrl, { forServer = false } = {}) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch (_) {
+    throw new Error("LIVEKIT_URL must be a valid URL.");
+  }
+
+  if (!["http:", "https:", "ws:", "wss:"].includes(parsed.protocol)) {
+    throw new Error(
+      "LIVEKIT_URL must start with http://, https://, ws://, or wss://.",
+    );
+  }
+
+  if (forServer) {
+    if (parsed.protocol === "wss:") {
+      parsed.protocol = "https:";
+    } else if (parsed.protocol === "ws:") {
+      parsed.protocol = "http:";
+    }
+  } else if (parsed.protocol === "https:") {
+    parsed.protocol = "wss:";
+  } else if (parsed.protocol === "http:") {
+    parsed.protocol = "ws:";
+  }
+
+  if (parsed.pathname === "/") {
+    parsed.pathname = "";
+  }
+  parsed.hash = "";
+  return parsed.toString();
+}
+
+function getLiveKitUrl() {
+  return normalizeLiveKitUrl(requireEnv("LIVEKIT_URL"));
+}
+
+function getLiveKitRoomServiceClient() {
+  if (liveKitRoomServiceClient != null) {
+    return liveKitRoomServiceClient;
+  }
+
+  liveKitRoomServiceClient = new RoomServiceClient(
+    normalizeLiveKitUrl(requireEnv("LIVEKIT_URL"), { forServer: true }),
+    requireEnv("LIVEKIT_API_KEY"),
+    requireEnv("LIVEKIT_API_SECRET"),
+  );
+  return liveKitRoomServiceClient;
+}
+
+function applyCors(req, res) {
+  const configured = process.env.CORS_ALLOW_ORIGIN;
+  const allowOrigin = configured && configured.trim() !== ""
+    ? configured.trim()
+    : "*";
+  res.set("Access-Control-Allow-Origin", allowOrigin);
+  res.set("Access-Control-Allow-Headers", CORS_HEADERS);
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Vary", "Origin");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return true;
+  }
+  return false;
+}
+
+function toPositiveNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) {
+    return null;
+  }
+  return number;
+}
+
+function roundTo2(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+  return number;
+}
+
+function normalizeWalletData(uid, walletData = {}) {
+  const budsBalance = roundTo2(
+    toFiniteNumber(walletData.buds_balance ?? walletData.balance_buds, 0),
+  );
+  const incomeBalanceUsd = roundTo2(
+    toFiniteNumber(
+      walletData.income_balance_usd ?? walletData.wallet_income_usd,
+      0,
+    ),
+  );
+  const onHoldUsd = roundTo2(
+    toFiniteNumber(walletData.on_hold_usd ?? walletData.buds_on_hold, 0),
+  );
+
+  return {
+    user_id: uid,
+    buds_balance: budsBalance,
+    balance_buds: budsBalance, // legacy compatibility
+    currency: String(walletData.currency || "usd").toLowerCase(),
+    income_balance_usd: incomeBalanceUsd,
+    wallet_income_usd: incomeBalanceUsd, // legacy compatibility
+    on_hold_usd: onHoldUsd,
+    buds_on_hold: onHoldUsd, // legacy compatibility
+    gems_balance: roundTo2(toFiniteNumber(walletData.gems_balance, 0)),
+    gem_dust_balance: roundTo2(toFiniteNumber(walletData.gem_dust_balance, 0)),
+  };
+}
+
+function resolveStoreFrame(frameId) {
+  if (typeof frameId !== "string") {
+    return null;
+  }
+  const normalized = frameId.trim();
+  if (normalized === "") {
+    return null;
+  }
+  return STORE_FRAMES[normalized] || null;
+}
+
+function resolveChatGift(giftId) {
+  if (typeof giftId !== "string") {
+    return null;
+  }
+  const normalized = giftId.trim();
+  if (normalized === "") {
+    return null;
+  }
+  return CHAT_GIFTS[normalized] || null;
+}
+
+function resolveStoreFrameAssetPath(frameId) {
+  const frame = resolveStoreFrame(frameId);
+  return frame ? frame.asset_path : null;
+}
+
+function parseOwnedFrameIds(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return [...new Set(value
+    .map((item) => String(item || "").trim())
+    .filter((item) => item !== "" && resolveStoreFrame(item) != null))];
+}
+
+function parseActiveFrameId(assetsData = {}, userData = {}) {
+  const candidates = [
+    assetsData.active_frame_id,
+    userData.active_frame_id,
+    userData.profile_frame_id,
+    userData.metadata?.active_frame_id,
+    userData.metadata?.profile_frame_id,
+  ];
+
+  for (const candidate of candidates) {
+    const frame = resolveStoreFrame(String(candidate || ""));
+    if (frame) {
+      return frame.id;
+    }
+  }
+  return null;
+}
+
+function buildFrameProfileFields(activeFrameId) {
+  const activeFrameAsset = resolveStoreFrameAssetPath(activeFrameId);
+  return {
+    active_frame_id: activeFrameId,
+    profile_frame_id: activeFrameId,
+    profile_frame_asset: activeFrameAsset,
+    active_frame_asset: activeFrameAsset,
+    "metadata.active_frame_id": activeFrameId,
+    "metadata.profile_frame_id": activeFrameId,
+    "metadata.profile_frame_asset": activeFrameAsset,
+    "metadata.active_frame_asset": activeFrameAsset,
+  };
+}
+
+function buildFrameStoreState(uid, walletData = {}, assetsData = {}, userData = {}) {
+  const wallet = normalizeWalletData(uid, walletData);
+  const ownedFrameIds = parseOwnedFrameIds(assetsData.owned_frame_ids);
+  const activeFrameId = parseActiveFrameId(assetsData, userData);
+
+  if (activeFrameId && !ownedFrameIds.includes(activeFrameId)) {
+    ownedFrameIds.push(activeFrameId);
+  }
+
+  const frames = Object.values(STORE_FRAMES).map((frame) => ({
+    id: frame.id,
+    name: frame.name,
+    asset_path: frame.asset_path,
+    price_buds: frame.price_buds,
+    giftable: frame.giftable,
+    owned: ownedFrameIds.includes(frame.id),
+    active: frame.id === activeFrameId,
+  }));
+
+  return {
+    wallet,
+    frames,
+    ownedFrameIds,
+    activeFrameId,
+  };
+}
+
+function sanitizeReturnUrl(candidateUrl, fallbackUrl) {
+  if (typeof candidateUrl !== "string" || candidateUrl.trim() === "") {
+    return fallbackUrl;
+  }
+
+  try {
+    const parsed = new URL(candidateUrl);
+    const isLocalhost = parsed.hostname === "localhost" ||
+      parsed.hostname === "127.0.0.1";
+    const protocolAllowed = parsed.protocol === "https:" ||
+      (parsed.protocol === "http:" && isLocalhost);
+
+    if (!protocolAllowed) {
+      return fallbackUrl;
+    }
+
+    return parsed.toString();
+  } catch (_) {
+    return fallbackUrl;
+  }
+}
+
+function withQuery(baseUrl, query) {
+  const parsed = new URL(baseUrl);
+  for (const [key, value] of Object.entries(query)) {
+    parsed.searchParams.set(key, value);
+  }
+  return parsed.toString();
+}
+
+function defaultTopupReturnUrl(req) {
+  const configured = process.env.DEFAULT_TOPUP_RETURN_URL;
+  if (configured && configured.trim() !== "") {
+    return configured.trim();
+  }
+
+  const origin = req.headers.origin;
+  if (typeof origin === "string" && origin.trim() !== "") {
+    return `${origin.replace(/\/$/, "")}${TOPUP_CHECKOUT_PATH}`;
+  }
+
+  return `https://example.com${TOPUP_CHECKOUT_PATH}`;
+}
+
+function toTrimmedString(value, fallback = "") {
+  if (typeof value !== "string") {
+    if (value == null) {
+      return fallback;
+    }
+    return String(value).trim();
+  }
+  return value.trim();
+}
+
+function toNullableTrimmedString(value) {
+  const normalized = toTrimmedString(value);
+  return normalized === "" ? null : normalized;
+}
+
+function firstNonEmpty(candidates, fallback = "") {
+  for (const candidate of candidates) {
+    const normalized = toTrimmedString(candidate);
+    if (normalized !== "") {
+      return normalized;
+    }
+  }
+  return fallback;
+}
+
+function slugifyRoomId(value) {
+  const normalized = toTrimmedString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+
+  if (normalized !== "") {
+    return normalized;
+  }
+  return `room-${Date.now()}`;
+}
+
+function normalizeLiveRoomTags(value) {
+  const rawTags = Array.isArray(value)
+    ? value
+    : toTrimmedString(value)
+      .split(/[,\s]+/);
+
+  return [...new Set(rawTags
+    .map((tag) => toTrimmedString(tag))
+    .filter((tag) => tag !== "")
+    .slice(0, 12))];
+}
+
+function toBoolean(value, fallback = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  return fallback;
+}
+
+function normalizeLiveRoomData(roomId, roomData = {}) {
+  const roomName = firstNonEmpty(
+    [roomData.room_name, roomData.roomName],
+    "Untitled room",
+  );
+  return {
+    roomId,
+    roomName,
+    tagline: toTrimmedString(roomData.tagline),
+    language: toTrimmedString(roomData.language),
+    tags: normalizeLiveRoomTags(roomData.tags),
+    atmosphereImageUrl: toTrimmedString(
+      roomData.atmosphere_image_url || roomData.atmosphereImageUrl,
+    ),
+    overviewImageUrl: toTrimmedString(
+      roomData.overview_image_url || roomData.overviewImageUrl,
+    ),
+    hostId: toTrimmedString(roomData.host_id),
+    hostName: toTrimmedString(roomData.host_name),
+    hostAvatarUrl: toTrimmedString(roomData.host_avatar_url),
+    status: firstNonEmpty([roomData.status], "live"),
+    visibility: firstNonEmpty([roomData.visibility], "public"),
+    isPrivate: roomData.is_private === true,
+    pinnedMessage: toTrimmedString(roomData.pinned_message),
+    giftGoalEnabled: roomData.gift_goal_enabled === true,
+    giftGoalBuds: toPositiveNumber(roomData.gift_goal_buds),
+  };
+}
+
+function publicUserFields(uid, userData = {}, fallbackName = "User") {
+  return {
+    uid,
+    displayName: firstNonEmpty(
+      [
+        userData.full_name,
+        userData.display_name,
+        userData.name,
+        userData.metadata?.full_name,
+        userData.metadata?.display_name,
+        userData.metadata?.name,
+      ],
+      fallbackName,
+    ),
+    avatarUrl: firstNonEmpty(
+      [
+        userData.avatar_url,
+        userData.photo_url,
+        userData.metadata?.avatar_url,
+        userData.metadata?.photo_url,
+        userData.metadata?.picture,
+      ],
+      "",
+    ),
+  };
+}
+
+async function createLiveKitToken({
+  identity,
+  displayName,
+  metadata,
+  roomId,
+  isHost,
+}) {
+  const accessToken = new AccessToken(
+    requireEnv("LIVEKIT_API_KEY"),
+    requireEnv("LIVEKIT_API_SECRET"),
+    {
+      identity,
+      name: displayName,
+      metadata: JSON.stringify(metadata),
+      ttl: "12h",
+    },
+  );
+
+  accessToken.addGrant({
+    roomJoin: true,
+    room: roomId,
+    roomAdmin: isHost,
+    canPublish: true,
+    canPublishData: true,
+    canSubscribe: true,
+  });
+
+  return accessToken.toJwt();
+}
+
+async function extractUidFromAuthorization(req) {
+  const authHeader = req.headers.authorization;
+  if (typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const idToken = authHeader.substring("Bearer ".length).trim();
+  if (idToken.length === 0) {
+    return null;
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    return decoded.uid || null;
+  } catch (error) {
+    logger.warn("Invalid Firebase ID token.", error);
+    return null;
+  }
+}
+
+async function fulfillTopupOrderFromSession(session, eventId) {
+  const metadata = session.metadata || {};
+  if (metadata.flow !== "topup") {
+    return;
+  }
+
+  const orderId = metadata.order_id;
+  let userId = metadata.user_id || session.client_reference_id || null;
+  let totalBuds = toPositiveNumber(metadata.total_buds);
+  let buds = toPositiveNumber(metadata.buds);
+  let bonusBuds = Number(metadata.bonus_buds || 0);
+  let packId = metadata.pack_id || null;
+  let alreadyFulfilled = false;
+  const amountCents = Number(session.amount_total || 0);
+  const currency = String(session.currency || "usd").toLowerCase();
+
+  if (!orderId || !userId) {
+    logger.error("Missing top-up metadata in Stripe session.", {
+      sessionId: session.id,
+      orderId,
+      userId,
+    });
+    return;
+  }
+
+  const orderRef = db.collection("topup_orders").doc(orderId);
+  await db.runTransaction(async (transaction) => {
+    const orderSnapshot = await transaction.get(orderRef);
+    if (orderSnapshot.exists) {
+      const orderData = orderSnapshot.data() || {};
+      alreadyFulfilled = orderData.status === "fulfilled";
+
+      userId = String(orderData.user_id || userId);
+      packId = String(orderData.pack_id || packId || "");
+      totalBuds = toPositiveNumber(orderData.total_buds) || totalBuds;
+      buds = toPositiveNumber(orderData.buds) || buds;
+      bonusBuds = Number(orderData.bonus_buds || bonusBuds || 0);
+    }
+
+    if (!userId || !totalBuds) {
+      throw new Error("Order does not have a valid user_id or total_buds.");
+    }
+
+    const currentWalletRef = db.collection("wallets").doc(userId);
+    const userProfileRef = db.collection("users").doc(userId);
+    const walletSnapshot = await transaction.get(currentWalletRef);
+    const userProfileSnapshot = await transaction.get(userProfileRef);
+    const walletData = walletSnapshot.data() || {};
+    const currentBudsBalance = Number(
+      walletData.buds_balance ?? walletData.balance_buds ?? 0,
+    );
+    const nextBudsBalance = alreadyFulfilled
+      ? roundTo2(currentBudsBalance)
+      : roundTo2(currentBudsBalance + totalBuds);
+
+    if (!alreadyFulfilled) {
+      transaction.set(
+        currentWalletRef,
+        {
+          user_id: userId,
+          buds_balance: nextBudsBalance,
+          balance_buds: nextBudsBalance, // legacy compatibility
+          currency: "usd",
+          income_balance_usd: Number(walletData.income_balance_usd || 0),
+          on_hold_usd: Number(walletData.on_hold_usd || 0),
+          gems_balance: Number(walletData.gems_balance || 0),
+          gem_dust_balance: Number(walletData.gem_dust_balance || 0),
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+    if (userProfileSnapshot.exists) {
+      transaction.update(userProfileRef, {
+        buds_balance: nextBudsBalance,
+        balance_buds: nextBudsBalance, // legacy compatibility
+        "metadata.wallet_balance_buds": nextBudsBalance,
+        "metadata.buds_balance": nextBudsBalance,
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      transaction.set(
+        userProfileRef,
+        {
+          buds_balance: nextBudsBalance,
+          balance_buds: nextBudsBalance, // legacy compatibility
+          metadata: {
+            wallet_balance_buds: nextBudsBalance,
+            buds_balance: nextBudsBalance,
+          },
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+
+    if (!alreadyFulfilled) {
+      transaction.set(
+        orderRef,
+        {
+          flow: "topup",
+          user_id: userId,
+          pack_id: packId,
+          buds: buds,
+          bonus_buds: bonusBuds,
+          total_buds: totalBuds,
+          amount_cents: amountCents,
+          amount_usd: roundTo2(amountCents / 100),
+          exchange_rate_usd_to_bud: 1,
+          currency: currency,
+          status: "fulfilled",
+          stripe_checkout_session_id: session.id,
+          stripe_payment_intent_id: session.payment_intent || null,
+          stripe_payment_status: session.payment_status || "paid",
+          stripe_event_id: eventId,
+          fulfilled_at: admin.firestore.FieldValue.serverTimestamp(),
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      const walletTransactionRef = db.collection("wallet_transactions").doc();
+      const walletTransactionData = {
+        user_id: userId,
+        flow: "topup",
+        type: "credit",
+        status: "completed",
+        source: "stripe_checkout",
+        amount_buds: totalBuds,
+        amount_usd: roundTo2(amountCents / 100),
+        buds_balance_after: nextBudsBalance,
+        exchange_rate_usd_to_bud: 1,
+        order_id: orderId,
+        pack_id: packId,
+        stripe_checkout_session_id: session.id,
+        stripe_event_id: eventId,
+        description: `Top-up ${totalBuds} Buds`,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      transaction.set(walletTransactionRef, walletTransactionData);
+      const userWalletTransactionRef = currentWalletRef
+        .collection("transactions")
+        .doc(walletTransactionRef.id);
+      transaction.set(userWalletTransactionRef, walletTransactionData);
+    }
+  });
+
+  logger.info(
+    alreadyFulfilled
+      ? "Top-up order already fulfilled; synced user profile balance."
+      : "Top-up order fulfilled.",
+    {
+    sessionId: session.id,
+    orderId,
+    userId,
+    totalBuds,
+    },
+  );
+}
+
+async function markOrderStatusFromSession(session, nextStatus, eventId) {
+  const metadata = session.metadata || {};
+  const orderId = metadata.order_id;
+  if (!orderId) {
+    return;
+  }
+
+  const orderRef = db.collection("topup_orders").doc(orderId);
+  await db.runTransaction(async (transaction) => {
+    const orderSnapshot = await transaction.get(orderRef);
+    const orderData = orderSnapshot.data();
+    if (orderData?.status === "fulfilled") {
+      return;
+    }
+
+    transaction.set(
+      orderRef,
+      {
+        status: nextStatus,
+        stripe_checkout_session_id: session.id,
+        stripe_payment_status: session.payment_status || nextStatus,
+        stripe_event_id: eventId,
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+}
+
+function deriveOrderStatusFromStripeSession(session) {
+  if (session.payment_status === "paid") {
+    return "fulfilled";
+  }
+  if (session.status === "expired") {
+    return "expired";
+  }
+  if (session.status === "complete") {
+    return "processing";
+  }
+  return "pending";
+}
+
+exports.createTopupCheckoutSession = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const packId = String(body?.packId || "").trim();
+    if (!TOPUP_PACKS[packId]) {
+      res.status(400).json({ error: "Invalid top-up pack" });
+      return;
+    }
+
+    const pack = TOPUP_PACKS[packId];
+    const fallbackUrl = defaultTopupReturnUrl(req);
+    const requestedSuccessUrl = sanitizeReturnUrl(body?.successUrl, fallbackUrl);
+    const requestedCancelUrl = sanitizeReturnUrl(body?.cancelUrl, fallbackUrl);
+    const successUrl = withQuery(requestedSuccessUrl, {
+      status: "success",
+      session_id: "{CHECKOUT_SESSION_ID}",
+    });
+    const cancelUrl = withQuery(requestedCancelUrl, { status: "cancelled" });
+
+    const orderRef = db.collection("topup_orders").doc();
+    const orderBase = {
+      flow: "topup",
+      user_id: uid,
+      pack_id: pack.id,
+      buds: pack.buds,
+      bonus_buds: pack.bonusBuds,
+      total_buds: pack.totalBuds,
+      amount_cents: pack.unitAmountCents,
+      amount_usd: roundTo2(pack.unitAmountCents / 100),
+      exchange_rate_usd_to_bud: 1,
+      currency: pack.currency,
+      status: "pending",
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      updated_at: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await orderRef.set(orderBase, { merge: true });
+
+    try {
+      const stripe = getStripeClient();
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        client_reference_id: uid,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: pack.currency,
+              unit_amount: pack.unitAmountCents,
+              product_data: {
+                name: `${pack.totalBuds} Buds`,
+                description: `${pack.buds} Buds + ${pack.bonusBuds} Bonus`,
+              },
+            },
+          },
+        ],
+        metadata: {
+          flow: "topup",
+          order_id: orderRef.id,
+          user_id: uid,
+          pack_id: pack.id,
+          buds: String(pack.buds),
+          bonus_buds: String(pack.bonusBuds),
+          total_buds: String(pack.totalBuds),
+        },
+      });
+
+      await orderRef.set(
+        {
+          stripe_checkout_session_id: session.id,
+          stripe_payment_status: session.payment_status || "unpaid",
+          checkout_url: session.url || null,
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      if (!session.url) {
+        res.status(500).json({ error: "Stripe checkout URL was not returned" });
+        return;
+      }
+
+      res.status(200).json({
+        orderId: orderRef.id,
+        checkoutSessionId: session.id,
+        checkoutUrl: session.url,
+      });
+    } catch (error) {
+      logger.error("Failed to create Stripe checkout session.", error);
+      await orderRef.set(
+        {
+          status: "failed",
+          failure_reason: String(error),
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      res.status(500).json({ error: "Unable to create checkout session" });
+    }
+  },
+);
+
+exports.confirmTopupCheckoutSession = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const checkoutSessionId = String(
+      body?.checkoutSessionId || body?.sessionId || "",
+    ).trim();
+    if (!checkoutSessionId) {
+      res.status(400).json({ error: "checkoutSessionId is required" });
+      return;
+    }
+
+    try {
+      const stripe = getStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
+
+      if (!session || session.object !== "checkout.session") {
+        res.status(404).json({ error: "Checkout session not found" });
+        return;
+      }
+
+      const metadata = session.metadata || {};
+      if (metadata.flow !== "topup") {
+        res.status(400).json({ error: "Checkout session is not a top-up flow" });
+        return;
+      }
+
+      const sessionUserId = String(
+        metadata.user_id || session.client_reference_id || "",
+      ).trim();
+      if (!sessionUserId || sessionUserId !== uid) {
+        res.status(403).json({ error: "Checkout session does not belong to user" });
+        return;
+      }
+
+      const eventId = `manual-confirm-${session.id}-${Date.now()}`;
+      if (session.payment_status === "paid") {
+        await fulfillTopupOrderFromSession(session, eventId);
+
+        const walletSnapshot = await db.collection("wallets").doc(uid).get();
+        const wallet = normalizeWalletData(uid, walletSnapshot.data() || {});
+        const balanceBuds = wallet.buds_balance;
+
+        logger.info("Top-up checkout session confirmed as paid.", {
+          uid,
+          checkoutSessionId: session.id,
+          balanceBuds,
+        });
+
+        res.status(200).json({
+          status: "paid",
+          fulfilled: true,
+          balanceBuds,
+          totalBuds: toPositiveNumber(metadata.total_buds) || 0,
+          wallet,
+        });
+        return;
+      }
+
+      const nextStatus = deriveOrderStatusFromStripeSession(session);
+      await markOrderStatusFromSession(session, nextStatus, eventId);
+      logger.info("Top-up checkout session confirmation pending.", {
+        uid,
+        checkoutSessionId: session.id,
+        status: nextStatus,
+      });
+      res.status(200).json({
+        status: nextStatus,
+        fulfilled: false,
+      });
+    } catch (error) {
+      logger.error("Failed to confirm Stripe checkout session.", {
+        checkoutSessionId,
+        uid,
+        message: error?.message || String(error),
+      });
+      res.status(500).json({ error: "Could not confirm checkout session" });
+    }
+  },
+);
+
+exports.syncMyWalletBalance = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const walletRef = db.collection("wallets").doc(uid);
+    const userProfileRef = db.collection("users").doc(uid);
+
+    try {
+      const wallet = await db.runTransaction(async (transaction) => {
+        const walletSnapshot = await transaction.get(walletRef);
+        const userSnapshot = await transaction.get(userProfileRef);
+        const normalizedWallet = normalizeWalletData(
+          uid,
+          walletSnapshot.data() || {},
+        );
+        const balanceBuds = normalizedWallet.buds_balance;
+
+        transaction.set(
+          walletRef,
+          {
+            ...normalizedWallet,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        if (userSnapshot.exists) {
+          transaction.update(userProfileRef, {
+            buds_balance: balanceBuds,
+            balance_buds: balanceBuds,
+            "metadata.wallet_balance_buds": balanceBuds,
+            "metadata.buds_balance": balanceBuds,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            userProfileRef,
+            {
+              buds_balance: balanceBuds,
+              balance_buds: balanceBuds,
+              metadata: {
+                wallet_balance_buds: balanceBuds,
+                buds_balance: balanceBuds,
+              },
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        return normalizedWallet;
+      });
+
+      logger.info("Wallet balance sync completed.", {
+        uid,
+        balanceBuds: wallet.buds_balance,
+      });
+
+      res.status(200).json({
+        balanceBuds: wallet.buds_balance,
+        wallet,
+      });
+    } catch (error) {
+      logger.error("Failed to sync wallet balance to user profile.", error);
+      res.status(500).json({ error: "Could not sync wallet balance" });
+    }
+  },
+);
+
+exports.requestWalletWithdrawal = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const amountUsd = roundTo2(toFiniteNumber(body?.amountUsd, 0));
+    if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+      res.status(400).json({ error: "amountUsd must be greater than 0." });
+      return;
+    }
+
+    const method = String(body?.method || "bank_transfer")
+        .trim()
+        .toLowerCase();
+    if (method.length === 0) {
+      res.status(400).json({ error: "method is required." });
+      return;
+    }
+
+    const walletRef = db.collection("wallets").doc(uid);
+    const userProfileRef = db.collection("users").doc(uid);
+    const withdrawalRef = db.collection("withdrawal_requests").doc();
+    const walletTransactionRef = db.collection("wallet_transactions").doc();
+
+    try {
+      const result = await db.runTransaction(async (transaction) => {
+        const walletSnapshot = await transaction.get(walletRef);
+        const userSnapshot = await transaction.get(userProfileRef);
+        const normalizedWallet = normalizeWalletData(uid, walletSnapshot.data() || {});
+        const availableIncomeUsd = roundTo2(
+          toFiniteNumber(normalizedWallet.income_balance_usd, 0),
+        );
+
+        if (amountUsd > availableIncomeUsd) {
+          throw new Error("INSUFFICIENT_WITHDRAWABLE_BALANCE");
+        }
+
+        const feeUsd = roundTo2(amountUsd * WITHDRAWAL_FEE_RATE);
+        const payoutUsd = roundTo2(amountUsd - feeUsd);
+        if (payoutUsd <= 0) {
+          throw new Error("WITHDRAWAL_AMOUNT_TOO_SMALL");
+        }
+
+        const nextIncomeUsd = roundTo2(availableIncomeUsd - amountUsd);
+        const currentOnHoldUsd = roundTo2(
+          toFiniteNumber(normalizedWallet.on_hold_usd, 0),
+        );
+        const nextOnHoldUsd = roundTo2(currentOnHoldUsd + amountUsd);
+
+        const updatedWallet = {
+          ...normalizedWallet,
+          income_balance_usd: nextIncomeUsd,
+          wallet_income_usd: nextIncomeUsd, // legacy compatibility
+          on_hold_usd: nextOnHoldUsd,
+          buds_on_hold: nextOnHoldUsd, // legacy compatibility
+        };
+
+        transaction.set(
+          walletRef,
+          {
+            ...updatedWallet,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        const userWalletMetadata = {
+          wallet_balance_buds: updatedWallet.buds_balance,
+          buds_balance: updatedWallet.buds_balance,
+          wallet_income_usd: updatedWallet.income_balance_usd,
+          wallet_on_hold_usd: updatedWallet.on_hold_usd,
+        };
+
+        if (userSnapshot.exists) {
+          transaction.update(userProfileRef, {
+            buds_balance: updatedWallet.buds_balance,
+            balance_buds: updatedWallet.buds_balance,
+            "metadata.wallet_balance_buds": updatedWallet.buds_balance,
+            "metadata.buds_balance": updatedWallet.buds_balance,
+            "metadata.wallet_income_usd": updatedWallet.income_balance_usd,
+            "metadata.wallet_on_hold_usd": updatedWallet.on_hold_usd,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            userProfileRef,
+            {
+              buds_balance: updatedWallet.buds_balance,
+              balance_buds: updatedWallet.buds_balance,
+              metadata: userWalletMetadata,
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        const withdrawalData = {
+          user_id: uid,
+          status: "pending",
+          method: method,
+          currency: "usd",
+          amount_usd: amountUsd,
+          fee_rate: WITHDRAWAL_FEE_RATE,
+          fee_usd: feeUsd,
+          payout_usd: payoutUsd,
+          source_balance: "income_balance_usd",
+          on_hold_usd_before: currentOnHoldUsd,
+          on_hold_usd_after: nextOnHoldUsd,
+          income_balance_usd_before: availableIncomeUsd,
+          income_balance_usd_after: nextIncomeUsd,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        transaction.set(withdrawalRef, withdrawalData);
+
+        const walletTransactionData = {
+          user_id: uid,
+          flow: "withdrawal",
+          type: "debit",
+          status: "pending",
+          source: "withdrawal_request",
+          amount_usd: amountUsd,
+          fee_usd: feeUsd,
+          payout_usd: payoutUsd,
+          order_id: withdrawalRef.id,
+          description: `Withdrawal request ${amountUsd.toFixed(2)} USD`,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        transaction.set(walletTransactionRef, walletTransactionData);
+        transaction.set(
+          walletRef.collection("transactions").doc(walletTransactionRef.id),
+          walletTransactionData,
+        );
+
+        return {
+          withdrawalRequestId: withdrawalRef.id,
+          feeUsd,
+          payoutUsd,
+          wallet: updatedWallet,
+        };
+      });
+
+      logger.info("Wallet withdrawal request created.", {
+        uid,
+        withdrawalRequestId: result.withdrawalRequestId,
+        amountUsd,
+      });
+
+      res.status(200).json(result);
+    } catch (error) {
+      if (error?.message === "INSUFFICIENT_WITHDRAWABLE_BALANCE") {
+        res.status(400).json({
+          error: "Insufficient withdrawable balance.",
+        });
+        return;
+      }
+
+      if (error?.message === "WITHDRAWAL_AMOUNT_TOO_SMALL") {
+        res.status(400).json({
+          error: "Withdrawal amount is too small after fee deduction.",
+        });
+        return;
+      }
+
+      logger.error("Failed to create wallet withdrawal request.", {
+        uid,
+        amountUsd,
+        message: error?.message || String(error),
+      });
+      res.status(500).json({ error: "Could not create withdrawal request" });
+    }
+  },
+);
+
+exports.sendChatGift = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const conversationId = String(body?.conversationId || "").trim();
+    if (!conversationId) {
+      res.status(400).json({ error: "conversationId is required." });
+      return;
+    }
+
+    const giftId = String(body?.giftId || "").trim();
+    const gift = resolveChatGift(giftId);
+    if (!gift) {
+      res.status(400).json({ error: "Invalid giftId." });
+      return;
+    }
+
+    const multiplier = Math.floor(toFiniteNumber(body?.multiplier, 0));
+    if (!Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 100) {
+      res.status(400).json({ error: "multiplier must be between 1 and 100." });
+      return;
+    }
+
+    const conversationRef = db.collection("conversations").doc(conversationId);
+    const senderWalletRef = db.collection("wallets").doc(uid);
+    const senderUserRef = db.collection("users").doc(uid);
+    const messageRef = conversationRef.collection("messages").doc();
+
+    try {
+      const result = await db.runTransaction(async (transaction) => {
+        const [conversationSnapshot, senderWalletSnapshot, senderUserSnapshot] = await Promise.all([
+          transaction.get(conversationRef),
+          transaction.get(senderWalletRef),
+          transaction.get(senderUserRef),
+        ]);
+
+        const conversationData = conversationSnapshot.data() || {};
+        if (!conversationSnapshot.exists) {
+          throw new Error("CONVERSATION_NOT_FOUND");
+        }
+
+        const participants = Array.isArray(conversationData.participants)
+          ? conversationData.participants
+            .map((entry) => String(entry || "").trim())
+            .filter((entry) => entry !== "")
+          : [];
+        if (!participants.includes(uid)) {
+          throw new Error("NOT_CONVERSATION_PARTICIPANT");
+        }
+
+        const receiverId = participants.find((entry) => entry !== uid) || "";
+        if (!receiverId) {
+          throw new Error("DIRECT_CHAT_REQUIRED");
+        }
+
+        const receiverWalletRef = db.collection("wallets").doc(receiverId);
+        const receiverUserRef = db.collection("users").doc(receiverId);
+        const [receiverWalletSnapshot, receiverUserSnapshot] = await Promise.all([
+          transaction.get(receiverWalletRef),
+          transaction.get(receiverUserRef),
+        ]);
+
+        const senderWallet = normalizeWalletData(uid, senderWalletSnapshot.data() || {});
+        const receiverWallet = normalizeWalletData(
+          receiverId,
+          receiverWalletSnapshot.data() || {},
+        );
+
+        const chargedBuds = roundTo2(toFiniteNumber(gift.price_buds, 0) * multiplier);
+        if (!Number.isFinite(chargedBuds) || chargedBuds <= 0) {
+          throw new Error("GIFT_PRICE_INVALID");
+        }
+        if (senderWallet.buds_balance < chargedBuds) {
+          throw new Error("INSUFFICIENT_BUDS_BALANCE");
+        }
+
+        const receiverIncomeUsd = roundTo2(chargedBuds * CHAT_GIFT_RECEIVER_SHARE_RATE);
+        const nextSenderBudsBalance = roundTo2(senderWallet.buds_balance - chargedBuds);
+        const nextReceiverIncomeUsd = roundTo2(
+          receiverWallet.income_balance_usd + receiverIncomeUsd,
+        );
+
+        const nextSenderWallet = {
+          ...senderWallet,
+          buds_balance: nextSenderBudsBalance,
+          balance_buds: nextSenderBudsBalance,
+        };
+        const nextReceiverWallet = {
+          ...receiverWallet,
+          income_balance_usd: nextReceiverIncomeUsd,
+          wallet_income_usd: nextReceiverIncomeUsd,
+        };
+
+        transaction.set(
+          senderWalletRef,
+          {
+            ...nextSenderWallet,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+        transaction.set(
+          receiverWalletRef,
+          {
+            ...nextReceiverWallet,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        if (senderUserSnapshot.exists) {
+          transaction.update(senderUserRef, {
+            buds_balance: nextSenderWallet.buds_balance,
+            balance_buds: nextSenderWallet.buds_balance,
+            "metadata.wallet_balance_buds": nextSenderWallet.buds_balance,
+            "metadata.buds_balance": nextSenderWallet.buds_balance,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            senderUserRef,
+            {
+              buds_balance: nextSenderWallet.buds_balance,
+              balance_buds: nextSenderWallet.buds_balance,
+              metadata: {
+                wallet_balance_buds: nextSenderWallet.buds_balance,
+                buds_balance: nextSenderWallet.buds_balance,
+              },
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        if (receiverUserSnapshot.exists) {
+          transaction.update(receiverUserRef, {
+            "metadata.wallet_income_usd": nextReceiverWallet.income_balance_usd,
+            "metadata.wallet_on_hold_usd": nextReceiverWallet.on_hold_usd,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            receiverUserRef,
+            {
+              metadata: {
+                wallet_income_usd: nextReceiverWallet.income_balance_usd,
+                wallet_on_hold_usd: nextReceiverWallet.on_hold_usd,
+              },
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        const unreadCountsRaw = conversationData.unread_counts || {};
+        const unreadCounts = {};
+        for (const [participantId, value] of Object.entries(unreadCountsRaw)) {
+          unreadCounts[participantId] = Math.max(0, Math.floor(toFiniteNumber(value, 0)));
+        }
+        for (const participantId of participants) {
+          if (participantId === uid) {
+            unreadCounts[participantId] = 0;
+            continue;
+          }
+          unreadCounts[participantId] = (unreadCounts[participantId] || 0) + 1;
+        }
+
+        const giftText = `Sent ${gift.name} gift x${multiplier}`;
+        transaction.set(messageRef, {
+          conversation_id: conversationId,
+          sender_id: uid,
+          text: giftText,
+          message_type: "gift",
+          gift_id: gift.id,
+          gift_name: gift.name,
+          gift_asset_path: gift.asset_path,
+          gift_price_buds: gift.price_buds,
+          gift_multiplier: multiplier,
+          gift_total_buds: chargedBuds,
+          receiver_income_usd: receiverIncomeUsd,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        transaction.update(conversationRef, {
+          last_message_text: giftText,
+          last_message_sender_id: uid,
+          last_message_at: admin.firestore.FieldValue.serverTimestamp(),
+          unread_counts: unreadCounts,
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const senderTxRef = db.collection("wallet_transactions").doc();
+        const senderTxData = {
+          user_id: uid,
+          flow: "chat_gift_send",
+          type: "debit",
+          status: "completed",
+          source: "chat_gift",
+          amount_buds: chargedBuds,
+          buds_balance_after: nextSenderWallet.buds_balance,
+          counterparty: receiverId,
+          order_id: messageRef.id,
+          conversation_id: conversationId,
+          gift_id: gift.id,
+          gift_name: gift.name,
+          gift_multiplier: multiplier,
+          description: `Sent ${gift.name} x${multiplier}`,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        transaction.set(senderTxRef, senderTxData);
+        transaction.set(
+          senderWalletRef.collection("transactions").doc(senderTxRef.id),
+          senderTxData,
+        );
+
+        const receiverTxRef = db.collection("wallet_transactions").doc();
+        const receiverTxData = {
+          user_id: receiverId,
+          flow: "gift",
+          type: "credit",
+          status: "completed",
+          source: "chat_gift",
+          amount_usd: receiverIncomeUsd,
+          income_balance_usd_after: nextReceiverWallet.income_balance_usd,
+          counterparty: uid,
+          order_id: messageRef.id,
+          conversation_id: conversationId,
+          gift_id: gift.id,
+          gift_name: gift.name,
+          gift_multiplier: multiplier,
+          description: `Received ${gift.name} x${multiplier}`,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        transaction.set(receiverTxRef, receiverTxData);
+        transaction.set(
+          receiverWalletRef.collection("transactions").doc(receiverTxRef.id),
+          receiverTxData,
+        );
+
+        return {
+          senderWallet: nextSenderWallet,
+          receiverWallet: nextReceiverWallet,
+          chargedBuds,
+          receiverIncomeUsd,
+        };
+      });
+
+      logger.info("Chat gift sent successfully.", {
+        uid,
+        conversationId,
+        giftId: gift.id,
+        multiplier,
+      });
+      res.status(200).json(result);
+    } catch (error) {
+      if (error?.message === "CONVERSATION_NOT_FOUND") {
+        res.status(404).json({ error: "Conversation does not exist." });
+        return;
+      }
+      if (error?.message === "NOT_CONVERSATION_PARTICIPANT") {
+        res.status(403).json({ error: "You are not part of this conversation." });
+        return;
+      }
+      if (error?.message === "DIRECT_CHAT_REQUIRED") {
+        res.status(400).json({ error: "Gifts are available in direct chats only." });
+        return;
+      }
+      if (error?.message === "INSUFFICIENT_BUDS_BALANCE") {
+        res.status(400).json({ error: "Insufficient Buds balance." });
+        return;
+      }
+      if (error?.message === "GIFT_PRICE_INVALID") {
+        res.status(400).json({ error: "Selected gift price is invalid." });
+        return;
+      }
+
+      logger.error("Failed to send chat gift.", {
+        uid,
+        conversationId,
+        giftId,
+        multiplier,
+        message: error?.message || String(error),
+      });
+      res.status(500).json({ error: "Could not send gift right now." });
+    }
+  },
+);
+
+exports.getMyFrameStoreState = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const [walletSnapshot, userAssetsSnapshot, userSnapshot] = await Promise.all([
+        db.collection("wallets").doc(uid).get(),
+        db.collection("user_assets").doc(uid).get(),
+        db.collection("users").doc(uid).get(),
+      ]);
+
+      const state = buildFrameStoreState(
+        uid,
+        walletSnapshot.data() || {},
+        userAssetsSnapshot.data() || {},
+        userSnapshot.data() || {},
+      );
+
+      res.status(200).json(state);
+    } catch (error) {
+      logger.error("Failed to load frame store state.", {
+        uid,
+        message: error?.message || String(error),
+      });
+      res.status(500).json({ error: "Could not load frame store state" });
+    }
+  },
+);
+
+exports.purchaseStoreFrame = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const frameId = String(body?.frameId || "").trim();
+    const frame = resolveStoreFrame(frameId);
+    if (!frame) {
+      res.status(400).json({ error: "Invalid frameId." });
+      return;
+    }
+
+    const walletRef = db.collection("wallets").doc(uid);
+    const userAssetsRef = db.collection("user_assets").doc(uid);
+    const userProfileRef = db.collection("users").doc(uid);
+    const purchaseRef = db.collection("store_frame_purchases").doc();
+    const walletTransactionRef = db.collection("wallet_transactions").doc();
+
+    try {
+      const state = await db.runTransaction(async (transaction) => {
+        const [walletSnapshot, assetsSnapshot, userSnapshot] = await Promise.all([
+          transaction.get(walletRef),
+          transaction.get(userAssetsRef),
+          transaction.get(userProfileRef),
+        ]);
+
+        const wallet = normalizeWalletData(uid, walletSnapshot.data() || {});
+        const assetsData = assetsSnapshot.data() || {};
+        const userData = userSnapshot.data() || {};
+        const ownedFrameIds = parseOwnedFrameIds(assetsData.owned_frame_ids);
+
+        const alreadyOwned = ownedFrameIds.includes(frame.id);
+        const priceBuds = roundTo2(toFiniteNumber(frame.price_buds, 0));
+        if (priceBuds <= 0) {
+          throw new Error("FRAME_PRICE_INVALID");
+        }
+
+        let nextWallet = { ...wallet };
+        if (!alreadyOwned) {
+          if (wallet.buds_balance < priceBuds) {
+            throw new Error("INSUFFICIENT_BUDS_BALANCE");
+          }
+          const nextBudsBalance = roundTo2(wallet.buds_balance - priceBuds);
+          nextWallet = {
+            ...wallet,
+            buds_balance: nextBudsBalance,
+            balance_buds: nextBudsBalance,
+          };
+        }
+
+        const nextOwnedFrameIds = alreadyOwned
+          ? ownedFrameIds
+          : [...ownedFrameIds, frame.id];
+        const nextActiveFrameId = frame.id;
+        const frameProfileFields = buildFrameProfileFields(nextActiveFrameId);
+
+        transaction.set(
+          walletRef,
+          {
+            ...nextWallet,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        transaction.set(
+          userAssetsRef,
+          {
+            user_id: uid,
+            owned_frame_ids: nextOwnedFrameIds,
+            active_frame_id: nextActiveFrameId,
+            created_at: assetsSnapshot.exists
+              ? assetsData.created_at || admin.firestore.FieldValue.serverTimestamp()
+              : admin.firestore.FieldValue.serverTimestamp(),
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        const userProfileWalletFields = {
+          buds_balance: nextWallet.buds_balance,
+          balance_buds: nextWallet.buds_balance,
+          "metadata.wallet_balance_buds": nextWallet.buds_balance,
+          "metadata.buds_balance": nextWallet.buds_balance,
+        };
+
+        if (userSnapshot.exists) {
+          transaction.update(userProfileRef, {
+            ...userProfileWalletFields,
+            ...frameProfileFields,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            userProfileRef,
+            {
+              ...userProfileWalletFields,
+              ...frameProfileFields,
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        if (!alreadyOwned) {
+          const purchaseData = {
+            user_id: uid,
+            frame_id: frame.id,
+            frame_name: frame.name,
+            frame_asset_path: frame.asset_path,
+            amount_buds: priceBuds,
+            status: "completed",
+            source: "store",
+            created_at: admin.firestore.FieldValue.serverTimestamp(),
+          };
+          transaction.set(purchaseRef, purchaseData);
+
+          const walletTransactionData = {
+            user_id: uid,
+            flow: "store_frame_purchase",
+            type: "debit",
+            status: "completed",
+            source: "store",
+            amount_buds: priceBuds,
+            order_id: purchaseRef.id,
+            frame_id: frame.id,
+            frame_name: frame.name,
+            buds_balance_after: nextWallet.buds_balance,
+            description: `Purchased frame ${frame.name}`,
+            created_at: admin.firestore.FieldValue.serverTimestamp(),
+          };
+          transaction.set(walletTransactionRef, walletTransactionData);
+          transaction.set(
+            walletRef.collection("transactions").doc(walletTransactionRef.id),
+            walletTransactionData,
+          );
+        }
+
+        return buildFrameStoreState(
+          uid,
+          nextWallet,
+          {
+            ...assetsData,
+            owned_frame_ids: nextOwnedFrameIds,
+            active_frame_id: nextActiveFrameId,
+          },
+          {
+            ...userData,
+            active_frame_id: nextActiveFrameId,
+            profile_frame_id: nextActiveFrameId,
+            profile_frame_asset: resolveStoreFrameAssetPath(nextActiveFrameId),
+            metadata: {
+              ...(userData.metadata || {}),
+              active_frame_id: nextActiveFrameId,
+              profile_frame_id: nextActiveFrameId,
+              profile_frame_asset: resolveStoreFrameAssetPath(nextActiveFrameId),
+            },
+          },
+        );
+      });
+
+      logger.info("Frame purchased/equipped successfully.", {
+        uid,
+        frameId: frame.id,
+      });
+      res.status(200).json(state);
+    } catch (error) {
+      if (error?.message === "INSUFFICIENT_BUDS_BALANCE") {
+        res.status(400).json({ error: "Insufficient Buds balance." });
+        return;
+      }
+      if (error?.message === "FRAME_PRICE_INVALID") {
+        res.status(400).json({ error: "Selected frame price is invalid." });
+        return;
+      }
+
+      logger.error("Failed to purchase frame.", {
+        uid,
+        frameId,
+        message: error?.message || String(error),
+      });
+      res.status(500).json({ error: "Could not complete frame purchase" });
+    }
+  },
+);
+
+exports.setActiveProfileFrame = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const requestedFrameIdRaw = String(body?.frameId || "").trim();
+    const clearFrame = requestedFrameIdRaw === "";
+    const frame = clearFrame ? null : resolveStoreFrame(requestedFrameIdRaw);
+    if (!clearFrame && !frame) {
+      res.status(400).json({ error: "Invalid frameId." });
+      return;
+    }
+
+    const walletRef = db.collection("wallets").doc(uid);
+    const userAssetsRef = db.collection("user_assets").doc(uid);
+    const userProfileRef = db.collection("users").doc(uid);
+
+    try {
+      const state = await db.runTransaction(async (transaction) => {
+        const [walletSnapshot, assetsSnapshot, userSnapshot] = await Promise.all([
+          transaction.get(walletRef),
+          transaction.get(userAssetsRef),
+          transaction.get(userProfileRef),
+        ]);
+
+        const wallet = normalizeWalletData(uid, walletSnapshot.data() || {});
+        const assetsData = assetsSnapshot.data() || {};
+        const userData = userSnapshot.data() || {};
+        const ownedFrameIds = parseOwnedFrameIds(assetsData.owned_frame_ids);
+
+        const nextActiveFrameId = clearFrame ? null : frame.id;
+        if (nextActiveFrameId && !ownedFrameIds.includes(nextActiveFrameId)) {
+          throw new Error("FRAME_NOT_OWNED");
+        }
+
+        const frameProfileFields = buildFrameProfileFields(nextActiveFrameId);
+
+        transaction.set(
+          userAssetsRef,
+          {
+            user_id: uid,
+            owned_frame_ids: ownedFrameIds,
+            active_frame_id: nextActiveFrameId,
+            created_at: assetsSnapshot.exists
+              ? assetsData.created_at || admin.firestore.FieldValue.serverTimestamp()
+              : admin.firestore.FieldValue.serverTimestamp(),
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        if (userSnapshot.exists) {
+          transaction.update(userProfileRef, {
+            ...frameProfileFields,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            userProfileRef,
+            {
+              ...frameProfileFields,
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        return buildFrameStoreState(
+          uid,
+          wallet,
+          {
+            ...assetsData,
+            owned_frame_ids: ownedFrameIds,
+            active_frame_id: nextActiveFrameId,
+          },
+          {
+            ...userData,
+            active_frame_id: nextActiveFrameId,
+            profile_frame_id: nextActiveFrameId,
+            profile_frame_asset: resolveStoreFrameAssetPath(nextActiveFrameId),
+            metadata: {
+              ...(userData.metadata || {}),
+              active_frame_id: nextActiveFrameId,
+              profile_frame_id: nextActiveFrameId,
+              profile_frame_asset: resolveStoreFrameAssetPath(nextActiveFrameId),
+            },
+          },
+        );
+      });
+
+      logger.info("Active profile frame updated.", {
+        uid,
+        activeFrameId: state.activeFrameId,
+      });
+      res.status(200).json(state);
+    } catch (error) {
+      if (error?.message === "FRAME_NOT_OWNED") {
+        res.status(400).json({ error: "You do not own this frame yet." });
+        return;
+      }
+
+      logger.error("Failed to update active profile frame.", {
+        uid,
+        frameId: requestedFrameIdRaw,
+        message: error?.message || String(error),
+      });
+      res.status(500).json({ error: "Could not update active profile frame" });
+    }
+  },
+);
+
+exports.stripeWebhook = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      logger.error("STRIPE_WEBHOOK_SECRET is not configured.");
+      res.status(500).send("Webhook secret is missing");
+      return;
+    }
+
+    const signature = req.headers["stripe-signature"];
+    if (typeof signature !== "string") {
+      res.status(400).send("Missing Stripe signature");
+      return;
+    }
+
+    let event;
+    try {
+      const stripe = getStripeClient();
+      event = stripe.webhooks.constructEvent(req.rawBody, signature, webhookSecret);
+    } catch (error) {
+      logger.error("Stripe webhook signature verification failed.", error);
+      res.status(400).send(`Webhook signature error: ${error.message}`);
+      return;
+    }
+
+    const session = event.data.object;
+    if (!session || session.object !== "checkout.session") {
+      res.status(200).send("Ignored");
+      return;
+    }
+
+    try {
+      switch (event.type) {
+        case "checkout.session.completed":
+          if (session.payment_status === "paid") {
+            await fulfillTopupOrderFromSession(session, event.id);
+          } else {
+            await markOrderStatusFromSession(session, "processing", event.id);
+          }
+          break;
+        case "checkout.session.async_payment_succeeded":
+          await fulfillTopupOrderFromSession(session, event.id);
+          break;
+        case "checkout.session.async_payment_failed":
+          await markOrderStatusFromSession(session, "failed", event.id);
+          break;
+        case "checkout.session.expired":
+          await markOrderStatusFromSession(session, "expired", event.id);
+          break;
+        default:
+          logger.info("Unhandled Stripe event type.", { type: event.type });
+      }
+
+      res.status(200).json({ received: true });
+    } catch (error) {
+      logger.error("Error processing Stripe webhook.", error);
+      res.status(500).send("Webhook handler failed");
+    }
+  },
+);
+
+exports.joinLiveRoom = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const requestedRoomId = slugifyRoomId(
+      body?.roomId || body?.roomName || `${uid}-${Date.now()}`,
+    );
+    const requestedRoomName = firstNonEmpty(
+      [body?.roomName],
+      "Untitled room",
+    ).slice(0, 80);
+      const requestedVisibility = toTrimmedString(body?.visibility).toLowerCase() === "private"
+        ? "private"
+        : "public";
+      const requestedTagline = toTrimmedString(body?.tagline).slice(0, 160);
+      const requestedLanguage = toTrimmedString(body?.language).slice(0, 32);
+      const requestedAtmosphereImageUrl = toTrimmedString(
+        body?.atmosphereImageUrl,
+      ).slice(0, 2048);
+      const requestedOverviewImageUrl = toTrimmedString(
+        body?.overviewImageUrl,
+      ).slice(0, 2048);
+      const requestedPinnedMessage = toTrimmedString(body?.pinnedMessage).slice(0, 240);
+      const requestedTags = normalizeLiveRoomTags(body?.tags);
+      const requestedGiftGoalEnabled = toBoolean(body?.giftGoalEnabled, false);
+      const requestedGiftGoalBuds = toPositiveNumber(body?.giftGoalBuds);
+      let joinStage = "load-room-service";
+
+    try {
+      joinStage = "load-room-service";
+      const roomService = getLiveKitRoomServiceClient();
+      joinStage = "load-user-profile";
+      const userSnapshot = await db.collection("users").doc(uid).get();
+      const userProfile = publicUserFields(uid, userSnapshot.data() || {});
+      const roomRef = db.collection("live_rooms").doc(requestedRoomId);
+
+      let responsePayload = null;
+
+      joinStage = "transaction";
+      await db.runTransaction(async (transaction) => {
+        const roomSnapshot = await transaction.get(roomRef);
+        const roomData = roomSnapshot.data() || {};
+        const normalizedRoom = normalizeLiveRoomData(requestedRoomId, roomData);
+        const roomExists = roomSnapshot.exists;
+        const hostId = normalizedRoom.hostId !== "" ? normalizedRoom.hostId : uid;
+        const isHost = hostId === uid;
+
+        if (roomExists && normalizedRoom.status === "ended" && !isHost) {
+          throw new Error("ROOM_ENDED");
+        }
+
+        const roomName = firstNonEmpty(
+          isHost
+            ? [requestedRoomName, normalizedRoom.roomName]
+            : [normalizedRoom.roomName, requestedRoomName],
+          "Untitled room",
+        ).slice(0, 80);
+        const hostName = isHost || normalizedRoom.hostName === ""
+          ? userProfile.displayName
+          : normalizedRoom.hostName;
+        const hostAvatarUrl = isHost || normalizedRoom.hostAvatarUrl === ""
+          ? userProfile.avatarUrl
+          : normalizedRoom.hostAvatarUrl;
+          const visibility = isHost
+            ? requestedVisibility
+            : firstNonEmpty([normalizedRoom.visibility], requestedVisibility);
+          const isPrivate = visibility === "private";
+          const atmosphereImageUrl = isHost
+            ? firstNonEmpty(
+              [requestedAtmosphereImageUrl, normalizedRoom.atmosphereImageUrl],
+              "",
+            )
+            : normalizedRoom.atmosphereImageUrl;
+          const overviewImageUrl = isHost
+            ? firstNonEmpty(
+              [requestedOverviewImageUrl, normalizedRoom.overviewImageUrl],
+              "",
+            )
+            : normalizedRoom.overviewImageUrl;
+
+          const roomDocument = {
+            room_id: requestedRoomId,
+            livekit_room_name: requestedRoomId,
+            room_name: roomName,
+          tagline: isHost
+            ? requestedTagline
+            : normalizedRoom.tagline,
+            language: isHost
+              ? requestedLanguage
+              : normalizedRoom.language,
+            tags: isHost && requestedTags.length > 0
+              ? requestedTags
+              : normalizedRoom.tags,
+            atmosphere_image_url: atmosphereImageUrl,
+            overview_image_url: overviewImageUrl,
+            visibility,
+            is_private: isPrivate,
+            host_id: hostId,
+            host_name: hostName,
+            host_avatar_url: hostAvatarUrl,
+          pinned_message: isHost
+            ? requestedPinnedMessage
+            : normalizedRoom.pinnedMessage,
+          gift_goal_enabled: isHost
+            ? requestedGiftGoalEnabled
+            : normalizedRoom.giftGoalEnabled,
+          gift_goal_buds: isHost
+            ? requestedGiftGoalBuds
+            : normalizedRoom.giftGoalBuds,
+          status: "live",
+          activated_at: roomExists
+            ? roomData.activated_at || admin.firestore.FieldValue.serverTimestamp()
+            : admin.firestore.FieldValue.serverTimestamp(),
+          created_at: roomExists
+            ? roomData.created_at || admin.firestore.FieldValue.serverTimestamp()
+            : admin.firestore.FieldValue.serverTimestamp(),
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          last_joined_at: admin.firestore.FieldValue.serverTimestamp(),
+          last_activity_at: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        transaction.set(roomRef, roomDocument, { merge: true });
+
+        responsePayload = {
+            roomId: requestedRoomId,
+            roomName,
+            tagline: roomDocument.tagline,
+            language: roomDocument.language,
+            tags: roomDocument.tags,
+            atmosphereImageUrl: roomDocument.atmosphere_image_url,
+            overviewImageUrl: roomDocument.overview_image_url,
+            visibility,
+            isPrivate,
+            hostId,
+            hostName,
+            hostAvatarUrl,
+          pinnedMessage: roomDocument.pinned_message,
+          giftGoalEnabled: roomDocument.gift_goal_enabled,
+          giftGoalBuds: roomDocument.gift_goal_buds,
+          isHost,
+          effectiveRole: isHost ? "host" : "joiner",
+        };
+      });
+
+      joinStage = "create-token";
+      const metadata = {
+        roomId: responsePayload.roomId,
+        userId: uid,
+        isHost: responsePayload.isHost,
+        avatarUrl: userProfile.avatarUrl,
+      };
+      const participantIdentity = `${uid}-${Date.now()}`;
+      const token = await createLiveKitToken({
+        identity: participantIdentity,
+        displayName: userProfile.displayName,
+        metadata,
+        roomId: responsePayload.roomId,
+        isHost: responsePayload.isHost,
+      });
+
+      joinStage = "list-rooms";
+      const roomMetadata = JSON.stringify({
+        roomId: responsePayload.roomId,
+        roomName: responsePayload.roomName,
+        hostId: responsePayload.hostId,
+        hostName: responsePayload.hostName,
+        visibility: responsePayload.visibility,
+      });
+      const existingRooms = await roomService.listRooms([responsePayload.roomId]);
+      if (existingRooms.length === 0) {
+        joinStage = "create-room";
+        await roomService.createRoom({
+          name: responsePayload.roomId,
+          metadata: roomMetadata,
+          maxParticipants: LIVE_ROOM_MAX_PARTICIPANTS,
+          emptyTimeout: LIVE_ROOM_EMPTY_TIMEOUT_SECONDS,
+          departureTimeout: LIVE_ROOM_DEPARTURE_TIMEOUT_SECONDS,
+        });
+      } else {
+        joinStage = "update-room-metadata";
+        await roomService.updateRoomMetadata(responsePayload.roomId, roomMetadata);
+      }
+
+      joinStage = "respond";
+      res.status(200).json({
+        ...responsePayload,
+        roomStatus: "live",
+        livekitUrl: getLiveKitUrl(),
+        token,
+        participantIdentity,
+      });
+    } catch (error) {
+      if (error?.message === "ROOM_ENDED") {
+        res.status(409).json({ error: "This live room has ended." });
+        return;
+      }
+
+      logger.error("Failed to join live room.", {
+        uid,
+        roomId: requestedRoomId,
+        stage: joinStage,
+        errorMessage: error?.message || String(error),
+        errorStack: error?.stack || null,
+      });
+      res.status(500).json({ error: "Could not join live room right now." });
+    }
+  },
+);
+
+exports.endLiveRoom = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const roomIdRaw = toTrimmedString(body?.roomId);
+    if (roomIdRaw === "") {
+      res.status(400).json({ error: "roomId is required." });
+      return;
+    }
+    const roomId = slugifyRoomId(roomIdRaw);
+
+    const roomRef = db.collection("live_rooms").doc(roomId);
+
+    try {
+      const roomSnapshot = await roomRef.get();
+      if (!roomSnapshot.exists) {
+        res.status(404).json({ error: "Live room not found." });
+        return;
+      }
+
+      const roomData = roomSnapshot.data() || {};
+      const hostId = toTrimmedString(roomData.host_id);
+      if (hostId === "" || hostId !== uid) {
+        res.status(403).json({ error: "Only the host can end this room." });
+        return;
+      }
+
+      await roomRef.set({
+        status: "ended",
+        ended_at: admin.firestore.FieldValue.serverTimestamp(),
+        updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        last_activity_at: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      try {
+        const roomService = getLiveKitRoomServiceClient();
+        const existingRooms = await roomService.listRooms([roomId]);
+        if (existingRooms.length > 0) {
+          await roomService.deleteRoom(roomId);
+        }
+      } catch (error) {
+        logger.warn("Failed to delete LiveKit room after ending live room.", {
+          roomId,
+          message: error?.message || String(error),
+        });
+      }
+
+      res.status(200).json({ roomId, status: "ended" });
+    } catch (error) {
+      logger.error("Failed to end live room.", {
+        uid,
+        roomId,
+        message: error?.message || String(error),
+      });
+      res.status(500).json({ error: "Could not end live room right now." });
+    }
+  },
+);
+
+exports.sendLiveRoomGift = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (applyCors(req, res)) {
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    const uid = await extractUidFromAuthorization(req);
+    if (!uid) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    let body;
+    try {
+      body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    } catch (_) {
+      res.status(400).json({ error: "Invalid JSON body" });
+      return;
+    }
+
+    const roomIdRaw = toTrimmedString(body?.roomId);
+    const giftId = toTrimmedString(body?.giftId);
+    const gift = resolveChatGift(giftId);
+    const multiplier = Math.max(1, Math.floor(toFiniteNumber(body?.multiplier, 1)));
+
+    if (roomIdRaw === "") {
+      res.status(400).json({ error: "roomId is required." });
+      return;
+    }
+    const roomId = slugifyRoomId(roomIdRaw);
+    if (!gift) {
+      res.status(400).json({ error: "Invalid giftId." });
+      return;
+    }
+
+    const roomRef = db.collection("live_rooms").doc(roomId);
+    const senderWalletRef = db.collection("wallets").doc(uid);
+    const senderUserRef = db.collection("users").doc(uid);
+    const senderUserSnapshot = await senderUserRef.get();
+    const senderUser = publicUserFields(uid, senderUserSnapshot.data() || {});
+
+    try {
+      const result = await db.runTransaction(async (transaction) => {
+        const roomSnapshot = await transaction.get(roomRef);
+        const senderWalletSnapshot = await transaction.get(senderWalletRef);
+
+        if (!roomSnapshot.exists) {
+          throw new Error("ROOM_NOT_FOUND");
+        }
+
+        const roomData = roomSnapshot.data() || {};
+        if (toTrimmedString(roomData.status, "live") === "ended") {
+          throw new Error("ROOM_ENDED");
+        }
+
+        const hostId = toTrimmedString(roomData.host_id);
+        if (hostId === "") {
+          throw new Error("ROOM_HOST_MISSING");
+        }
+        if (hostId === uid) {
+          throw new Error("CANNOT_GIFT_SELF");
+        }
+
+        const hostWalletRef = db.collection("wallets").doc(hostId);
+        const hostUserRef = db.collection("users").doc(hostId);
+        const messageRef = roomRef.collection("messages").doc();
+        const senderTxRef = db.collection("wallet_transactions").doc();
+        const hostTxRef = db.collection("wallet_transactions").doc();
+
+        const [hostWalletSnapshot, hostUserSnapshot] = await Promise.all([
+          transaction.get(hostWalletRef),
+          transaction.get(hostUserRef),
+        ]);
+
+        const senderWallet = normalizeWalletData(uid, senderWalletSnapshot.data() || {});
+        const hostWallet = normalizeWalletData(hostId, hostWalletSnapshot.data() || {});
+        const chargedBuds = roundTo2(toFiniteNumber(gift.price_buds, 0) * multiplier);
+        if (chargedBuds <= 0) {
+          throw new Error("GIFT_PRICE_INVALID");
+        }
+        if (senderWallet.buds_balance < chargedBuds) {
+          throw new Error("INSUFFICIENT_BUDS_BALANCE");
+        }
+
+        const hostIncomeUsd = roundTo2(chargedBuds * CHAT_GIFT_RECEIVER_SHARE_RATE);
+        const nextSenderWallet = {
+          ...senderWallet,
+          buds_balance: roundTo2(senderWallet.buds_balance - chargedBuds),
+          balance_buds: roundTo2(senderWallet.buds_balance - chargedBuds),
+        };
+        const nextHostWallet = {
+          ...hostWallet,
+          income_balance_usd: roundTo2(hostWallet.income_balance_usd + hostIncomeUsd),
+          wallet_income_usd: roundTo2(hostWallet.income_balance_usd + hostIncomeUsd),
+        };
+
+        transaction.set(
+          senderWalletRef,
+          {
+            ...nextSenderWallet,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+        transaction.set(
+          hostWalletRef,
+          {
+            ...nextHostWallet,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        transaction.set(
+          senderUserRef,
+          {
+            buds_balance: nextSenderWallet.buds_balance,
+            balance_buds: nextSenderWallet.buds_balance,
+            "metadata.wallet_balance_buds": nextSenderWallet.buds_balance,
+            "metadata.buds_balance": nextSenderWallet.buds_balance,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        if (hostUserSnapshot.exists) {
+          transaction.update(hostUserRef, {
+            "metadata.wallet_income_usd": nextHostWallet.income_balance_usd,
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.set(
+            hostUserRef,
+            {
+              metadata: {
+                wallet_income_usd: nextHostWallet.income_balance_usd,
+              },
+              created_at: admin.firestore.FieldValue.serverTimestamp(),
+              updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
+
+        const giftText = `Sent ${gift.name} gift x${multiplier}`;
+        transaction.set(messageRef, {
+          room_id: roomId,
+          sender_id: uid,
+          sender_name: senderUser.displayName,
+          sender_avatar_url: senderUser.avatarUrl,
+          text: giftText,
+          message_type: "gift",
+          gift_id: gift.id,
+          gift_name: gift.name,
+          gift_asset_path: gift.asset_path,
+          gift_price_buds: gift.price_buds,
+          gift_multiplier: multiplier,
+          gift_total_buds: chargedBuds,
+          receiver_id: hostId,
+          receiver_income_usd: hostIncomeUsd,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        transaction.set(roomRef, {
+          last_message_text: giftText,
+          last_message_sender_id: uid,
+          last_message_at: admin.firestore.FieldValue.serverTimestamp(),
+          last_activity_at: admin.firestore.FieldValue.serverTimestamp(),
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+        const senderTxData = {
+          user_id: uid,
+          flow: "live_room_gift_send",
+          type: "debit",
+          status: "completed",
+          source: "live_room_gift",
+          amount_buds: chargedBuds,
+          buds_balance_after: nextSenderWallet.buds_balance,
+          counterparty: hostId,
+          order_id: messageRef.id,
+          room_id: roomId,
+          gift_id: gift.id,
+          gift_name: gift.name,
+          gift_multiplier: multiplier,
+          description: `Sent ${gift.name} x${multiplier} in live room`,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        transaction.set(senderTxRef, senderTxData);
+        transaction.set(
+          senderWalletRef.collection("transactions").doc(senderTxRef.id),
+          senderTxData,
+        );
+
+        const hostTxData = {
+          user_id: hostId,
+          flow: "live_room_gift_receive",
+          type: "credit",
+          status: "completed",
+          source: "live_room_gift",
+          amount_usd: hostIncomeUsd,
+          income_balance_usd_after: nextHostWallet.income_balance_usd,
+          counterparty: uid,
+          order_id: messageRef.id,
+          room_id: roomId,
+          gift_id: gift.id,
+          gift_name: gift.name,
+          gift_multiplier: multiplier,
+          description: `Received ${gift.name} x${multiplier} in live room`,
+          created_at: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        transaction.set(hostTxRef, hostTxData);
+        transaction.set(
+          hostWalletRef.collection("transactions").doc(hostTxRef.id),
+          hostTxData,
+        );
+
+        return {
+          senderWallet: nextSenderWallet,
+          chargedBuds,
+          hostIncomeUsd,
+        };
+      });
+
+      res.status(200).json(result);
+    } catch (error) {
+      const knownErrors = {
+        ROOM_NOT_FOUND: "Live room not found.",
+        ROOM_ENDED: "This live room has ended.",
+        ROOM_HOST_MISSING: "This live room does not have a host right now.",
+        CANNOT_GIFT_SELF: "You cannot send gifts to yourself.",
+        INSUFFICIENT_BUDS_BALANCE: "Insufficient Buds balance.",
+        GIFT_PRICE_INVALID: "Selected gift price is invalid.",
+      };
+
+      if (knownErrors[error?.message]) {
+        res.status(400).json({ error: knownErrors[error.message] });
+        return;
+      }
+
+      logger.error("Failed to send live room gift.", {
+        uid,
+        roomId,
+        giftId,
+        message: error?.message || String(error),
+      });
+      res.status(500).json({ error: "Could not send gift right now." });
+    }
+  },
+);
