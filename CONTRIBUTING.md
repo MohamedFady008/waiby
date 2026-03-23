@@ -1,5 +1,6 @@
 # Contributing
-
+- Mohamed Fady Fouad Abdel-fattah
+- Eslam Magdy Selim Adel-Monam
 ## Prerequisites
 
 - Flutter SDK (stable channel)
