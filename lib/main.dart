@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -9,12 +10,19 @@ import 'controllers/creator_form_controller.dart';
 import 'controllers/home_controller.dart';
 import 'core/web/audioplayers_web_plugin_config.dart';
 import 'core/web/firebase_web_loader.dart';
+import 'core/web/mobile_web_access_gate.dart';
 import 'core/web/record_web_plugin_config.dart';
 import 'core/web/url_strategy_config.dart';
 import 'firebase_options.dart';
+import 'pages/mobile_app_only_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb && shouldRestrictMobileWebAccess()) {
+    runApp(const MobileWebRestrictedApp());
+    return;
+  }
+
   try {
     configureWebUrlStrategy();
     ensureAudioplayersWebPluginRegistered();
