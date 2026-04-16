@@ -85,7 +85,7 @@ class MobileWebRestrictedPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'The current web experience is only enabled for desktop and laptop browsers. Mobile browser access is blocked until the interface is adapted for smaller screens.',
+                      'Waiby will be available soon on Google Play and the App Store. For now, mobile browser access is limited while we prepare the mobile release.',
                       style: textTheme.titleMedium?.copyWith(
                         color: Colors.white.withValues(alpha: 0.78),
                         height: 1.5,
@@ -124,7 +124,7 @@ class MobileWebRestrictedPage extends StatelessWidget {
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Please open Waiby from a laptop or desktop browser for now. The mobile app is not published yet, and mobile web access stays disabled until that experience is ready.',
+                              'Waiby will be available soon on Google Play and the App Store. Until then, please use a laptop or desktop browser to access the web version.',
                               style: textTheme.bodyLarge?.copyWith(
                                 color: Colors.white.withValues(alpha: 0.72),
                                 height: 1.5,
